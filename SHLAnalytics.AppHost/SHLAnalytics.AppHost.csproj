@@ -1,0 +1,11 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.1.0">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <UserSecretsId>e376ce48-c44d-40a9-923b-b6977e948f5b</UserSecretsId>
+    </PropertyGroup>
+
+</Project>
