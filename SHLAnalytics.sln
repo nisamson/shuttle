@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SHLAnalytics.AppHost", "SHL
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SHLAnalytics.App", "SHLAnalytics.App\SHLAnalytics.App.csproj", "{57549977-99E9-4BE0-AD44-155BAB3103CF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SHLAnalytics.WebApi", "SHLAnalytics.WebApi\SHLAnalytics.WebApi.csproj", "{993C0371-076B-4228-9BEB-08291A0391A0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -53,6 +55,10 @@ Global
 		{57549977-99E9-4BE0-AD44-155BAB3103CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{57549977-99E9-4BE0-AD44-155BAB3103CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{57549977-99E9-4BE0-AD44-155BAB3103CF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{993C0371-076B-4228-9BEB-08291A0391A0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{993C0371-076B-4228-9BEB-08291A0391A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{993C0371-076B-4228-9BEB-08291A0391A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{993C0371-076B-4228-9BEB-08291A0391A0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

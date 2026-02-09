@@ -8,4 +8,14 @@
         <UserSecretsId>e376ce48-c44d-40a9-923b-b6977e948f5b</UserSecretsId>
     </PropertyGroup>
 
+    <ItemGroup>
+        <PackageReference Include="Aspire.Hosting.Azure.Storage"/>
+        <PackageReference Include="Aspire.Hosting.Azure.AppService"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\SHLAnalytics.App\SHLAnalytics.App.csproj"/>
+        <ProjectReference Include="..\SHLAnalytics.WebApi\SHLAnalytics.WebApi.csproj"/>
+    </ItemGroup>
+
 </Project>

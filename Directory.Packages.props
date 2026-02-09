@@ -30,10 +30,24 @@
     <PackageVersion Include="Serilog" Version="4.3.0"/>
     <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1"/>
     <PackageVersion Include="Serilog.Extensions.Hosting" Version="10.0.0"/>
+    <PackageVersion Include="Serilog.Sinks.OpenTelemetry" Version="4.2.0"/>
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.12"/>
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="9.0.12"/>
     <PackageVersion Include="CsvHelper" Version="33.1.0"/>
     <PackageVersion Include="FlexLabs.EntityFrameworkCore.Upsert" Version="9.103.0"/>
     <PackageVersion Include="System.Commandline" Version="2.0.2"/>
+    
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.2"/>
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.2"/>
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.2" PrivateAssets="all"/>
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2"/>
+    <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.1.0" />
+    <PackageVersion Include="Aspire.Hosting.Azure.AppConfiguration" Version="13.1.0" />
+    <PackageVersion Include="Aspire.Hosting.Azure.AppService" Version="13.1.0-preview.1.25616.3" />
+    <PackageVersion Include="Aspire.Hosting.Azure.AppContainers" Version="13.1.0" />
+    <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.1.0" />
+    <PackageVersion Include="Mudblazor" Version="8.15.0"/>
+    
+    <PackageVersion Include="Nerdbank.GitVersioning" Version="3.9.50"/>
   </ItemGroup>
 </Project>
