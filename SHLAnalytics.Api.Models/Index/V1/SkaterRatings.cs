@@ -1,0 +1,41 @@
+﻿using SHLAnalytics.Api.Models.Common;
+using SHLAnalytics.Api.Models.Common.Mixins;
+
+namespace SHLAnalytics.Api.Models.Index.V1;
+
+
+
+public record SkaterRatings(
+    int Id,
+    int League,
+    int Season,
+    int Screening,
+    int GettingOpen,
+    int Passing,
+    int Puckhandling,
+    int ShootingAccuracy,
+    int ShootingRange,
+    int OffensiveRead,
+    int Agression,
+    int Bravery,
+    int Determination,
+    int TeamPlayer,
+    int Leadership,
+    int Temperament,
+    int Professionalism,
+    int Checking,
+    int Stickchecking,
+    int Hitting,
+    int Positioning,
+    int ShotBlocking,
+    int StickChecking,
+    int DefensiveRead,
+    int Acceleration,
+    int Agility,
+    int Balance,
+    int Speed,
+    int Stamina,
+    int Strength,
+    int Fighting,
+    int AppliedTpe
+) : IHasId, ILeagueSeason, ISkaterRatings;

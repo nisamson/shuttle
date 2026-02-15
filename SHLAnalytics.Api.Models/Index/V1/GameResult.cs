@@ -3,6 +3,7 @@
 namespace SHLAnalytics.Api.Models.Index.V1;
 
 public record GameResult(
+    int GameId,
     int Season,
     int League,
     [property: JsonConverter(typeof(ShlDateConverter))]

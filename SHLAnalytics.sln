@@ -17,9 +17,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SHLAnalytics.EloCalc", "SHL
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SHLAnalytics.AppHost", "SHLAnalytics.AppHost\SHLAnalytics.AppHost.csproj", "{15DD3091-74E5-48FD-9D2A-B818DAD29051}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SHLAnalytics.App", "SHLAnalytics.App\SHLAnalytics.App.csproj", "{57549977-99E9-4BE0-AD44-155BAB3103CF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SHLAnalytics.WebApp", "SHLAnalytics.WebApp\SHLAnalytics.WebApp.csproj", "{2B9EDB95-21AF-4652-98EA-5C0089465F4E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SHLAnalytics.WebApi", "SHLAnalytics.WebApi\SHLAnalytics.WebApi.csproj", "{993C0371-076B-4228-9BEB-08291A0391A0}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SHLAnalytics.EFCore", "SHLAnalytics.EFCore\SHLAnalytics.EFCore.csproj", "{C924634D-F2F0-40B7-ABE5-BBEF00F89613}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -51,14 +51,14 @@ Global
 		{15DD3091-74E5-48FD-9D2A-B818DAD29051}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{15DD3091-74E5-48FD-9D2A-B818DAD29051}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{15DD3091-74E5-48FD-9D2A-B818DAD29051}.Release|Any CPU.Build.0 = Release|Any CPU
-		{57549977-99E9-4BE0-AD44-155BAB3103CF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{57549977-99E9-4BE0-AD44-155BAB3103CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{57549977-99E9-4BE0-AD44-155BAB3103CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{57549977-99E9-4BE0-AD44-155BAB3103CF}.Release|Any CPU.Build.0 = Release|Any CPU
-		{993C0371-076B-4228-9BEB-08291A0391A0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{993C0371-076B-4228-9BEB-08291A0391A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{993C0371-076B-4228-9BEB-08291A0391A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{993C0371-076B-4228-9BEB-08291A0391A0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2B9EDB95-21AF-4652-98EA-5C0089465F4E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2B9EDB95-21AF-4652-98EA-5C0089465F4E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2B9EDB95-21AF-4652-98EA-5C0089465F4E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2B9EDB95-21AF-4652-98EA-5C0089465F4E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C924634D-F2F0-40B7-ABE5-BBEF00F89613}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C924634D-F2F0-40B7-ABE5-BBEF00F89613}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C924634D-F2F0-40B7-ABE5-BBEF00F89613}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C924634D-F2F0-40B7-ABE5-BBEF00F89613}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

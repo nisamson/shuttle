@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    </PropertyGroup>
+    
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+        <PackageReference Include="Mudblazor"/>
+        <PackageReference Include="Aspire.Azure.Storage.Blobs"/>
+        <PackageReference Include="Serilog"/>
+        <PackageReference Include="Serilog.Sinks.Console"/>
+        <PackageReference Include="Serilog.Extensions.Hosting"/>
+        <PackageReference Include="Serilog.Sinks.OpenTelemetry"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design"/>
+        <PackageReference Include="FlexLabs.EntityFrameworkCore.Upsert"/>
+        <PackageReference Include="Nerdbank.GitVersioning"/>
+        
+        <PackageReference Include="Quartz"/>
+        <PackageReference Include="Quartz.AspNetCore"/>
+        <PackageReference Include="Quartz.Serialization.SystemTextJson"/>
+        
+        <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded"/>
+    </ItemGroup>
+    
+    <ItemGroup>
+      <Folder Include="Components\Authentication\" />
+      <Folder Include="wwwroot\" />
+      <EmbeddedResource Include="Services\Jobs\quartz_sqlite_init.sql" />
+    </ItemGroup>
+
+</Project>

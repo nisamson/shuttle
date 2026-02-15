@@ -1,5 +1,6 @@
 ﻿using SHLAnalytics.Api.Models.Index.V1;
 using SHLAnalytics.Math;
+using Player = SHLAnalytics.Math.Player;
 
 namespace SHLAnalytics.EloCalc;
 
