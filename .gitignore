@@ -482,3 +482,7 @@ $RECYCLE.BIN/
 *.swp
 
 Analysis/
+
+*.db
+*.sqlite
+*.sqlite3

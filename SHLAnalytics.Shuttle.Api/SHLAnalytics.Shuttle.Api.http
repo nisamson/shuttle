@@ -1,0 +1,6 @@
+@SHLAnalytics.Shuttle.Api_HostAddress = http://localhost:5279
+
+GET {{SHLAnalytics.Shuttle.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

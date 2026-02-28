@@ -13,7 +13,7 @@ public record Team : IEntityConvertible<Team, Api.Models.Index.V1.Team> {
     public int TeamId { get; set; }
     public int Season { get; set; }
     public int LeagueId { get; set; }
-    public int DivisionId { get; set; }
+    public int? DivisionId { get; set; }
     
     public int ConferenceId { get; set; }
     

@@ -37,7 +37,6 @@ public class SkaterRatings : ISkaterRatings, IEntityConvertible<SkaterRatings, A
     public required int Strength { get; set; }
     public required int Fighting { get; set; }
     public required int AppliedTpe { get; set; }
-    public DateTimeOffset LastUpdated { get; set; } = DateTimeOffset.UtcNow;
     
     public Player? Player { get; }
     public LeagueSeason? LeagueSeason { get; }
@@ -124,8 +123,7 @@ public class SkaterRatings : ISkaterRatings, IEntityConvertible<SkaterRatings, A
         if (!(this as ISkaterRatings).RatingsChanged(ratings)) {
             return false;
         }
-
-        LastUpdated = DateTimeOffset.UtcNow;
+        
         Screening = ratings.Screening;
         GettingOpen = ratings.GettingOpen;
         Passing = ratings.Passing;
@@ -162,8 +160,10 @@ public class SkaterRatings : ISkaterRatings, IEntityConvertible<SkaterRatings, A
 
 public class SkaterRatingsEntityConfiguration : IEntityTypeConfiguration<SkaterRatings> {
     public void Configure(EntityTypeBuilder<SkaterRatings> builder) {
+        builder.AddTemporalTableSupport();
         builder.HasKey(r => new { r.PlayerId, r.Season, r.LeagueId });
-        builder.HasIndex(r => new { r.PlayerId, r.LastUpdated });
+        builder.HasIndex(r => new { r.PlayerId, ValidFrom = EF.Property<DateTime>(r, Constants.ValidFrom) });
+        builder.HasIndex(r => new { r.PlayerId, r.Season, ValidFrom = EF.Property<DateTime>(r, Constants.ValidFrom) });
         builder.HasOne<Player>()
             .WithMany()
             .HasForeignKey(p => p.PlayerId)

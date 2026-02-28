@@ -48,7 +48,7 @@ public static class JobsExtensions {
     public static void AddJobs(this IServiceCollection services, string dbPath) {
         services.AddQuartz(c => {
             c.UsePersistentStore(opt => {
-                opt.UseSQLite(GetQuartzConnectionString(dbPath));
+                opt.UseMicrosoftSQLite(GetQuartzConnectionString(dbPath));
                 opt.UseProperties = true;
                 opt.UseSystemTextJsonSerializer();
             });
