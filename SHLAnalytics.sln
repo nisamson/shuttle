@@ -23,6 +23,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SHLAnalytics.Shuttle", "SHL
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SHLAnalytics.Shuttle.Api", "SHLAnalytics.Shuttle.Api\SHLAnalytics.Shuttle.Api.csproj", "{60CEB156-9559-4278-8045-5670C6F9084C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SHLAnalytics.ML.CV", "SHLAnalytics.ML.CV\SHLAnalytics.ML.CV.csproj", "{27124197-370F-4175-BDA4-3DAE36FA9D6B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SHLAnalytics.Core", "SHLAnalytics.Core\SHLAnalytics.Core.csproj", "{A5BE64DE-9596-491D-940B-17F85C87665F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SHLAnalytics.ML.CV.Trainer", "SHLAnalytics.ML.CV.Trainer\SHLAnalytics.ML.CV.Trainer.csproj", "{DD3DDE31-5431-4EE3-962D-281029C0FB86}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -77,6 +83,18 @@ Global
 		{60CEB156-9559-4278-8045-5670C6F9084C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{60CEB156-9559-4278-8045-5670C6F9084C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{60CEB156-9559-4278-8045-5670C6F9084C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{27124197-370F-4175-BDA4-3DAE36FA9D6B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{27124197-370F-4175-BDA4-3DAE36FA9D6B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{27124197-370F-4175-BDA4-3DAE36FA9D6B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{27124197-370F-4175-BDA4-3DAE36FA9D6B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A5BE64DE-9596-491D-940B-17F85C87665F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A5BE64DE-9596-491D-940B-17F85C87665F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A5BE64DE-9596-491D-940B-17F85C87665F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A5BE64DE-9596-491D-940B-17F85C87665F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DD3DDE31-5431-4EE3-962D-281029C0FB86}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DD3DDE31-5431-4EE3-962D-281029C0FB86}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DD3DDE31-5431-4EE3-962D-281029C0FB86}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DD3DDE31-5431-4EE3-962D-281029C0FB86}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
