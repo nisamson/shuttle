@@ -1,13 +1,10 @@
-﻿using System.Net;
-using System.Runtime.CompilerServices;
-using System.Text.Json.Serialization;
-using Newtonsoft.Json;
+﻿using System.Runtime.CompilerServices;
 using SHLAnalytics.Api.Client;
 using SHLAnalytics.Api.Client.Raw.Index;
 using SHLAnalytics.EFCore.SiteArchive;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
-namespace SHLAnalytics.Shuttle.Api.Services;
+namespace SHLAnalytics.Shuttle.Api.Services.Crawlers;
 
 public class IndexCrawler : IApiCrawler {
     private readonly ILogger<IndexCrawler> logger;

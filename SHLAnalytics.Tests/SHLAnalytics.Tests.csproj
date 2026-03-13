@@ -34,4 +34,8 @@
     <Folder Include="Utilites\Serialization\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Serialization\Portal\portalPlayers.json" />
+  </ItemGroup>
+
 </Project>

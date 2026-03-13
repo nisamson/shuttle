@@ -2,7 +2,7 @@
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SHLAnalytics.Api.Models.Common;
 
-namespace SHLAnalytics.EFCore.Entities;
+namespace SHLAnalytics.EFCore.Entities.Index;
 
 public class GameResult : IEntityConvertible<GameResult, Api.Models.Index.V1.GameResult> {
 

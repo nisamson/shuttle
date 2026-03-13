@@ -1,6 +1,6 @@
 ﻿using SHLAnalytics.EFCore.SiteArchive;
 
-namespace SHLAnalytics.Shuttle.Api.Services;
+namespace SHLAnalytics.Shuttle.Api.Services.Crawlers;
 
 public class PortalCrawler : IApiCrawler {
     private readonly ILogger<PortalCrawler> logger;

@@ -1,12 +1,9 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.Diagnostics.CodeAnalysis;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SHLAnalytics.Api.Models.Common;
 
-namespace SHLAnalytics.EFCore.Entities;
-
-using Microsoft.EntityFrameworkCore;
+namespace SHLAnalytics.EFCore.Entities.Index;
 
 public record League : IEntityConvertible<League, Api.Models.Index.V1.League> {
 

@@ -1,6 +1,6 @@
 ﻿using SHLAnalytics.EFCore.SiteArchive;
 
-namespace SHLAnalytics.Shuttle.Api.Services;
+namespace SHLAnalytics.Shuttle.Api.Services.Crawlers;
 
 public interface IApiCrawler {
 

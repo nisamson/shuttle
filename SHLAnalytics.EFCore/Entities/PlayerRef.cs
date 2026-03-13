@@ -5,24 +5,24 @@ using SHLAnalytics.Api.Models.Index.V1;
 
 namespace SHLAnalytics.EFCore.Entities;
 
-public class Player : IEntityConvertible<Player, PlayerRef> {
+public class PlayerRef : IEntityConvertible<PlayerRef, Api.Models.Index.V1.PlayerRef> {
     public required int Id { get; set; }
     [MaxLength(256)]
     public required string Name { get; set; }
 
-    public static Player From(PlayerRef original) {
+    public static PlayerRef From(Api.Models.Index.V1.PlayerRef original) {
         return new() {
             Id = original.Id,
             Name = original.Name
         };
     }
-    public PlayerRef To() {
+    public Api.Models.Index.V1.PlayerRef To() {
         return new(Id, Name);
     }
 }
 
-public class PlayerEntityConfiguration : IEntityTypeConfiguration<Player> {
-    public void Configure(EntityTypeBuilder<Player> builder) {
+public class PlayerEntityConfiguration : IEntityTypeConfiguration<PlayerRef> {
+    public void Configure(EntityTypeBuilder<PlayerRef> builder) {
         builder.HasKey(p => p.Id);
         builder.HasIndex(p => p.Name);
     }

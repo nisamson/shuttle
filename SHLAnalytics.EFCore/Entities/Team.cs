@@ -3,6 +3,9 @@ using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SHLAnalytics.Api.Models.Index.V1;
+using Conference = SHLAnalytics.EFCore.Entities.Index.Conference;
+using Division = SHLAnalytics.EFCore.Entities.Index.Division;
+using League = SHLAnalytics.EFCore.Entities.Index.League;
 
 namespace SHLAnalytics.EFCore.Entities;
 

@@ -1,8 +1,6 @@
-﻿using System.Threading.Tasks.Dataflow;
-using SHLAnalytics.EFCore.SiteArchive;
-using SHLAnalytics.Shuttle.Api.Utilites;
+﻿using SHLAnalytics.EFCore.SiteArchive;
 
-namespace SHLAnalytics.Shuttle.Api.Services;
+namespace SHLAnalytics.Shuttle.Api.Services.Crawlers;
 
 public class ShlCrawler : IApiCrawler {
     private readonly ILogger<ShlCrawler> logger;

@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 using SHLAnalytics.Api.Models.Common;
 
 namespace SHLAnalytics.Api.Models.Index.V1;
-using Positions = IDictionary<SkaterPosition, PlayerRef>;
+using Positions = IDictionary<PlayerPosition, PlayerRef>;
 
 public record Lineup();
 

@@ -58,8 +58,7 @@ public abstract record CommonCliOptions {
     public static CommonCliOptions FromResult(ParseResult parseResult) {
         var commandName = parseResult.CommandResult.Command.Name;
         var result = commandName switch {
-            SplitterOptions.SplitCommandName => SplitterOptions.FromResult(parseResult.CommandResult) as CommonCliOptions,
-            DedupOptions.DedupCommandName => DedupOptions.FromResult(parseResult.CommandResult),
+            DedupOptions.DedupCommandName => DedupOptions.FromResult(parseResult.CommandResult) as CommonCliOptions,
             _ => throw new ArgumentException($"Unknown command: {parseResult.CommandResult.Command.Name}")
         } ;
         result.LoggingPath = parseResult.GetValue<FileInfo>(LoggingPathArg);
@@ -74,33 +73,8 @@ public abstract record CommonCliOptions {
 
     public static RootCommand CreateRootWithSubcommands() {
         var root = CreateRoot();
-        SplitterOptions.AddToRoot(root);
         DedupOptions.AddToRoot(root);
         return root;
-    }
-}
-
-public record SplitterOptions : CommonCliOptions {
-    public const string SplitCommandName = "split";
-    private const string VideoPathArg = "video-path";
-
-    public required FileInfo VideoPath { get; set; }
-
-    public static void AddToRoot(RootCommand root) {
-        var command = new Command(SplitCommandName, "Splits a video into frames and saves them to the output directory.");
-        var videoPathArg = new Argument<FileInfo>(VideoPathArg) {
-            Description = "The path to the video file to split.",
-        }.AcceptExistingOnly();
-        command.Arguments.Add(videoPathArg);
-        root.Subcommands.Add(command);
-    }
-
-    public static SplitterOptions FromResult(CommandResult commandResult) {
-        ArgumentOutOfRangeException.ThrowIfNotEqual(commandResult.Command.Name, SplitCommandName);
-        var options = new SplitterOptions {
-            VideoPath = commandResult.GetRequiredValue<FileInfo>(VideoPathArg)
-        };
-        return options;
     }
 }
 

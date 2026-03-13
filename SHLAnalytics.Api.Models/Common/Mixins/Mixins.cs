@@ -1,4 +1,4 @@
-﻿namespace SHLAnalytics.Api.Models.Common;
+﻿namespace SHLAnalytics.Api.Models.Common.Mixins;
 
 public interface IHasId {
     int Id { get; }

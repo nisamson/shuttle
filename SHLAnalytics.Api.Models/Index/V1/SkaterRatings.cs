@@ -16,7 +16,7 @@ public record SkaterRatings(
     int ShootingAccuracy,
     int ShootingRange,
     int OffensiveRead,
-    int Agression,
+    int Aggression,
     int Bravery,
     int Determination,
     int TeamPlayer,
@@ -37,5 +37,6 @@ public record SkaterRatings(
     int Stamina,
     int Strength,
     int Fighting,
-    int AppliedTpe
+    int AppliedTpe,
+    int Faceoffs
 ) : IHasId, ILeagueSeason, ISkaterRatings;

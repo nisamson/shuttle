@@ -1,4 +1,5 @@
 ﻿using SHLAnalytics.Api.Models.Common;
+using SHLAnalytics.Api.Models.Common.Mixins;
 
 namespace SHLAnalytics.Api.Models.Index.V1;
 

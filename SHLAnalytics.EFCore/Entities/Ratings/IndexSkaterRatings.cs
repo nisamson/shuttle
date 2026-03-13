@@ -1,10 +1,11 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SHLAnalytics.Api.Models.Common.Mixins;
+using SHLAnalytics.EFCore.Entities.Index;
 
-namespace SHLAnalytics.EFCore.Entities;
+namespace SHLAnalytics.EFCore.Entities.Ratings;
 
-public class SkaterRatings : ISkaterRatings, IEntityConvertible<SkaterRatings, Api.Models.Index.V1.SkaterRatings> {
+public class IndexSkaterRatings : ISkaterRatings, IEntityConvertible<IndexSkaterRatings, Api.Models.Index.V1.SkaterRatings> {
     public required int PlayerId { get; set; }
     public required int Season { get; set; }
     public required int LeagueId { get; set; }
@@ -15,7 +16,7 @@ public class SkaterRatings : ISkaterRatings, IEntityConvertible<SkaterRatings, A
     public required int ShootingAccuracy { get; set; }
     public required int ShootingRange { get; set; }
     public required int OffensiveRead { get; set; }
-    public required int Agression { get; set; }
+    public required int Aggression { get; set; }
     public required int Bravery { get; set; }
     public required int Determination { get; set; }
     public required int TeamPlayer { get; set; }
@@ -37,11 +38,12 @@ public class SkaterRatings : ISkaterRatings, IEntityConvertible<SkaterRatings, A
     public required int Strength { get; set; }
     public required int Fighting { get; set; }
     public required int AppliedTpe { get; set; }
+    public required int Faceoffs { get; set; }
     
-    public Player? Player { get; }
+    public PlayerRef? Player { get; }
     public LeagueSeason? LeagueSeason { get; }
     
-    public static SkaterRatings From(Api.Models.Index.V1.SkaterRatings original) {
+    public static IndexSkaterRatings From(Api.Models.Index.V1.SkaterRatings original) {
         return new() {
             PlayerId = original.Id,
             Season = original.Season,
@@ -53,7 +55,7 @@ public class SkaterRatings : ISkaterRatings, IEntityConvertible<SkaterRatings, A
             ShootingAccuracy = original.ShootingAccuracy,
             ShootingRange = original.ShootingRange,
             OffensiveRead = original.OffensiveRead,
-            Agression = original.Agression,
+            Aggression = original.Aggression,
             Bravery = original.Bravery,
             Determination = original.Determination,
             TeamPlayer = original.TeamPlayer,
@@ -74,7 +76,8 @@ public class SkaterRatings : ISkaterRatings, IEntityConvertible<SkaterRatings, A
             Stamina = original.Stamina,
             Strength = original.Strength,
             Fighting = original.Fighting,
-            AppliedTpe = original.AppliedTpe
+            AppliedTpe = original.AppliedTpe,
+            Faceoffs = original.Faceoffs
         };
     }
     public Api.Models.Index.V1.SkaterRatings To() {
@@ -89,7 +92,7 @@ public class SkaterRatings : ISkaterRatings, IEntityConvertible<SkaterRatings, A
             ShootingAccuracy,
             ShootingRange,
             OffensiveRead,
-            Agression,
+            Aggression,
             Bravery,
             Determination,
             TeamPlayer,
@@ -110,7 +113,8 @@ public class SkaterRatings : ISkaterRatings, IEntityConvertible<SkaterRatings, A
             Stamina,
             Strength,
             Fighting,
-            AppliedTpe
+            AppliedTpe,
+            Faceoffs
             );
     }
 
@@ -131,7 +135,7 @@ public class SkaterRatings : ISkaterRatings, IEntityConvertible<SkaterRatings, A
         ShootingAccuracy = ratings.ShootingAccuracy;
         ShootingRange = ratings.ShootingRange;
         OffensiveRead = ratings.OffensiveRead;
-        Agression = ratings.Agression;
+        Aggression = ratings.Aggression;
         Bravery = ratings.Bravery;
         Determination = ratings.Determination;
         TeamPlayer = ratings.TeamPlayer;
@@ -153,18 +157,19 @@ public class SkaterRatings : ISkaterRatings, IEntityConvertible<SkaterRatings, A
         Strength = ratings.Strength;
         Fighting = ratings.Fighting;
         AppliedTpe = ratings.AppliedTpe;
+        Faceoffs = ratings.Faceoffs;
         
         return true;
     }
 }
 
-public class SkaterRatingsEntityConfiguration : IEntityTypeConfiguration<SkaterRatings> {
-    public void Configure(EntityTypeBuilder<SkaterRatings> builder) {
+public class SkaterRatingsEntityConfiguration : IEntityTypeConfiguration<IndexSkaterRatings> {
+    public void Configure(EntityTypeBuilder<IndexSkaterRatings> builder) {
         builder.AddTemporalTableSupport();
         builder.HasKey(r => new { r.PlayerId, r.Season, r.LeagueId });
         builder.HasIndex(r => new { r.PlayerId, ValidFrom = EF.Property<DateTime>(r, Constants.ValidFrom) });
         builder.HasIndex(r => new { r.PlayerId, r.Season, ValidFrom = EF.Property<DateTime>(r, Constants.ValidFrom) });
-        builder.HasOne<Player>()
+        builder.HasOne<PlayerRef>()
             .WithMany()
             .HasForeignKey(p => p.PlayerId)
             .OnDelete(DeleteBehavior.Cascade)

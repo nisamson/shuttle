@@ -14,7 +14,7 @@ public record GoaltenderRatings(
     int Professionalism,
     int Positioning,
     int Passing,
-    int PokeChecking,
+    int PokeCheck,
     int Blocker,
     int Glove,
     int Rebound,

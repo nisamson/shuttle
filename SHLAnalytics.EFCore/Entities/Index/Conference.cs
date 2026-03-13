@@ -2,7 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace SHLAnalytics.EFCore.Entities;
+namespace SHLAnalytics.EFCore.Entities.Index;
 
 public record Conference : IEntityConvertible<Conference, Api.Models.Index.V1.Conference> {
     public int Id { get; set; }

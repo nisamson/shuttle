@@ -1,4 +1,6 @@
-﻿namespace SHLAnalytics.Api.Models.Common.Mixins;
+﻿using System.Text.Json.Serialization;
+
+namespace SHLAnalytics.Api.Models.Common.Mixins;
 
 public interface IOffensiveRatings {
     int Screening { get; }
@@ -11,7 +13,7 @@ public interface IOffensiveRatings {
 }
 
 public interface IMentalRatings {
-    int Agression { get; }
+    int Aggression { get; }
     int Bravery { get; }
     int Determination { get; }
     int TeamPlayer { get; }
@@ -26,8 +28,8 @@ public interface IDefensiveRatings {
     int Hitting { get; }
     int Positioning { get; }
     int ShotBlocking { get; }
-    int StickChecking { get; }
     int DefensiveRead { get; }
+    int Faceoffs { get; }
 }
 
 public interface IPhysicalRatings {
@@ -41,7 +43,6 @@ public interface IPhysicalRatings {
 }
 
 public interface ISkaterRatings : IOffensiveRatings, IMentalRatings, IDefensiveRatings, IPhysicalRatings {
-    int AppliedTpe { get; }
     
     bool RatingsChanged(ISkaterRatings other) =>
         Screening != other.Screening ||
@@ -51,7 +52,7 @@ public interface ISkaterRatings : IOffensiveRatings, IMentalRatings, IDefensiveR
         ShootingAccuracy != other.ShootingAccuracy ||
         ShootingRange != other.ShootingRange ||
         OffensiveRead != other.OffensiveRead ||
-        Agression != other.Agression ||
+        Aggression != other.Aggression ||
         Bravery != other.Bravery ||
         Determination != other.Determination ||
         TeamPlayer != other.TeamPlayer ||
@@ -63,7 +64,6 @@ public interface ISkaterRatings : IOffensiveRatings, IMentalRatings, IDefensiveR
         Hitting != other.Hitting ||
         Positioning != other.Positioning ||
         ShotBlocking != other.ShotBlocking ||
-        StickChecking != other.StickChecking ||
         DefensiveRead != other.DefensiveRead ||
         Acceleration != other.Acceleration ||
         Agility != other.Agility ||
@@ -77,7 +77,7 @@ public interface ISkaterRatings : IOffensiveRatings, IMentalRatings, IDefensiveR
 public interface IGoaltendingTechniqueRatings {
     int Positioning { get; }
     int Passing { get; }
-    int PokeChecking { get; }
+    int PokeCheck { get; }
     int Blocker { get; }
     int Glove { get; }
     int Rebound { get; }
@@ -99,5 +99,4 @@ public interface IGoaltendingMentalRatings {
 }
 
 public interface IGoaltenderRatings : IGoaltendingMentalRatings, IGoaltendingTechniqueRatings {
-    int AppliedTpe { get; }
 };

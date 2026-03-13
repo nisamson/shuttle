@@ -486,3 +486,5 @@ Analysis/
 *.db
 *.sqlite
 *.sqlite3
+
+docs/nocommit

@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace SHLAnalytics.EFCore.Entities;
+namespace SHLAnalytics.EFCore.Entities.Index;
 
 public record Division : IEntityConvertible<Division, Api.Models.Index.V1.Division> {
     public int Id { get; set; }
@@ -31,7 +31,7 @@ public record Division : IEntityConvertible<Division, Api.Models.Index.V1.Divisi
 public class DivisionEntityConfiguration : IEntityTypeConfiguration<Division> {
 
     public void Configure(EntityTypeBuilder<Division> builder) {
-        builder.HasKey(d => new { d.Id, d.Season, d.LeagueId });
+        builder.HasKey(d => new { d.Id, d.Season, d.LeagueId, d.ConferenceId });
         builder.HasOne<Conference>(d => d.Conference)
             .WithMany()
             .HasForeignKey(d => new { d.ConferenceId, d.LeagueId, d.Season })

@@ -1,5 +1,8 @@
-﻿namespace SHLAnalytics.Api.Models.Common;
+﻿using System.Text.Json.Serialization;
 
+namespace SHLAnalytics.Api.Models.Common;
+
+[JsonConverter(typeof(JsonStringEnumConverter<KnownLeague>))]
 public enum KnownLeague {
     Shl = 0,
     Smjhl = 1,

@@ -42,4 +42,8 @@
       <ProjectReference Include="..\SHLAnalytics.Api.Client\SHLAnalytics.Api.Client.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="Services\Portal\" />
+    </ItemGroup>
+
 </Project>

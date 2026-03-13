@@ -21,10 +21,7 @@
 
         <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
         
-        <!-- Included due to transitive vulnerabilities -->
         <PackageReference Include="SixLabors.ImageSharp" />
-
-        <PackageReference Include="FFMediaToolkit" />
     </ItemGroup>
 
 </Project>

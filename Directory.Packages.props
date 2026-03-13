@@ -82,7 +82,6 @@
 
     <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.3" />
 
-    <PackageVersion Include="FFMediaToolkit" Version="4.8.1" />
-    <PackageVersion Include="SixLabors.ImageSharp" Version="2.1.13" />
+    <PackageVersion Include="SixLabors.ImageSharp" Version="3.1.12" />
   </ItemGroup>
 </Project>
