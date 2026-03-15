@@ -4,46 +4,42 @@
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
+        <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
         <UserSecretsId>3bc9b9d-9d6a-45d4-8429-2a2761773502</UserSecretsId>
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Aspire.Microsoft.Data.SqlClient" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" NoWarn="NU1605"/>
         <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" NoWarn="NU1605"/>
         <PackageReference Include="Microsoft.AspNetCore.OpenApi"/>
-        <PackageReference Include="Microsoft.Identity.Web" />
-        <PackageReference Include="Microsoft.Identity.Web.DownstreamApi" />
+        <PackageReference Include="Microsoft.Identity.Web"/>
+        <PackageReference Include="Microsoft.Identity.Web.DownstreamApi"/>
 
-        <PackageReference Include="Serilog" />
-        <PackageReference Include="Azure.Identity" />
-        <PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" />
-        <PackageReference Include="Serilog.Sinks.Console" />
-        <PackageReference Include="Serilog.Extensions.Hosting" />
-        <PackageReference Include="Serilog.Sinks.OpenTelemetry" />
-        <PackageReference Include="Microsoft.EntityFrameworkCore" />
-        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
+        <PackageReference Include="Serilog"/>
+        <PackageReference Include="Azure.Identity"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer"/>
         <PackageReference Include="linq2db.EntityFrameworkCore"/>
-        <PackageReference Include="Nerdbank.GitVersioning" />
+        <PackageReference Include="Nerdbank.GitVersioning"/>
 
-        <PackageReference Include="Quartz" />
-        <PackageReference Include="Quartz.AspNetCore" />
-        <PackageReference Include="Quartz.Serialization.SystemTextJson" />
-        
-        <PackageReference Include="Polly.Core" />
-        <PackageReference Include="Polly.RateLimiting" />
-        <PackageReference Include="Polly.Extensions" />
-        
+        <PackageReference Include="Polly.Core"/>
+        <PackageReference Include="Polly.RateLimiting"/>
+        <PackageReference Include="Polly.Extensions"/>
+
         <PackageReference Include="System.Linq.Async"/>
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\SHLAnalytics.EFCore\SHLAnalytics.EFCore.csproj" />
-      <ProjectReference Include="..\SHLAnalytics.Api.Client\SHLAnalytics.Api.Client.csproj" />
+        <ProjectReference Include="..\SHLAnalytics.EFCore\SHLAnalytics.EFCore.csproj"/>
+        <ProjectReference Include="..\SHLAnalytics.Api.Client\SHLAnalytics.Api.Client.csproj"/>
+        <ProjectReference Include="..\Shuttle.ServiceDefaults\Shuttle.ServiceDefaults.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Services\Portal\" />
+        <Folder Include="Services\Portal\"/>
+        <Folder Include="Services\Services\" />
     </ItemGroup>
 
 </Project>

@@ -21,6 +21,7 @@
 
 
   <ItemGroup>
+    <ProjectReference Include="..\SHLAnalytics.Core\SHLAnalytics.Core.csproj" />
     <ProjectReference Include="..\SHLAnalytics.Math\SHLAnalytics.Math.csproj" />
     <ProjectReference Include="..\SHLAnalytics.Shuttle.Api\SHLAnalytics.Shuttle.Api.csproj" />
   </ItemGroup>

@@ -22,10 +22,6 @@ Log.Logger.Debug("Bootstrap logger configured.");
 var options = CommonCliOptions.FromResult(parseResult);
 
 switch (options) {
-    case SplitterOptions splitterOptions:
-        builder.Services.AddSingleton(splitterOptions);
-        builder.Services.AddScoped<ICommand, SplitCommand>();
-        break;
     case DedupOptions dedupOptions:
         builder.Services.AddSingleton(dedupOptions);
         builder.Services.AddScoped<ICommand, DedupCommand>();

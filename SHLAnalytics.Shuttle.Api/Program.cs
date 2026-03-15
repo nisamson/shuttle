@@ -8,13 +8,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
 using Serilog;
 using SHLAnalytics.Shuttle.Api.Entities;
+using Shuttle.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
 
-Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Debug()
-    .WriteTo.Console() // + file or centralized logging
-    .CreateLogger();
+builder.AddServiceDefaults();
 
 // Add services to the container.
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -27,6 +25,8 @@ var corsOrigins = builder.Configuration
 if (corsOrigins?.Length is not > 0 && !builder.Environment.IsDevelopment()) {
     throw new InvalidOperationException("Allowed CORS origins must be configured in production.");
 }
+
+builder.Services.AddAntiforgery();
 
 builder.Services.AddCors(options => {
         options.AddDefaultPolicy(policy => {
@@ -45,31 +45,11 @@ builder.Services.AddCors(options => {
 
 builder.Services.AddControllers();
 
-builder.Services.AddSerilog(
-    lc => {
-        lc.WriteTo.Console();
-        lc.MinimumLevel.Information();
-    },
-    writeToProviders: true
-);
-
-builder.Services.AddOpenTelemetry()
-    .UseAzureMonitor(opt => {
-            if (builder.Environment.IsDevelopment()) {
-                opt.ConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"];
-            }
-        }
-    );
-
-builder.Logging.AddOpenTelemetry(l => { l.IncludeScopes = true; }
-);
-
-var databaseName = builder.Configuration["Database:DatabaseName"];
+var databaseName = Environment.GetEnvironmentVariable("DATABASE_NAME");
 ArgumentException.ThrowIfNullOrWhiteSpace(databaseName);
 
-var databaseUrl = builder.Configuration["Database:DatabaseUrl"]
-    ?? Environment.GetEnvironmentVariable("DATABASE_URL");
-ArgumentException.ThrowIfNullOrEmpty(databaseUrl);
+var dbServer = Environment.GetEnvironmentVariable("SHUTTLESQLSERVER_URI");
+ArgumentException.ThrowIfNullOrWhiteSpace(dbServer);
 
 var authMethod = SqlAuthenticationMethod.ActiveDirectoryDefault;
 if (builder.Environment.IsDevelopment()) {
@@ -77,7 +57,7 @@ if (builder.Environment.IsDevelopment()) {
 }
 
 var connectionStringBuilder = new SqlConnectionStringBuilder() {
-    DataSource = databaseUrl,
+    DataSource = dbServer,
     InitialCatalog = databaseName,
     PersistSecurityInfo = false,
     Encrypt = true,
@@ -89,11 +69,9 @@ var connectionString = connectionStringBuilder.ToString();
 
 var optionsBuilder = new DbContextOptionsBuilder<ShlDbContext>();
 optionsBuilder.UseSqlServer(connectionString);
-optionsBuilder.UseLinqToDB(builder => {
-    builder.AddCustomOptions(o => o.UseSqlServer());
+optionsBuilder.UseLinqToDB(ldb => {
+    ldb.AddCustomOptions(o => o.UseSqlServer(connectionString));
 });
-
-builder.Services.AddHealthChecks();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -116,6 +94,7 @@ app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapControllers();
+app.MapDefaultEndpoints();
 app.MapStaticAssets();
 
 app.Run();
