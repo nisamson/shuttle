@@ -17,7 +17,7 @@ public static class GameEndingExtensions {
             _ => throw new ArgumentOutOfRangeException(nameof(value), $"Unexpected value: {value}")
         };
         
-        public static GameEnding? FromGameResult(SHLAnalytics.Api.Models.Index.V1.GameResult result) {
+        public static GameEnding? FromGameResult(Shl.Api.Models.Index.V1.GameResult result) {
             if (!result.Played) {
                 return null;
             }

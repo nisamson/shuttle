@@ -29,7 +29,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\SHLAnalytics.Core\SHLAnalytics.Core.csproj" />
+      <ProjectReference Include="..\Shuttle.Core\Shuttle.Core.csproj" />
     </ItemGroup>
 
 </Project>

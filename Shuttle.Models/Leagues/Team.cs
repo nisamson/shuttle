@@ -1,5 +1,5 @@
-﻿using SHLAnalytics.Api.Models.Common;
-using SHLAnalytics.Api.Models.Index.V1;
+﻿using Shuttle.Shl.Api.Models.Common;
+using Shuttle.Shl.Api.Models.Index.V1;
 
 namespace Shuttle.Models.Leagues;
 

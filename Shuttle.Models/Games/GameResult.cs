@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
-using SHLAnalytics.Api.Models;
-using SHLAnalytics.Api.Models.Common;
+using Shuttle.Shl.Api.Models.Common;
 
 namespace Shuttle.Models.Games;
 

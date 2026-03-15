@@ -1,8 +1,7 @@
 ﻿using System.Text.Json.Serialization;
-using SHLAnalytics.Api.Models;
-using SHLAnalytics.Api.Models.Common;
-using SHLAnalytics.Api.Models.Portal.V1;
 using Shuttle.Models.Meta;
+using Shuttle.Shl.Api.Models.Common;
+using Shuttle.Shl.Api.Models.Portal.V1;
 using TaskStatus = System.Threading.Tasks.TaskStatus;
 
 namespace Shuttle.Models.Players;

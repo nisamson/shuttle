@@ -10,7 +10,7 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Enrichers.Span;
-using SHLAnalytics.Core;
+using Shuttle.Core;
 
 namespace Shuttle.ServiceDefaults;
 

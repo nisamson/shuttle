@@ -41,7 +41,7 @@ var storage = builder.AddAzureStorage("shuttle-storage-account")
     .RunAsEmulator();
 
 #pragma warning disable ASPIREPROBES001
-var api = builder.AddProject<SHLAnalytics_Shuttle_Api>("shuttle-api")
+var api = builder.AddProject<Shuttle_Api>("shuttle-api")
     .WithReference(sqlServer)
     .WaitFor(sqlServer)
     .WithAzureUserAssignedIdentity(umi)
@@ -66,7 +66,6 @@ var jobs = builder.AddAzureFunctionsProject<Shuttle_Jobs>("shuttle-jobs")
     .WithEnvironment("DATABASE_NAME", databaseName)
     .WithAzureUserAssignedIdentity(umi)
     .WithHostStorage(storage)
-    .WithRoleAssignments(storage, StorageBuiltInRole.StorageBlobDataContributor, StorageBuiltInRole.StorageTableDataContributor, StorageBuiltInRole.StorageQueueDataContributor)
     .PublishAsAzureAppServiceWebsite((infra, site) => {
         site.Kind = "functionapp,linux";
         site.SiteConfig.IsAlwaysOn = true;

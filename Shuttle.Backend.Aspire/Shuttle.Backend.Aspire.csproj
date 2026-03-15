@@ -15,7 +15,7 @@
     </ItemGroup>
     
     <ItemGroup>
-        <ProjectReference Include="..\SHLAnalytics.Shuttle.Api\SHLAnalytics.Shuttle.Api.csproj" />
+        <ProjectReference Include="..\Shuttle.Api\Shuttle.Api.csproj" />
         <ProjectReference Include="..\Shuttle.Jobs\Shuttle.Jobs.csproj" />
     </ItemGroup>
 
