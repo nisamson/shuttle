@@ -1,0 +1,23 @@
+﻿<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Shuttle Options</MudText>
+        <MudTooltip Text="Locally-saved options for the Shuttle app."/>
+    </TitleContent>
+    <DialogContent>
+        <MudForm>
+            <MudSwitch For="() => OptionsModel.DarkMode" @bind-Value="OptionsModel.DarkMode"/>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton
+            OnClick="@(_ => OnCancelEdit())">
+            Cancel
+        </MudButton>
+        <MudButton
+            Color="Color.Success"
+            Disabled="!IsTouched"
+            OnClick="@(_ => OnOptionsEdited())">
+            Save
+        </MudButton>
+    </DialogActions>
+</MudDialog>

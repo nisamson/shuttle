@@ -4,13 +4,17 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SHLAnalytics.Shuttle</title>
+    <title>Shuttle.WebClient</title>
     <base href="/" />
     <link rel="preload" id="webassembly" />
     <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
-    <link href="SHLAnalytics.Shuttle.styles.css" rel="stylesheet" />
+    <link href="Shuttle.WebClient.styles.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+    <!-- Important: Increment the version parameter whenever you update MudBlazor to prevent caching issues -->
+    <link href="_content/MudBlazor/MudBlazor.min.css?v=1" rel="stylesheet" />
+    <link href="_content/MudBlazor.Markdown/MudBlazor.Markdown.min.css?v=1" rel="stylesheet" />
     <script type="importmap"></script>
 </head>
 
@@ -30,6 +34,8 @@
     </div>
     <script src="_content/Microsoft.Authentication.WebAssembly.Msal/AuthenticationService.js"></script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js?v=1"></script>
+    <script src="_content/MudBlazor.Markdown/MudBlazor.Markdown.min.js"></script>
 </body>
 
 </html>

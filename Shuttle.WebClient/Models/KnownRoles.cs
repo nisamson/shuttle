@@ -1,4 +1,4 @@
-﻿namespace SHLAnalytics.Shuttle.Models;
+﻿namespace Shuttle.WebClient.Models;
 
 public enum KnownRoles {
     Admin,
