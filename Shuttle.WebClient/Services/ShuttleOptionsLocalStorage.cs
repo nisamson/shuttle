@@ -5,12 +5,16 @@ using Shuttle.WebClient.Models.Options;
 
 namespace Shuttle.WebClient.Services;
 
-public class ShuttleOptionsLocalStorage : IShuttleOptionsStorage {
+public class ShuttleOptionsLocalStorage : IShuttleOptionsStorage, IDisposable {
     private readonly ILogger<ShuttleOptionsLocalStorage> logger;
     private readonly SemaphoreSlim optionsLock = new(1, 1);
     private const string StorageKey = "shuttle-options";
+    private const string StorageEventListenerFunction = "registerStorageListenerEvent";
     private readonly ILocalStorageService localStorage;
     private bool firstLoad = true;
+
+    private readonly DotNetObjectReference<ShuttleOptionsLocalStorage> jsRef;
+    private Task registerStorageEventListenerTask;
 
     public ShuttleOptions CurrentOptions {
         get;
@@ -25,12 +29,16 @@ public class ShuttleOptionsLocalStorage : IShuttleOptionsStorage {
 
     public event Action<ShuttleOptions>? OptionsChanged;
 
-    public ShuttleOptionsLocalStorage(ILocalStorageService localStorage, ILogger<ShuttleOptionsLocalStorage> logger) {
+    public ShuttleOptionsLocalStorage(ILocalStorageService localStorage, IJSRuntime jsRuntime, ILogger<ShuttleOptionsLocalStorage> logger) {
         this.localStorage = localStorage;
         this.logger = logger;
+
+        jsRef = DotNetObjectReference.Create(this);
+        registerStorageEventListenerTask = jsRuntime.InvokeVoidAsync(StorageEventListenerFunction, jsRef).AsTask();
     }
 
     public async Task<ShuttleOptions> LoadOptions(bool forceLoad, CancellationToken token = default) {
+        await registerStorageEventListenerTask;
         if (!firstLoad && !forceLoad) {
             return CurrentOptions;
         }
@@ -63,6 +71,7 @@ public class ShuttleOptionsLocalStorage : IShuttleOptionsStorage {
     }
 
     public async Task SaveOptions(ShuttleOptions options, CancellationToken token = default) {
+        await registerStorageEventListenerTask;
         await DoWithLock(
             () => {
                 SaveOptionsInternal(options);
@@ -70,6 +79,11 @@ public class ShuttleOptionsLocalStorage : IShuttleOptionsStorage {
             },
             token
         );
+    }
+
+    private async Task OnOptionsUpdatedOutsideTab() {
+        logger.LogInformation("Options updated in another tab, reloading options");
+        await LoadOptions(true);
     }
 
     private void SaveOptionsInternal(ShuttleOptions options) {
@@ -88,5 +102,10 @@ public class ShuttleOptionsLocalStorage : IShuttleOptionsStorage {
             logger.LogTrace("Releasing options lock");
             optionsLock.Release();
         }
+    }
+
+    public void Dispose() {
+        optionsLock.Dispose();
+        jsRef.Dispose();
     }
 }

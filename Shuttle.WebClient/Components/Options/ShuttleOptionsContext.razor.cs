@@ -13,6 +13,9 @@ public partial class ShuttleOptionsContext : ComponentBase, IDisposable {
     
     [Inject]
     public required ILogger<ShuttleOptionsContext> Logger { private get; set; }
+    
+    [Parameter]
+    public EventCallback<ShuttleOptions> OptionsChanged { get; set; }
 
     public ShuttleOptions CurrentOptions { get ; private set; } = ShuttleOptions.Default;
     
@@ -36,6 +39,7 @@ public partial class ShuttleOptionsContext : ComponentBase, IDisposable {
     public async Task SaveOptions(ShuttleOptions options) {
         Logger.LogDebug("Saving options: {Options}", options);
         await OptionsStorage.SaveOptions(options);
+        await OptionsChanged.InvokeAsync(options);
     }
 
     [Parameter]

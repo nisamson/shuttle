@@ -33,7 +33,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shuttle.Backend.Aspire", "S
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shuttle.ServiceDefaults", "Shuttle.ServiceDefaults\Shuttle.ServiceDefaults.csproj", "{B39E1A1C-8F91-4BD7-8D82-DFD7601EEAE1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shuttle.Jobs", "Shuttle.Jobs\Shuttle.Jobs.csproj", "{46F4AFFC-5AAA-4594-8CAA-C764665461A5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shuttle.Api.Jobs", "Shuttle.Api.Jobs\Shuttle.Api.Jobs.csproj", "{C4BEB218-D2D9-4D41-9470-4D282AC211A6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -117,10 +117,10 @@ Global
 		{B39E1A1C-8F91-4BD7-8D82-DFD7601EEAE1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B39E1A1C-8F91-4BD7-8D82-DFD7601EEAE1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B39E1A1C-8F91-4BD7-8D82-DFD7601EEAE1}.Release|Any CPU.Build.0 = Release|Any CPU
-		{46F4AFFC-5AAA-4594-8CAA-C764665461A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{46F4AFFC-5AAA-4594-8CAA-C764665461A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{46F4AFFC-5AAA-4594-8CAA-C764665461A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{46F4AFFC-5AAA-4594-8CAA-C764665461A5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C4BEB218-D2D9-4D41-9470-4D282AC211A6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C4BEB218-D2D9-4D41-9470-4D282AC211A6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C4BEB218-D2D9-4D41-9470-4D282AC211A6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C4BEB218-D2D9-4D41-9470-4D282AC211A6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

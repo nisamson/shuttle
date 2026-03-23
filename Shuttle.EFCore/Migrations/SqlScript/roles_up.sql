@@ -1,0 +1,7 @@
+﻿CREATE ROLE [ShuttleQuartzUser];
+GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[qrtz] TO [ShuttleQuartz];
+GO;
+
+CREATE ROLE [ShuttleApiUser];
+GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[dbo] TO [ShuttleApiUser];
+GO;

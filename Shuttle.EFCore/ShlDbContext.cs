@@ -1,18 +1,13 @@
-﻿using System.Data;
-using System.Data.Common;
-using LinqToDB;
-using LinqToDB.Data;
+﻿using LinqToDB;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
-using Shuttle.EFCore;
-using Shuttle.EFCore.Entities;
+using Microsoft.Extensions.Logging;
 using Shuttle.EFCore.Entities.Portal;
-using Shuttle.EFCore.SiteArchive;
 
-namespace Shuttle.Api.Entities;
+namespace Shuttle.EFCore;
 
-public class ShlDbContext : DbContext, IShlDatabaseContext {
+public class ShlDbContext : DbContext {
 
     private readonly ILogger<ShlDbContext> logger;
     
@@ -54,33 +49,33 @@ public class ShlDbContext : DbContext, IShlDatabaseContext {
     //     return handled;
     // }
 
-    public DbSet<PlayerInfo> PlayerInfos { get; set; }
-
-    public async Task UpsertPlayerInfos(IReadOnlyList<PlayerInfo> infos, IDbContextTransaction? tx = null, CancellationToken token = default) {
-
-        var origTx = tx;
-        if (tx is null) {
-            tx = Database.CurrentTransaction ?? await Database.BeginTransactionAsync(token);
-        }
-
-        try {
-            
-            await using var linqConn = this.CreateLinqToDBConnection(tx);
-            var edited = await PlayerInfos.Merge()
-                .Using(infos)
-                .On((src, tgt) => src.PlayerId == tgt.PlayerId)
-                .InsertWhenNotMatched()
-                .UpdateWhenMatchedAnd(PlayerInfo.ShouldUpdateExpression)
-                .MergeAsync(token);
-            
-            if (origTx is null) {
-                await tx.CommitAsync(token);
-            }
-        } catch (Exception ex) {
-            logger.LogError(ex, "Error upserting player infos");
-            throw;
-        } finally {
-            await tx.DisposeAsync();
-        }
-    }
+    // public DbSet<PlayerInfo> PlayerInfos { get; set; }
+    //
+    // public async Task UpsertPlayerInfos(IReadOnlyList<PlayerInfo> infos, IDbContextTransaction? tx = null, CancellationToken token = default) {
+    //
+    //     var origTx = tx;
+    //     if (tx is null) {
+    //         tx = Database.CurrentTransaction ?? await Database.BeginTransactionAsync(token);
+    //     }
+    //
+    //     try {
+    //         
+    //         await using var linqConn = this.CreateLinqToDBConnection(tx);
+    //         var edited = await PlayerInfos.Merge()
+    //             .Using(infos)
+    //             .On((src, tgt) => src.PlayerId == tgt.PlayerId)
+    //             .InsertWhenNotMatched()
+    //             .UpdateWhenMatchedAnd(PlayerInfo.ShouldUpdateExpression)
+    //             .MergeAsync(token);
+    //         
+    //         if (origTx is null) {
+    //             await tx.CommitAsync(token);
+    //         }
+    //     } catch (Exception ex) {
+    //         logger.LogError(ex, "Error upserting player infos");
+    //         throw;
+    //     } finally {
+    //         await tx.DisposeAsync();
+    //     }
+    // }
 }

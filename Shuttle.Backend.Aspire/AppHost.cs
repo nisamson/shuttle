@@ -17,8 +17,6 @@ var appInsightsName = builder.AddParameter("appInsightsName")
     .WithDescription("The name of the Application Insights resource to create or use");
 var devAppInsightsName = builder.AddParameter("devAppInsightsName", "shlanalyticsdevinsights")
     .WithDescription("The name of the Application Insights resource to create or use for the development environment");
-var storageAccountName = builder.AddParameter("storageAccountName", secret: true)
-    .WithDescription("The name of the Storage Account to create or use");
 var umiName = builder.AddParameter("umiName")
     .WithDescription("The name of the User Managed Identity to create or use");
 
@@ -34,42 +32,49 @@ var insights = builder.AddAzureApplicationInsights("shuttle-app-insights")
     .RunAsExisting(devAppInsightsName, shuttleRg);
 
 var appServicePlan = builder.AddAzureAppServiceEnvironment("shuttle-app-service-plan")
-    .WithAzureApplicationInsights(insights);
-
-var storage = builder.AddAzureStorage("shuttle-storage-account")
-    .PublishAsExisting(storageAccountName, shuttleRg)
-    .RunAsEmulator();
+    .WithAzureApplicationInsights(insights)
+    .ConfigureInfrastructure(infra => {
+        var appServicePlan = infra.GetProvisionableResources()
+            .OfType<AppServicePlan>()
+            .Single();
+        appServicePlan.Sku = new() {
+            Name = "B3",
+            Tier = "Basic"
+        };
+        appServicePlan.IsElasticScaleEnabled = false;
+    });
 
 #pragma warning disable ASPIREPROBES001
 var api = builder.AddProject<Shuttle_Api>("shuttle-api")
     .WithReference(sqlServer)
     .WaitFor(sqlServer)
     .WithAzureUserAssignedIdentity(umi)
-    .WithEnvironment("DATABASE_NAME", databaseName)
-    .WithUrlForEndpoint("openapi",
+    .WithEnvironment("SHUTTLESQLSERVER_DATABASE", databaseName)
+    .WithUrlForEndpoint("https",
         c => {
             c.DisplayText = "OpenAPI Spec";
             c.Url = "/openapi.json";
         })
     .WithExternalHttpEndpoints()
-    .WithHttpProbe(ProbeType.Liveness, "/health", initialDelaySeconds: 5)
+    .WithHttpProbe(ProbeType.Liveness, "/alive", initialDelaySeconds: 5)
     .PublishAsAzureAppServiceWebsite((infra, site) => {
-        site.Kind = "app,linux";
         site.IsHttpsOnly = true;
         site.SiteConfig.IsAlwaysOn = true;
+        site.SiteConfig.NumberOfWorkers = 1;
     });
-#pragma warning restore ASPIREPROBES001
 
-var jobs = builder.AddAzureFunctionsProject<Shuttle_Jobs>("shuttle-jobs")
+var jobs = builder.AddProject<Shuttle_Api_Jobs>("shuttle-api-jobs")
     .WithReference(sqlServer)
     .WaitFor(sqlServer)
-    .WithEnvironment("DATABASE_NAME", databaseName)
     .WithAzureUserAssignedIdentity(umi)
-    .WithHostStorage(storage)
+    .WithEnvironment("SHUTTLESQLSERVER_DATABASE", databaseName)
+    .WithExternalHttpEndpoints()
+    .WithHttpProbe(ProbeType.Liveness, "/alive", initialDelaySeconds: 5)
     .PublishAsAzureAppServiceWebsite((infra, site) => {
-        site.Kind = "functionapp,linux";
+        site.IsHttpsOnly = true;
         site.SiteConfig.IsAlwaysOn = true;
-    })
-    .WithExternalHttpEndpoints();
+        site.SiteConfig.NumberOfWorkers = 1;
+    });
+#pragma warning restore ASPIREPROBES001
 
 builder.Build().Run();

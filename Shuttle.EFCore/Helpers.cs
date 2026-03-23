@@ -19,7 +19,7 @@ public record Temporal<T> where T : class {
 
 public static class Helpers {
     
-    public static void AddTemporalTableSupport<TEntity>(
+    internal static void AddTemporalTableSupport<TEntity>(
         this EntityTypeBuilder<TEntity> builder,
         string? tableName = null,
         Action<TableBuilder<TEntity>>? config = null

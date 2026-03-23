@@ -22,4 +22,9 @@
     <ItemGroup>
       <AdditionalFiles Include="Components\Options\ShuttleOptionsContext.razor" />
     </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Components\Services\" />
+      <Folder Include="Services\Events\" />
+    </ItemGroup>
 </Project>
