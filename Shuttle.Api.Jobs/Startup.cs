@@ -24,7 +24,7 @@ public static class Startup {
     public static void AddQuartz(this WebApplicationBuilder builder) {
         builder.Services.Configure<QuartzOptions>(options => {
                 options.Scheduling.IgnoreDuplicates = true;
-                options.Scheduling.OverWriteExistingData = true;
+                options.Scheduling.OverWriteExistingData = false;
                 options.Scheduling.ScheduleTriggerRelativeToReplacedTrigger = true;
                 options["quartz.plugin.jobHistory.type"] = "Quartz.Plugin.History.LoggingJobHistoryPlugin, Quartz.Plugins";
                 options["quartz.plugin.triggerHistory.type"] = "Quartz.Plugin.History.LoggingTriggerHistoryPlugin, Quartz.Plugins";

@@ -78,11 +78,11 @@
     <PackageVersion Include="Polly.Extensions" Version="8.6.5" />
     <PackageVersion Include="Polly.RateLimiting" Version="8.6.5" />
     <PackageVersion Include="Polly.Wrap" Version="8.6.5" />
-    <PackageVersion Include="Quartz" Version="3.16.1" />
-    <PackageVersion Include="Quartz.AspNetCore" Version="3.16.1" />
-    <PackageVersion Include="Quartz.Dashboard" Version="3.16.1" />
-    <PackageVersion Include="Quartz.Plugins" Version="3.16.1" />
-    <PackageVersion Include="Quartz.Serialization.SystemTextJson" Version="3.16.1" />
+    <PackageVersion Include="Quartz" Version="3.17.1" />
+    <PackageVersion Include="Quartz.AspNetCore" Version="3.17.1" />
+    <PackageVersion Include="Quartz.Dashboard" Version="3.17.1" />
+    <PackageVersion Include="Quartz.Plugins" Version="3.17.1" />
+    <PackageVersion Include="Quartz.Serialization.SystemTextJson" Version="3.17.1" />
     <PackageVersion Include="Refit" Version="9.0.2" />
     <PackageVersion Include="Refit.HttpClientFactory" Version="9.0.2" />
     <PackageVersion Include="Serilog" Version="4.3.0" />
