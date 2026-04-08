@@ -8,8 +8,6 @@ using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
-using Serilog;
-using Serilog.Enrichers.Span;
 using Shuttle.Core;
 
 namespace Shuttle.ServiceDefaults;
@@ -26,7 +24,6 @@ public static class Extensions {
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder {
         builder.ConfigureOpenTelemetry();
-        builder.AddShuttleSerilog();
 
         builder.AddDefaultHealthChecks();
 
@@ -55,11 +52,10 @@ public static class Extensions {
 
     public static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder {
-        builder.Logging.AddOpenTelemetry(logging => {
-                logging.IncludeFormattedMessage = true;
-                logging.IncludeScopes = true;
-            }
-        );
+        if (builder.Environment.IsDevelopment()) {
+            builder.Logging.SetMinimumLevel(LogLevel.Trace)
+                .AddEventSourceLogger();
+        }
 
         builder.Services.AddOpenTelemetry()
             .WithMetrics(metrics => {
@@ -70,43 +66,28 @@ public static class Extensions {
             )
             .WithTracing(tracing => {
                     tracing.AddSource(builder.Environment.ApplicationName)
-                        .AddAspNetCoreInstrumentation(tracing =>
+                        .AddAspNetCoreInstrumentation(ancTracing =>
 
                             // Exclude health check requests from tracing
-                            tracing.Filter = context =>
+                            ancTracing.Filter = context =>
                                 !context.Request.Path.StartsWithSegments(HealthEndpointPath)
                                 && !context.Request.Path.StartsWithSegments(AlivenessEndpointPath)
                         )
-
                         // Uncomment the following line to enable gRPC instrumentation (requires the OpenTelemetry.Instrumentation.GrpcNetClient package)
                         //.AddGrpcClientInstrumentation()
                         .AddHttpClientInstrumentation();
+                }
+            )
+            .WithLogging(
+                configureBuilder: null,
+                configureOptions: logging => {
+                    logging.IncludeFormattedMessage = true;
+                    logging.IncludeScopes = true;
                 }
             );
 
         builder.AddOpenTelemetryExporters();
 
-        return builder;
-    }
-
-    private static TBuilder AddShuttleSerilog<TBuilder>(this TBuilder builder) 
-        where TBuilder : IHostApplicationBuilder {
-        var useOtlpExporter = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
-        var loggerConfiguration = new LoggerConfiguration()
-            .ReadFrom.Configuration(builder.Configuration)
-            .WriteTo.Console()
-            .Enrich.FromLogContext()
-            .Enrich.WithSpan();
-
-        if (useOtlpExporter) {
-            loggerConfiguration.WriteTo.OpenTelemetry(options => {
-                    options.Endpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] ?? "http://localhost:4317";
-                }
-            );
-        }
-
-        Log.Logger = loggerConfiguration.CreateBootstrapLogger();
-        
         return builder;
     }
 
@@ -155,7 +136,8 @@ public static class Extensions {
         
         healthChecks.MapHealthChecks(HealthEndpointPath)
             .CacheOutput("HealthChecks")
-            .WithRequestTimeout("HealthChecks");
+            .WithRequestTimeout("HealthChecks")
+            .AllowAnonymous();
 
         // Only health checks tagged with the "live" tag must pass for app to be considered alive
         healthChecks.MapHealthChecks(
@@ -165,7 +147,8 @@ public static class Extensions {
             }
         )
         .CacheOutput("HealthChecks")
-        .WithRequestTimeout("HealthChecks");;
+        .WithRequestTimeout("HealthChecks")
+        .AllowAnonymous();
 
         return app;
     }

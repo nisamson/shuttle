@@ -20,6 +20,10 @@ namespace Shuttle.EFCore.Migrations
             return LoadSqlFromResource("Shuttle.EFCore.Migrations.SqlScript.roles_down.sql");
         }
         
+        private static string LoadQuartzDownSql() {
+            return LoadSqlFromResource("Shuttle.EFCore.Migrations.SqlScript.quartz_down.sql");
+        }
+        
         private static string LoadSqlFromResource(string resourceName) {
             var assembly = typeof(DbInit).Assembly;
             using var stream = assembly.GetManifestResourceStream(resourceName);
@@ -41,6 +45,7 @@ namespace Shuttle.EFCore.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.Sql(LoadRolesDownSql());
+            migrationBuilder.Sql(LoadQuartzDownSql());
             migrationBuilder.DropSchema("qrtz");
         }
     }

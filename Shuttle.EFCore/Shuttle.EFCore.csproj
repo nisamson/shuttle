@@ -8,6 +8,7 @@
   </PropertyGroup>
     
     <ItemGroup>
+        <PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" />
         <PackageReference Include="dotenv.net" />
         <PackageReference Include="Microsoft.EntityFrameworkCore" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
@@ -15,14 +16,26 @@
         <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
         <PackageReference Include="Microsoft.Data.SqlClient"/>
         <PackageReference Include="linq2db.EntityFrameworkCore" />
+        <PackageReference Include="OpenTelemetry" />
+        <PackageReference Include="OpenTelemetry.Api" />
+        <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
         
         <PackageReference Include="Microsoft.Extensions.Hosting" />
+        
+        <PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" />
+        
+        <PackageReference Include="OpenTelemetry.Instrumentation.SqlClient" />
+        <PackageReference Include="Polly.Core"/>
     </ItemGroup>
     
     <ItemGroup>
         <ProjectReference Include="..\Shuttle.Core\Shuttle.Core.csproj" />
         <ProjectReference Include="..\Shuttle.Shl.Api.Models\Shuttle.Shl.Api.Models.csproj" />
-        <EmbeddedResource Include="Migrations\SqlScript\quartz.sql" />
+        <EmbeddedResource Include="Migrations\SqlScript\*" />
+    </ItemGroup>
+    
+    <ItemGroup>
+      <Folder Include="Instrumentation\" />
     </ItemGroup>
 
 </Project>

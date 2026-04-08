@@ -16,7 +16,6 @@
         <PackageReference Include="Microsoft.Identity.Web"/>
         <PackageReference Include="Microsoft.Identity.Web.DownstreamApi"/>
 
-        <PackageReference Include="Serilog"/>
         <PackageReference Include="Azure.Identity"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design"/>

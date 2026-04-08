@@ -15,7 +15,7 @@ public class DesignTimeContextFactory : IDesignTimeDbContextFactory<ShlDbContext
             EnvironmentName = Environments.Development
         });
         builder.AddShuttleDatabase(out var optionsBuilder);
-        var connStr = builder.GetConnectionString();
+        var connStr = ShuttleEfCoreExtensions.GetConnectionString();
         Console.WriteLine(connStr);
         var db = new ShlDbContext(optionsBuilder.Options, NullLogger<ShlDbContext>.Instance);
         db.Database.ExecuteSql($"SELECT 1"); // Ensure database is created and migrations are applied at design time.

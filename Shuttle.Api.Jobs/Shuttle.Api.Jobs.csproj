@@ -8,13 +8,16 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="CrystalQuartz.AspNetCore" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi"/>
         <PackageReference Include="Microsoft.Identity.Web" />
+        <PackageReference Include="Microsoft.Identity.Web.UI" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.Quartz" />
         <PackageReference Include="Quartz"/>
         <PackageReference Include="Quartz.AspNetCore"/>
-        <PackageReference Include="Quartz.Dashboard"/>
         <PackageReference Include="Quartz.Plugins"/>
         <PackageReference Include="Quartz.Serialization.SystemTextJson"/>
+        <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
     </ItemGroup>
     
     <ItemGroup>

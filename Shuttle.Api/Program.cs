@@ -68,4 +68,6 @@ app.MapStaticAssets();
 app.UseOutputCache();
 app.UseRequestTimeouts();
 
-app.Run();
+await app.StartAsync();
+await app.EnsureShuttleDatabaseConnectivity();
+await app.WaitForShutdownAsync();

@@ -1,6 +1,9 @@
 using LinqToDB.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
+using Microsoft.Identity.Web.TokenCacheProviders.InMemory;
+using Microsoft.Identity.Web.UI;
 using Quartz;
 using Shuttle.Api.Jobs;
 using Shuttle.EFCore;
@@ -10,11 +13,18 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
-builder.Services.AddMicrosoftIdentityWebAppAuthentication(builder.Configuration.GetSection("AzureAd"));
+builder.Services.AddAuthentication(Startup.OptionsAuthScheme)
+    .AddMicrosoftIdentityWebApp(
+        builder.Configuration,
+        Startup.OptionsSectionName,
+        displayName: Startup.OptionsSectionName
+    );
+builder.Services.AddAntiforgery();
+builder.Services.AddInMemoryTokenCaches();
 
 // Add services to the container.
-
-builder.Services.AddControllers();
+builder.Services.AddControllersWithViews()
+    .AddMicrosoftIdentityUI();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -25,8 +35,6 @@ builder.AddQuartz();
 var app = builder.Build();
 
 LinqToDBForEFTools.Initialize();
-var db = app.Services.GetRequiredService<ShlDbContext>();
-db.Database.ExecuteSql($"SELECT 1"); // Ensure database is created and migrations are applied at startup.
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment()) {
@@ -34,12 +42,29 @@ if (app.Environment.IsDevelopment()) {
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseAntiforgery();
 
-app.MapQuartzDashboard();
-app.MapControllers()
-    .DisableCookieRedirect();
+app.MapControllers();
+app.MapGet("/MicrosoftIdentity/Account/AccessDenied", () =>
+    Results.Text("403 Forbidden — you do not have the required role to access this resource.\n\nSign out and back in at /MicrosoftIdentity/Account/SignOut", statusCode: 403))
+    .AllowAnonymous();
 
-app.Run();
+if (app.Environment.IsDevelopment()) {
+    app.MapGet("/debug/claims", (HttpContext context) => {
+        if (context.User.Identity?.IsAuthenticated != true)
+            return Results.Text("Not authenticated");
+        
+        var claims = context.User.Claims
+            .Select(c => $"{c.Type} = {c.Value}");
+        return Results.Text(string.Join("\n", claims));
+    }).RequireAuthorization();
+}
+
+app.AddQuartz();
+app.MapDefaultEndpoints();
+await app.EnsureShuttleDatabaseConnectivity();
+await app.RunAsync();

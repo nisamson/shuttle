@@ -4,6 +4,7 @@ using Azure.Provisioning.Resources;
 using Azure.Provisioning.Storage;
 using Azure.ResourceManager.Models;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Projects;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -70,6 +71,11 @@ var jobs = builder.AddProject<Shuttle_Api_Jobs>("shuttle-api-jobs")
     .WithEnvironment("SHUTTLESQLSERVER_DATABASE", databaseName)
     .WithExternalHttpEndpoints()
     .WithHttpProbe(ProbeType.Liveness, "/alive", initialDelaySeconds: 5)
+    .WithUrlForEndpoint("https",
+        c => {
+            c.DisplayText = "Job Dashboard";
+            c.Url = "/quartz";
+        })
     .PublishAsAzureAppServiceWebsite((infra, site) => {
         site.IsHttpsOnly = true;
         site.SiteConfig.IsAlwaysOn = true;
