@@ -1,0 +1,4390 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "description": "This is the API documentation for the Simulation Hockey League API. You can find out more about the SHL at [simulationhockey.com](https://simulationhockey.com/index.php). This API is a work in progress so expect future changes.\nNOTE: Whenever left unspecified, the season defaults to the current one, the league defaults to the SHL (0), and the seasontype defaults to regular season.",
+    "version": "1.0.3",
+    "title": "Simulation Hockey League",
+    "contact": {
+      "email": "simulationhockeysite@gmail.com"
+    },
+    "license": {
+      "name": "MIT License",
+      "url": "https://mit-license.org/"
+    }
+  },
+  "host": "index.simulationhockey.com",
+  "basePath": "/api/v1",
+  "tags": [
+    {
+      "name": "leagues",
+      "description": "Listing the simulation leagues that we provide data for"
+    },
+    {
+      "name": "conferences",
+      "description": "Conferences within a particular league"
+    },
+    {
+      "name": "divisions",
+      "description": "Divisions within a particular league or conference"
+    },
+    {
+      "name": "team",
+      "description": "Teams within a particular league"
+    },
+    {
+      "name": "players",
+      "description": "Players within a particular league"
+    },
+    {
+      "name": "goalies",
+      "description": "Goalies within a particular league"
+    },
+    {
+      "name": "results",
+      "description": "Games played or to be played"
+    },
+    {
+      "name": "livestreams",
+      "description": "Lists all livestreams for each league."
+    },
+    {
+      "name": "fantasy",
+      "description": "Lists all fantasy points for SHl players."
+    }
+  ],
+  "schemes": ["https", "http"],
+  "paths": {
+    "/leagues": {
+      "get": {
+        "tags": ["leagues"],
+        "summary": "List of Leagues",
+        "description": "A listing of the leagues that our data provides, their ids, and their abbreviations.",
+        "operationId": "getAllLeagues",
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/League"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leagues/seasons": {
+      "get": {
+        "tags": ["leagues"],
+        "summary": "List of Seasons in the Index by League",
+        "description": "A listing of all seasons in the index by league.",
+        "operationId": "getSeasons",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": null
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Seasons"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conferences": {
+      "get": {
+        "tags": ["conferences"],
+        "summary": "List of Conferences",
+        "description": "Returns the conferences within a given league",
+        "operationId": "getConferencesByLeague",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Conference"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conferences/{conference}": {
+      "get": {
+        "tags": ["conferences"],
+        "summary": "Single Conference",
+        "description": "Returns a single Conference",
+        "operationId": "getConferencesByID",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "conference",
+            "in": "path",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Conference"
+            }
+          }
+        }
+      }
+    },
+    "/divisions": {
+      "get": {
+        "tags": ["divisions"],
+        "summary": "List of Divisions",
+        "description": "Returns all Divisions for a League and/or a Conference. NOTE: Leaving out conferenceId out returns all Divisions for given league",
+        "operationId": "getDivisionsByLeague",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "conference",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Division"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/divisions/{division}": {
+      "get": {
+        "tags": ["divisions"],
+        "summary": "Single Division",
+        "description": "Returns a single Division",
+        "operationId": "getDivisionsByID",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "division",
+            "in": "path",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "conference",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Conference"
+            }
+          }
+        }
+      }
+    },
+    "/teams": {
+      "get": {
+        "tags": ["team"],
+        "summary": "List of Teams",
+        "description": "Returns all teams for a League, Conference or Division. You cannot query a division without a conference",
+        "operationId": "getTeamsByLeague",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "conference",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "division",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Team"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/{team}": {
+      "get": {
+        "tags": ["team"],
+        "summary": "List of Teams",
+        "description": "Returns info about a specific team.",
+        "operationId": "getLeagueTeam",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "team",
+            "in": "path",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "conference",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "division",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Team"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/{team}/roster": {
+      "get": {
+        "tags": ["team"],
+        "summary": "Get a Team's Roster",
+        "description": "Return a list of players for a specific team at a given time. Use full to get player info with attributes",
+        "operationId": "getTeamRoster",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "team",
+            "in": "path",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "conference",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "division",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "full",
+            "in": "query",
+            "type": "boolean",
+            "default": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/PlayerInfo"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/{team}/roster/stats": {
+      "get": {
+        "tags": ["team"],
+        "summary": "Get a Team's Player Stats",
+        "description": "Return a list of players for a specific team at a given time. Use full to get player info with attributes",
+        "operationId": "getTeamRosterStats",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "team",
+            "in": "path",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/rosterstats"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/players": {
+      "get": {
+        "tags": ["players"],
+        "summary": "List of Players",
+        "description": "Returns all Players for a League",
+        "operationId": "getPlayerByLeague",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/players"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/players/{id}": {
+      "get": {
+        "tags": ["players"],
+        "summary": "List of Player Information By ID",
+        "description": "Returns all Player information by id",
+        "operationId": "getPlayerById",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/players"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/players/stats": {
+      "get": {
+        "tags": ["players"],
+        "summary": "List all Player Stats",
+        "description": "Returns all Player's Stats for a League, NOTE: type options are rs, ps, po",
+        "operationId": "getPlayerStatsByLeague",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "regular"
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/playerstats"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/players/stats/{id}": {
+      "get": {
+        "tags": ["players"],
+        "summary": "List Single Player Stats",
+        "description": "Returns Single Player's Stats for a League, NOTE: type options are rs, ps, po",
+        "operationId": "getPlayerStatsByID",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "regular"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/playerstats"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/players/ratings": {
+      "get": {
+        "tags": ["players"],
+        "summary": "List all Player Ratings",
+        "description": "Returns all Player's Ratings for a League",
+        "operationId": "getPlayerRatingsByLeague",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/playerratings"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/players/ratings/{id}": {
+      "get": {
+        "tags": ["players"],
+        "summary": "List Single Player Ratings",
+        "description": "Returns Single Player's Ratings for a League",
+        "operationId": "getPlayerRatingsByID",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/playerratings"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/goalies": {
+      "get": {
+        "tags": ["goalies"],
+        "summary": "List all Goalies",
+        "description": "Returns all Goalies by League",
+        "operationId": "getGoaliesByLeague",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/goalies"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/goalies/{id}": {
+      "get": {
+        "tags": ["goalies"],
+        "summary": "List Goalie Information by ID",
+        "description": "Returns Goalie based on id",
+        "operationId": "getGoalieById",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/goalies"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/goalies/stats": {
+      "get": {
+        "tags": ["goalies"],
+        "summary": "List all Goalie Stats",
+        "description": "Returns all Goalie's Stats for a League, NOTE: type options are rs, ps, po",
+        "operationId": "getGoalieStatsByLeague",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "regular"
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/goaliestats"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/goalies/stats/{id}": {
+      "get": {
+        "tags": ["goalies"],
+        "summary": "List Single Goalie Stats",
+        "description": "Returns Single Goalie's Stats for a League, NOTE: type options are rs, ps, po",
+        "operationId": "getGoalieStatsByID",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "regular"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/goaliestats"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/goalies/ratings": {
+      "get": {
+        "tags": ["goalies"],
+        "summary": "List all Goalie Ratings",
+        "description": "Returns all Goalie's Ratings for a League",
+        "operationId": "getGoalieRatingsByLeague",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/goalieratings"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/goalies/ratings/{id}": {
+      "get": {
+        "tags": ["goalies"],
+        "summary": "List Single Goalie Ratings",
+        "description": "Returns Single Goalie's Ratings for a League",
+        "operationId": "getGoalieRatingsByID",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/goalieratings"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedule": {
+      "get": {
+        "tags": ["results"],
+        "summary": "List all Games and Results",
+        "description": "Returns all Schedule entries by League",
+        "operationId": "getScheduleByLeague",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "Regular Season",
+            "description": "'Pre-Season', 'Regular Season', or 'Playoffs'"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/schedule"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/standings": {
+      "get": {
+        "tags": ["results"],
+        "summary": "List Standings",
+        "description": "Returns Standings by League",
+        "operationId": "getStandingsByLeague",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/standings"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/standings/preseason": {
+      "get": {
+        "tags": ["results"],
+        "summary": "List Pre-Season standings",
+        "description": "Returns Pre-Season Standings by League",
+        "operationId": "getPreseasonStandingsByLeague",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/preseason"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/standings/playoffs": {
+      "get": {
+        "tags": ["results"],
+        "summary": "List Playoff Bracket",
+        "description": "Returns Playoff Bracket by League",
+        "operationId": "getPlayoffsByLeague",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/playoffs"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaders/skaters/goals": {
+      "get": {
+        "tags": ["skater leaders"],
+        "summary": "List of Leaders in Goals",
+        "description": "Returns top goal scorers for a League",
+        "operationId": "getGoalLeaders",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "default": 10
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/goalLeaders"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaders/skaters/assists": {
+      "get": {
+        "tags": ["skater leaders"],
+        "summary": "List of Leaders in Assists",
+        "description": "Returns top assists for a League",
+        "operationId": "getAssistLeaders",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "default": 10
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/assistLeaders"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaders/skaters/penaltyminutes": {
+      "get": {
+        "tags": ["skater leaders"],
+        "summary": "List of Leaders in PIMs",
+        "description": "Returns top PIMs for a League",
+        "operationId": "getPenaltyLeaders",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "default": 10
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/penaltyLeaders"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaders/skaters/plusminus": {
+      "get": {
+        "tags": ["skater leaders"],
+        "summary": "List of Leaders in plus minus",
+        "description": "Returns top plus minus for a League",
+        "operationId": "getPlusMinusLeaders",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "default": 10
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/plusMinusLeaders"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaders/skaters/points": {
+      "get": {
+        "tags": ["skater leaders"],
+        "summary": "List of Leaders in points",
+        "description": "Returns top points for a League",
+        "operationId": "getPointsLeaders",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "default": 10
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/pointLeaders"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaders/skaters/ppg": {
+      "get": {
+        "tags": ["skater leaders"],
+        "summary": "List of Leaders in Power Play Points",
+        "description": "Returns top Power Play Points for a League",
+        "operationId": "getPpgLeaders",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "default": 10
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ppgLeaders"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaders/skaters/shg": {
+      "get": {
+        "tags": ["skater leaders"],
+        "summary": "List of Leaders in shg",
+        "description": "Returns top shg for a League",
+        "operationId": "getShgLeaders",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "default": 10
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/shgLeaders"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaders/skaters/shotpct": {
+      "get": {
+        "tags": ["skater leaders"],
+        "summary": "List of Leaders in Shot Percentage",
+        "description": "Returns top Shot Percentage for a League",
+        "operationId": "getShotPctLeaders",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "default": 10
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/shotpctLeaders"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaders/skaters/shots": {
+      "get": {
+        "tags": ["skater leaders"],
+        "summary": "List of Leaders in Shots",
+        "description": "Returns top Shots for a League",
+        "operationId": "getShotsLeaders",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "default": 10
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/shotLeaders"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaders/skaters/shotsblocked": {
+      "get": {
+        "tags": ["skater leaders"],
+        "summary": "List of Leaders in Shots Blocked",
+        "description": "Returns top Shots Blocked for a League",
+        "operationId": "getShotsBlockedLeaders",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "default": 10
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/shotblockLeaders"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaders/goalies/ga": {
+      "get": {
+        "tags": ["goalie leaders"],
+        "summary": "List of Leaders in Goals Against",
+        "description": "Returns top Goals Against for a League",
+        "operationId": "getGaLeaders",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "default": 10
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/gaLeaders"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaders/goalies/gaa": {
+      "get": {
+        "tags": ["goalie leaders"],
+        "summary": "List of Leaders in Goals Against Avg",
+        "description": "Returns top Goals Against Avg for a League",
+        "operationId": "getGaaLeaders",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "default": 10
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/gaaLeaders"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaders/goalies/gamesplayed": {
+      "get": {
+        "tags": ["goalie leaders"],
+        "summary": "List of Leaders in Games Played",
+        "description": "Returns top Games Played for a League",
+        "operationId": "getGpLeaders",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "default": 10
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/gpLeaders"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaders/goalies/gsaa": {
+      "get": {
+        "tags": ["goalie leaders"],
+        "summary": "List of Leaders in Goals Saved Above Average",
+        "description": "Returns top Goals Saved Above Average for a League",
+        "operationId": "getGsaaLeaders",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "default": 10
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/gsaaLeaders"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaders/goalies/losses": {
+      "get": {
+        "tags": ["goalie leaders"],
+        "summary": "List of Leaders in Losses",
+        "description": "Returns top Losses for a League",
+        "operationId": "getLossLeaders",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "default": 10
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/lossLeaders"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaders/goalies/otl": {
+      "get": {
+        "tags": ["goalie leaders"],
+        "summary": "List of Leaders in OTL",
+        "description": "Returns top OT Losses for a League",
+        "operationId": "getOtlLeaders",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "default": 10
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/otlLeaders"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaders/goalies/savepct": {
+      "get": {
+        "tags": ["goalie leaders"],
+        "summary": "List of Leaders in Save Percentage",
+        "description": "Returns top Save Percentage for a League",
+        "operationId": "getSavePctLeaders",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "default": 10
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/savepctLeaders"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaders/goalies/saves": {
+      "get": {
+        "tags": ["goalie leaders"],
+        "summary": "List of Leaders in Saves",
+        "description": "Returns top Saves for a League",
+        "operationId": "getSavesLeaders",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "default": 10
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/saveLeaders"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaders/goalies/shutouts": {
+      "get": {
+        "tags": ["goalie leaders"],
+        "summary": "List of Leaders in Shutouts",
+        "description": "Returns top Shutouts for a League",
+        "operationId": "getShutoutsLeaders",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "default": 10
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/shutoutLeaders"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaders/goalies/wins": {
+      "get": {
+        "tags": ["goalie leaders"],
+        "summary": "List of Leaders in Wins",
+        "description": "Returns top Wins for a League",
+        "operationId": "getWinsLeaders",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "rs"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "default": 10
+          },
+          {
+            "name": "rookie",
+            "in": "query",
+            "type": "boolean",
+            "default": "false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/winLeaders"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/livestreams": {
+      "get": {
+        "tags": ["livestreams"],
+        "summary": "List of Livestream Information",
+        "description": "A listing of the livestreams information that our data provides, their video ids, and if they are live.",
+        "operationId": "getAllLivestreams",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "string",
+            "default": null
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Livestream"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/players/stats/allTime": {
+      "get": {
+        "tags": ["players"],
+        "summary": "Get Player All-Time Career Stats",
+        "description": "Returns career statistics for players across multiple seasons. Can be filtered by team, position, and season range.",
+        "operationId": "getPlayerAllTimeStats",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0,
+            "enum": [0, 1, 2, 3],
+            "description": "League ID to filter by"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "regular",
+            "enum": ["'preseason', 'regular', or 'playoffs'"],
+            "description": "'Pre-Season', 'Regular Season', or 'Playoffs'"
+          },
+          {
+            "name": "position",
+            "in": "query",
+            "type": "string",
+            "description": "Filter by position",
+            "enum": ["forward", "defenseman"]
+          },
+          {
+            "name": "seasonStart",
+            "in": "query",
+            "type": "number",
+            "description": "Start season for the aggregate data"
+          },
+          {
+            "name": "seasonEnd",
+            "in": "query",
+            "type": "number",
+            "description": "Start season for the aggregate data"
+          },
+          {
+            "name": "teamID",
+            "in": "query",
+            "type": "number",
+            "description": "Filter by teamID"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "type": "string",
+            "description": "Sort options",
+            "enum": [
+              "points,goals,assists,gamesPlayed,pim,hits,blocks,fights,fightWins,faceoffs,faceoffWins,ppGoals,ppAssists,ppPoints,shGoals,shAssists,shPoints,timeOnIce,giveaways,takeaways,plusMinus,shots"
+            ]
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "type": "string",
+            "enum": ["asc", "desc"],
+            "default": "desc",
+            "description": "Sort direction"
+          },
+          {
+            "name": "minGP",
+            "in": "query",
+            "type": "number",
+            "description": "Minimum games played to be included in results"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "description": "Limit the number of results returned"
+          },
+          {
+            "name": "grouped",
+            "in": "query",
+            "type": "boolean",
+            "enum": [true, false],
+            "description": "Returns aggregated stats or season by season"
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "type": "boolean",
+            "enum": [true, false],
+            "description": "Returns only active players"
+          },
+          {
+            "name": "playerID",
+            "in": "query",
+            "type": "number",
+            "description": "PlayerID you want to see"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/playerAllTimeGrouped"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/goalies/stats/allTime": {
+      "get": {
+        "tags": ["goalies"],
+        "summary": "Get Goalie All-Time Career Stats",
+        "description": "Returns career statistics for goalies across multiple seasons. Can be filtered by team and season range.",
+        "operationId": "getGoalieAllTimeStats",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0,
+            "enum": [0, 1, 2, 3],
+            "description": "League ID to filter by"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "type": "string",
+            "default": "regular",
+            "enum": ["'preseason', 'regular', or 'playoffs'"],
+            "description": "'Pre-Season', 'Regular Season', or 'Playoffs'"
+          },
+          {
+            "name": "seasonStart",
+            "in": "query",
+            "type": "number",
+            "description": "Start season for the aggregate data"
+          },
+          {
+            "name": "seasonEnd",
+            "in": "query",
+            "type": "number",
+            "description": "Start season for the aggregate data"
+          },
+          {
+            "name": "teamID",
+            "in": "query",
+            "type": "number",
+            "description": "Filter by teamID"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "type": "string",
+            "description": "Sort options",
+            "enum": [
+              "wins,losses,ot,goalsAgainst,shutouts,savePct,gaa,minutes,gamesPlayed"
+            ]
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "type": "string",
+            "enum": ["asc", "desc"],
+            "default": "desc",
+            "description": "Sort direction"
+          },
+          {
+            "name": "minGP",
+            "in": "query",
+            "type": "number",
+            "description": "Minimum games played to be included in results"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "number",
+            "description": "Limit the number of results returned"
+          },
+          {
+            "name": "grouped",
+            "in": "query",
+            "type": "boolean",
+            "enum": [true, false],
+            "description": "Returns aggregated stats or season by season"
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "type": "boolean",
+            "enum": [true, false],
+            "description": "Returns only active players"
+          },
+          {
+            "name": "playerID",
+            "in": "query",
+            "type": "number",
+            "description": "PlayerID you want to see"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/goalieAllTimeGrouped"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/allTime": {
+      "get": {
+        "tags": ["team"],
+        "summary": "Get Team All-Time Stats",
+        "description": "Returns team statistics aggregated across multiple seasons. Can be filtered by season range.",
+        "operationId": "getTeamAllTimeStats",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0,
+            "enum": [0, 1, 2, 3],
+            "description": "League ID to filter by"
+          },
+          {
+            "name": "seasonStart",
+            "in": "query",
+            "type": "number",
+            "description": "Start season for the aggregate data"
+          },
+          {
+            "name": "seasonEnd",
+            "in": "query",
+            "type": "number",
+            "description": "Start season for the aggregate data"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "type": "string",
+            "description": "Sort by field (points,wins,losses,overtimelosses,goalsFor,goalsAgainst,winPercentage)"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "type": "string",
+            "enum": ["asc", "desc"],
+            "default": "desc",
+            "description": "Sort direction"
+          },
+          {
+            "name": "grouped",
+            "in": "query",
+            "type": "boolean",
+            "enum": [true, false],
+            "description": "Returns aggregated stats or season by season"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/standings"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fantasy": {
+      "get": {
+        "tags": ["fantasy"],
+        "summary": "List of Fantasy Information",
+        "description": "A listing of the fantasy information about SHL players.",
+        "operationId": "getFantastyInformation",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "position",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Fantasy"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "League": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string",
+          "example": "Simulation Hockey League"
+        },
+        "abbreviation": {
+          "type": "string",
+          "example": "SHL"
+        }
+      }
+    },
+    "Seasons": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string",
+          "example": "Simulation Hockey League"
+        },
+        "abbreviation": {
+          "type": "string",
+          "example": "SHL"
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        }
+      }
+    },
+    "Conference": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "league": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string",
+          "example": "Eastern Conference"
+        },
+        "season": {
+          "type": "number",
+          "example": 55
+        }
+      }
+    },
+    "Division": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "league": {
+          "type": "number"
+        },
+        "conference": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string",
+          "example": "Great Lakes Division"
+        },
+        "season": {
+          "type": "number",
+          "example": 55
+        }
+      }
+    },
+    "Team": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "season": {
+          "type": "number"
+        },
+        "league": {
+          "type": "number"
+        },
+        "conference": {
+          "type": "number"
+        },
+        "division": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string",
+          "example": "Buffalo Stampede"
+        },
+        "abbreviation": {
+          "type": "string",
+          "example": "BUF"
+        },
+        "location": {
+          "type": "string",
+          "example": "Buffalo"
+        },
+        "colors": {
+          "type": "object",
+          "properties": {
+            "primary": {
+              "type": "string",
+              "example": "#164833"
+            },
+            "secondary": {
+              "type": "string",
+              "example": "#f6bf11"
+            }
+          }
+        }
+      }
+    },
+    "PlayerInfo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "team": {
+          "type": "number"
+        },
+        "league": {
+          "type": "number"
+        },
+        "season": {
+          "type": "number",
+          "example": 55
+        },
+        "name": {
+          "type": "string",
+          "example": "Eric Vanderberg"
+        },
+        "height": {
+          "type": "number",
+          "example": 74
+        },
+        "weight": {
+          "type": "number",
+          "example": 210
+        }
+      }
+    },
+    "players": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 6
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "name": {
+          "type": "string",
+          "example": "Poopity Scoop"
+        },
+        "team": {
+          "type": "string",
+          "example": "BUF"
+        },
+        "height": {
+          "type": "number",
+          "example": 79
+        },
+        "weight": {
+          "type": "number",
+          "example": 280
+        }
+      }
+    },
+    "playerstats": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 10
+        },
+        "name": {
+          "type": "string",
+          "example": "Casius Darrow"
+        },
+        "position": {
+          "type": "string",
+          "example": "RD"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "string",
+          "example": "SEA"
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "gamesPlayed": {
+          "type": "number",
+          "example": 25
+        },
+        "timeOnIce": {
+          "type": "number",
+          "example": 37687
+        },
+        "goals": {
+          "type": "number",
+          "example": 3
+        },
+        "assists": {
+          "type": "number",
+          "example": 8
+        },
+        "points": {
+          "type": "number",
+          "example": 11
+        },
+        "plusMinus": {
+          "type": "number",
+          "example": -12
+        },
+        "pim": {
+          "type": "number",
+          "example": 6
+        },
+        "ppGoals": {
+          "type": "number",
+          "example": 0
+        },
+        "ppAssists": {
+          "type": "number",
+          "example": 1
+        },
+        "ppPoints": {
+          "type": "number",
+          "example": 1
+        },
+        "ppTimeOnIce": {
+          "type": "number",
+          "example": 4013
+        },
+        "shGoals": {
+          "type": "number",
+          "example": 0
+        },
+        "shAssists": {
+          "type": "number",
+          "example": 0
+        },
+        "shPoints": {
+          "type": "number",
+          "example": 0
+        },
+        "shTimeOnIce": {
+          "type": "number",
+          "example": 1817
+        },
+        "fights": {
+          "type": "number",
+          "example": 0
+        },
+        "fightWins": {
+          "type": "number",
+          "example": 0
+        },
+        "fightLosses": {
+          "type": "number",
+          "example": 0
+        },
+        "hits": {
+          "type": "number",
+          "example": 67
+        },
+        "giveaways": {
+          "type": "number",
+          "example": 5
+        },
+        "takeaways": {
+          "type": "number",
+          "example": 18
+        },
+        "shotsBlocked": {
+          "type": "number",
+          "example": 84
+        },
+        "shotsOnGoal": {
+          "type": "number",
+          "example": 78
+        },
+        "gameRating": {
+          "type": "number",
+          "example": 69
+        },
+        "offensiveGameRating": {
+          "type": "number",
+          "example": 63
+        },
+        "devensiveGameRating": {
+          "type": "number",
+          "example": 72
+        },
+        "rookie": {
+          "type": "boolean",
+          "example": false
+        },
+        "advancedStats": {
+          "type": "object",
+          "properties": {
+            "PDO": {
+              "type": "number",
+              "example": 95.2
+            },
+            "GF60": {
+              "type": "number",
+              "example": 2.6
+            },
+            "GA60": {
+              "type": "number",
+              "example": 3.8
+            },
+            "SF60": {
+              "type": "number",
+              "example": 31.9
+            },
+            "SA60": {
+              "type": "number",
+              "example": 29.7
+            },
+            "CF": {
+              "type": "number",
+              "example": 512
+            },
+            "CA": {
+              "type": "number",
+              "example": 506
+            },
+            "CFPct": {
+              "type": "number",
+              "example": 50.3
+            },
+            "CFPctRel": {
+              "type": "number",
+              "example": 6.1
+            },
+            "FF": {
+              "type": "number",
+              "example": 385
+            },
+            "FA": {
+              "type": "number",
+              "example": 365
+            },
+            "FFPct": {
+              "type": "number",
+              "example": 51.3
+            },
+            "FFPctRel": {
+              "type": "number",
+              "example": 7.5
+            }
+          }
+        }
+      }
+    },
+    "rosterstats": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 22
+        },
+        "name": {
+          "type": "string",
+          "example": "Michael Scarn"
+        },
+        "position": {
+          "type": "string",
+          "example": "C"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 2
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "gamesPlayed": {
+          "type": "number",
+          "example": 30
+        },
+        "timeOnIce": {
+          "type": "number",
+          "example": 38555
+        },
+        "goals": {
+          "type": "number",
+          "example": 17
+        },
+        "assists": {
+          "type": "number",
+          "example": 21
+        },
+        "points": {
+          "type": "number",
+          "example": 38
+        },
+        "plusMinus": {
+          "type": "number",
+          "example": 7
+        },
+        "pim": {
+          "type": "number",
+          "example": 10
+        },
+        "ppGoals": {
+          "type": "number",
+          "example": 5
+        },
+        "ppAssists": {
+          "type": "number",
+          "example": 6
+        },
+        "ppPoints": {
+          "type": "number",
+          "example": 11
+        },
+        "ppTimeOnIce": {
+          "type": "number",
+          "example": 5284
+        },
+        "shGoals": {
+          "type": "number",
+          "example": 0
+        },
+        "shAssists": {
+          "type": "number",
+          "example": 0
+        },
+        "shPoints": {
+          "type": "number",
+          "example": 0
+        },
+        "shTimeOnIce": {
+          "type": "number",
+          "example": 553
+        },
+        "fights": {
+          "type": "number",
+          "example": 0
+        },
+        "fightWins": {
+          "type": "number",
+          "example": 0
+        },
+        "fightLosses": {
+          "type": "number",
+          "example": 0
+        },
+        "hits": {
+          "type": "number",
+          "example": 71
+        },
+        "giveaways": {
+          "type": "number",
+          "example": 19
+        },
+        "takeaways": {
+          "type": "number",
+          "example": 9
+        },
+        "shotsBlocked": {
+          "type": "number",
+          "example": 16
+        },
+        "shotsOnGoal": {
+          "type": "number",
+          "example": 135
+        },
+        "gameRating": {
+          "type": "number",
+          "example": 71
+        },
+        "offensiveGameRating": {
+          "type": "number",
+          "example": 77
+        },
+        "devensiveGameRating": {
+          "type": "number",
+          "example": 58
+        },
+        "advancedStats": {
+          "type": "object",
+          "properties": {
+            "PDO": {
+              "type": "number",
+              "example": 96
+            },
+            "GF60": {
+              "type": "number",
+              "example": 3.4
+            },
+            "GA60": {
+              "type": "number",
+              "example": 2.6
+            },
+            "SF60": {
+              "type": "number",
+              "example": 44
+            },
+            "SA60": {
+              "type": "number",
+              "example": 22.6
+            },
+            "CF": {
+              "type": "number",
+              "example": 696
+            },
+            "CA": {
+              "type": "number",
+              "example": 418
+            },
+            "CFPct": {
+              "type": "number",
+              "example": 62.5
+            },
+            "CFPctRel": {
+              "type": "number",
+              "example": -2.1
+            },
+            "FF": {
+              "type": "number",
+              "example": 541
+            },
+            "FA": {
+              "type": "number",
+              "example": 308
+            },
+            "FFPct": {
+              "type": "number",
+              "example": 63.7
+            },
+            "FFPctRel": {
+              "type": "number",
+              "example": -1
+            }
+          }
+        }
+      }
+    },
+    "playerratings": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 9
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "name": {
+          "type": "string",
+          "example": "Tatu Makela"
+        },
+        "team": {
+          "type": "string",
+          "example": "BUF"
+        },
+        "screening": {
+          "type": "number",
+          "example": 5
+        },
+        "gettingOpen": {
+          "type": "number",
+          "example": 9
+        },
+        "passing": {
+          "type": "number",
+          "example": 12
+        },
+        "shootingAccuracy": {
+          "type": "number",
+          "example": 9
+        },
+        "shootingRange": {
+          "type": "number",
+          "example": 12
+        },
+        "offensiveRead": {
+          "type": "number",
+          "example": 12
+        },
+        "checking": {
+          "type": "number",
+          "example": 15
+        },
+        "hitting": {
+          "type": "number",
+          "example": 9
+        },
+        "positioning": {
+          "type": "number",
+          "example": 17
+        },
+        "stickchecking": {
+          "type": "number",
+          "example": 17
+        },
+        "faceoffs": {
+          "type": "number",
+          "example": 5
+        },
+        "defensiveRead": {
+          "type": "number",
+          "example": 15
+        },
+        "agility": {
+          "type": "number",
+          "example": 17
+        },
+        "balance": {
+          "type": "number",
+          "example": 17
+        },
+        "speed": {
+          "type": "number",
+          "example": 17
+        },
+        "stamina": {
+          "type": "number",
+          "example": 15
+        },
+        "strength": {
+          "type": "number",
+          "example": 11
+        },
+        "fighting": {
+          "type": "number",
+          "example": 5
+        },
+        "aggression": {
+          "type": "number",
+          "example": 5
+        },
+        "bravery": {
+          "type": "number",
+          "example": 10
+        },
+        "determination": {
+          "type": "number",
+          "example": 15
+        },
+        "leadership": {
+          "type": "number",
+          "example": 15
+        },
+        "temperament": {
+          "type": "number",
+          "example": 15
+        },
+        "professionalism": {
+          "type": "number",
+          "example": 15
+        }
+      }
+    },
+    "goalies": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 33
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "name": {
+          "type": "string",
+          "example": "Tibuk Soonika"
+        },
+        "team": {
+          "type": "string",
+          "example": "CHI"
+        },
+        "height": {
+          "type": "number",
+          "example": 76
+        },
+        "weight": {
+          "type": "number",
+          "example": 210
+        }
+      }
+    },
+    "goaliestats": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 36
+        },
+        "name": {
+          "type": "string",
+          "example": "Name Redacted"
+        },
+        "position": {
+          "type": "string",
+          "example": "G"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "string",
+          "example": "NEW"
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "gamesPlayed": {
+          "type": "number",
+          "example": 8
+        },
+        "minutes": {
+          "type": "number",
+          "example": 443
+        },
+        "wins": {
+          "type": "number",
+          "example": 4
+        },
+        "losses": {
+          "type": "number",
+          "example": 1
+        },
+        "ot": {
+          "type": "number",
+          "example": 2
+        },
+        "shotsAgainst": {
+          "type": "number",
+          "example": 167
+        },
+        "saves": {
+          "type": "number",
+          "example": 145
+        },
+        "goalsAgainst": {
+          "type": "number",
+          "example": 22
+        },
+        "gaa": {
+          "type": "number",
+          "example": 2.98
+        },
+        "shutouts": {
+          "type": "number",
+          "example": 0
+        },
+        "savePct": {
+          "type": "number",
+          "example": 0.868
+        },
+        "gameRating": {
+          "type": "number",
+          "example": 54
+        },
+        "rookie": {
+          "type": "boolean",
+          "example": false
+        }
+      }
+    },
+    "goalieratings": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 35
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "name": {
+          "type": "string",
+          "example": "Billy Sorokin"
+        },
+        "team": {
+          "type": "string",
+          "example": "WPG"
+        },
+        "blocker": {
+          "type": "number",
+          "example": 14
+        },
+        "glove": {
+          "type": "number",
+          "example": 14
+        },
+        "passing": {
+          "type": "number",
+          "example": 7
+        },
+        "pokeCheck": {
+          "type": "number",
+          "example": 7
+        },
+        "positioning": {
+          "type": "number",
+          "example": 15
+        },
+        "rebound": {
+          "type": "number",
+          "example": 13
+        },
+        "recovery": {
+          "type": "number",
+          "example": 14
+        },
+        "puckhandling": {
+          "type": "number",
+          "example": 7
+        },
+        "lowShots": {
+          "type": "number",
+          "example": 13
+        },
+        "reflexes": {
+          "type": "number",
+          "example": 15
+        },
+        "skating": {
+          "type": "number",
+          "example": 7
+        },
+        "aggression": {
+          "type": "number",
+          "example": 8
+        },
+        "mentalToughness": {
+          "type": "number",
+          "example": 13
+        },
+        "determination": {
+          "type": "number",
+          "example": 15
+        },
+        "leadership": {
+          "type": "number",
+          "example": 15
+        },
+        "goalieStamina": {
+          "type": "number",
+          "example": 9
+        },
+        "professionalism": {
+          "type": "number",
+          "example": 15
+        }
+      }
+    },
+    "playoffs": {
+      "type": "object",
+      "properties": {
+        "team1": {
+          "type": "number",
+          "example": 3
+        },
+        "team2": {
+          "type": "number",
+          "example": 12
+        },
+        "LeagueID": {
+          "type": "number",
+          "example": 0
+        },
+        "SeasonID": {
+          "type": "number",
+          "example": 58
+        },
+        "team1Wins": {
+          "type": "number",
+          "example": 4
+        },
+        "team2Wins": {
+          "type": "number",
+          "example": 3
+        },
+        "team1_Name": {
+          "type": "string",
+          "example": "Toronto"
+        },
+        "team1_Nickname": {
+          "type": "string",
+          "example": "North Stars"
+        },
+        "team1_Abbr": {
+          "type": "string",
+          "example": "TOR"
+        },
+        "team2_Name": {
+          "type": "string",
+          "example": "San Francisco"
+        },
+        "team2_Nickname": {
+          "type": "string",
+          "example": "Pride"
+        },
+        "team2_Abbr": {
+          "type": "string",
+          "example": "SFP"
+        }
+      }
+    },
+    "schedule": {
+      "type": "object",
+      "properties": {
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "date": {
+          "type": "string",
+          "example": "2024-10-10"
+        },
+        "homeTeam": {
+          "type": "number",
+          "example": 1
+        },
+        "homeScore": {
+          "type": "number",
+          "example": 1
+        },
+        "awayTeam": {
+          "type": "number",
+          "example": 2
+        },
+        "awayScore": {
+          "type": "number",
+          "example": 4
+        },
+        "type": {
+          "type": "string",
+          "example": "Regular Season"
+        },
+        "played": {
+          "type": "number",
+          "example": 1
+        },
+        "overtime": {
+          "type": "number",
+          "example": 0
+        },
+        "shootout": {
+          "type": "number",
+          "example": 0
+        }
+      }
+    },
+    "standings": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "type": "number",
+          "example": 10
+        },
+        "id": {
+          "type": "number",
+          "example": 18
+        },
+        "name": {
+          "type": "string",
+          "example": "Atlanta Inferno"
+        },
+        "location": {
+          "type": "string",
+          "example": "Atlanta"
+        },
+        "abbreviation": {
+          "type": "string",
+          "example": "ATL"
+        },
+        "gp": {
+          "type": "number",
+          "example": 29
+        },
+        "wins": {
+          "type": "number",
+          "example": 15
+        },
+        "losses": {
+          "type": "number",
+          "example": 13
+        },
+        "OTL": {
+          "type": "number",
+          "example": 1
+        },
+        "points": {
+          "type": "number",
+          "example": 31
+        },
+        "winPercent": {
+          "type": "number",
+          "example": "0.534"
+        },
+        "ROW": {
+          "type": "number",
+          "example": 14
+        },
+        "goalsFor": {
+          "type": "number",
+          "example": 92
+        },
+        "goalsAgainst": {
+          "type": "number",
+          "example": 90
+        },
+        "goalDiff": {
+          "type": "number",
+          "example": 2
+        },
+        "home": {
+          "type": "object",
+          "properties": {
+            "wins": {
+              "type": "number",
+              "example": 5
+            },
+            "losses": {
+              "type": "number",
+              "example": 5
+            },
+            "OTL": {
+              "type": "number",
+              "example": 1
+            }
+          }
+        },
+        "away": {
+          "type": "object",
+          "properties": {
+            "wins": {
+              "type": "number",
+              "example": 10
+            },
+            "losses": {
+              "type": "number",
+              "example": 8
+            },
+            "OTL": {
+              "type": "number",
+              "example": 0
+            }
+          }
+        },
+        "shootout": {
+          "type": "object",
+          "properties": {
+            "wins": {
+              "type": "number",
+              "example": 1
+            },
+            "losses": {
+              "type": "number",
+              "example": 0
+            }
+          }
+        }
+      }
+    },
+    "preseason": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "type": "number",
+          "example": 10
+        },
+        "id": {
+          "type": "number",
+          "example": 18
+        },
+        "name": {
+          "type": "string",
+          "example": "Atlanta Inferno"
+        },
+        "location": {
+          "type": "string",
+          "example": "Atlanta"
+        },
+        "abbreviation": {
+          "type": "string",
+          "example": "ATL"
+        },
+        "gp": {
+          "type": "number",
+          "example": 7
+        },
+        "wins": {
+          "type": "number",
+          "example": 5
+        },
+        "losses": {
+          "type": "number",
+          "example": 2
+        },
+        "OTL": {
+          "type": "number",
+          "example": 0
+        },
+        "points": {
+          "type": "number",
+          "example": 10
+        },
+        "winPercent": {
+          "type": "number",
+          "example": "0.714"
+        },
+        "ROW": {
+          "type": "number",
+          "example": 4
+        },
+        "goalsFor": {
+          "type": "number",
+          "example": 19
+        },
+        "goalsAgainst": {
+          "type": "number",
+          "example": 13
+        },
+        "goalDiff": {
+          "type": "number",
+          "example": 6
+        },
+        "home": {
+          "type": "object",
+          "properties": {
+            "wins": {
+              "type": "number",
+              "example": 4
+            },
+            "losses": {
+              "type": "number",
+              "example": 0
+            },
+            "OTL": {
+              "type": "number",
+              "example": 0
+            }
+          }
+        },
+        "away": {
+          "type": "object",
+          "properties": {
+            "wins": {
+              "type": "number",
+              "example": 1
+            },
+            "losses": {
+              "type": "number",
+              "example": 2
+            },
+            "OTL": {
+              "type": "number",
+              "example": 0
+            }
+          }
+        },
+        "shootout": {
+          "type": "object",
+          "properties": {
+            "wins": {
+              "type": "number",
+              "example": 1
+            },
+            "losses": {
+              "type": "number",
+              "example": 0
+            }
+          }
+        }
+      }
+    },
+    "goalLeaders": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 5
+        },
+        "name": {
+          "type": "string",
+          "example": "Martijn  Westbroek"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 1
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "goals": {
+          "type": "number",
+          "example": 41
+        }
+      }
+    },
+    "assistLeaders": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 284
+        },
+        "name": {
+          "type": "string",
+          "example": "Esa Parmborg"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 8
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "assists": {
+          "type": "number",
+          "example": 60
+        }
+      }
+    },
+    "penaltyLeaders": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 478
+        },
+        "name": {
+          "type": "string",
+          "example": "DeMaricus Smyth"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 18
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "penaltyMinutes": {
+          "type": "number",
+          "example": 148
+        }
+      }
+    },
+    "plusMinusLeaders": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 950
+        },
+        "name": {
+          "type": "string",
+          "example": "Axel Meszaros"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 3
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "plusMinus": {
+          "type": "number",
+          "example": 55
+        }
+      }
+    },
+    "pointLeaders": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 284
+        },
+        "name": {
+          "type": "string",
+          "example": "Esa Parmberg"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 8
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "points": {
+          "type": "number",
+          "example": 79
+        }
+      }
+    },
+    "ppgLeaders": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 284
+        },
+        "name": {
+          "type": "string",
+          "example": "Michael Scarn"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 2
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "powerPlayGoals": {
+          "type": "number",
+          "example": 14
+        }
+      }
+    },
+    "shgLeaders": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 413
+        },
+        "name": {
+          "type": "string",
+          "example": "Nathan Explosion"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 18
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "shorthandedGoals": {
+          "type": "number",
+          "example": 4
+        }
+      }
+    },
+    "shotpctLeaders": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 692
+        },
+        "name": {
+          "type": "string",
+          "example": "Karl Krashwagen"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 7
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "shotPct": {
+          "type": "number",
+          "example": 0.1963
+        }
+      }
+    },
+    "shotLeaders": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 457
+        },
+        "name": {
+          "type": "string",
+          "example": "Theo Morgan"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 2
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "shots": {
+          "type": "number",
+          "example": 305
+        }
+      }
+    },
+    "shotblockLeaders": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 470
+        },
+        "name": {
+          "type": "string",
+          "example": "Lyle Odelein III"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 2
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "shotsBlocked": {
+          "type": "number",
+          "example": 305
+        }
+      }
+    },
+    "gaLeaders": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 738
+        },
+        "name": {
+          "type": "string",
+          "example": "Olli Saarinen, Jr"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 14
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "goalsAgainst": {
+          "type": "number",
+          "example": 234
+        }
+      }
+    },
+    "gaaLeaders": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 661
+        },
+        "name": {
+          "type": "string",
+          "example": "Cale Amundsen"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 8
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "gaa": {
+          "type": "number",
+          "example": 1.72
+        }
+      }
+    },
+    "gpLeaders": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 738
+        },
+        "name": {
+          "type": "string",
+          "example": "Olli Saarinen, Jr"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 14
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "gamesPlayed": {
+          "type": "number",
+          "example": 58
+        }
+      }
+    },
+    "gsaaLeaders": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 629
+        },
+        "name": {
+          "type": "string",
+          "example": "Frans Eller"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 5
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "gamesPlayed": {
+          "type": "number",
+          "example": 23.5308
+        }
+      }
+    },
+    "lossLeaders": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 565
+        },
+        "name": {
+          "type": "string",
+          "example": "Strom Chamberlain"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 11
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "losses": {
+          "type": "number",
+          "example": 30
+        }
+      }
+    },
+    "winLeaders": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 596
+        },
+        "name": {
+          "type": "string",
+          "example": "A Jobin"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 2
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "losses": {
+          "type": "number",
+          "example": 39
+        }
+      }
+    },
+    "otlLeaders": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 429
+        },
+        "name": {
+          "type": "string",
+          "example": "Knox Booth"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 13
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "overtimelosses": {
+          "type": "number",
+          "example": 6
+        }
+      }
+    },
+    "savepctLeaders": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 497
+        },
+        "name": {
+          "type": "string",
+          "example": "White Goodman"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 15
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "savePct": {
+          "type": "number",
+          "example": 0.927
+        }
+      }
+    },
+    "saveLeaders": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 738
+        },
+        "name": {
+          "type": "string",
+          "example": "Olli Saarinen, Jr"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 14
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "saves": {
+          "type": "number",
+          "example": 2205
+        }
+      }
+    },
+    "shutoutLeaders": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 33
+        },
+        "name": {
+          "type": "string",
+          "example": "Tibuk Soonika"
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "team": {
+          "type": "number",
+          "example": 1
+        },
+        "season": {
+          "type": "number",
+          "example": 58
+        },
+        "shutouts": {
+          "type": "number",
+          "example": 13
+        }
+      }
+    },
+    "Livestream": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "league": {
+          "type": "string",
+          "example": "shl"
+        },
+        "videoId": {
+          "type": "string",
+          "example": "asdFgdasd3"
+        },
+        "isLive": {
+          "type": "string",
+          "example": "live"
+        }
+      }
+    },
+    "Fantasy": {
+      "type": "object",
+      "properties": {
+        "seasonID": {
+          "type": "number",
+          "example": 59
+        },
+        "position": {
+          "type": "string",
+          "example": "D"
+        },
+        "name": {
+          "type": "string",
+          "example": "Lyle Odelein III"
+        },
+        "fantasyPoints": {
+          "type": "number",
+          "example": 588.2
+        }
+      }
+    },
+    "playerAllTimeGrouped": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "number", "example": 3356 },
+        "name": { "type": "string", "example": "Sean Davies" },
+        "league": { "type": "number", "example": 0 },
+        "teamAbbr": { "type": "string", "example": "NEW" },
+        "seasons": { "type": "number", "example": 10 },
+        "gamesPlayed": { "type": "number", "example": 660 },
+        "goals": { "type": "number", "example": 54 },
+        "assists": { "type": "number", "example": 239 },
+        "points": { "type": "number", "example": 293 },
+        "plusMinus": { "type": "number", "example": 374 },
+        "pim": { "type": "number", "example": 425 },
+        "shotsOnGoal": { "type": "number", "example": 1126 },
+        "hits": { "type": "number", "example": 672 },
+        "shotsBlocked": { "type": "number", "example": 1655 },
+        "giveaways": { "type": "number", "example": 116 },
+        "takeaways": { "type": "number", "example": 482 },
+        "timeOnIce": { "type": "number", "example": 782401 },
+        "evTimeOnIce": { "type": "number", "example": 683670 },
+        "ppTimeOnIce": { "type": "number", "example": 18128 },
+        "shTimeOnIce": { "type": "number", "example": 80603 },
+        "ppGoals": { "type": "number", "example": 5 },
+        "ppAssists": { "type": "number", "example": 10 },
+        "ppPoints": { "type": "number", "example": 15 },
+        "shGoals": { "type": "number", "example": 2 },
+        "shAssists": { "type": "number", "example": 35 },
+        "shPoints": { "type": "number", "example": 37 },
+        "evGoals": { "type": "number", "example": 47 },
+        "evAssists": { "type": "number", "example": 194 },
+        "evPoints": { "type": "number", "example": 241 },
+        "fights": { "type": "number", "example": 0 },
+        "fightWins": { "type": "number", "example": 0 },
+        "fightLosses": { "type": "number", "example": 0 },
+        "stillActive": { "type": "boolean", "example": false }
+      }
+    },
+    "goalieAllTimeGrouped": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "example": "grouped",
+          "description": "Indicates this is grouped all-time goalie data"
+        },
+        "id": {
+          "type": "number",
+          "example": 1827
+        },
+        "name": {
+          "type": "string",
+          "example": "Jeff Newman"
+        },
+        "position": {
+          "type": "string",
+          "example": "G"
+        },
+        "league": {
+          "type": "number",
+          "example": 1
+        },
+        "seasons": {
+          "type": "number",
+          "example": 4
+        },
+        "teamAbbr": {
+          "type": "string",
+          "example": "DET"
+        },
+        "gamesPlayed": {
+          "type": "number",
+          "example": 233
+        },
+        "minutes": {
+          "type": "number",
+          "example": 13603
+        },
+        "wins": {
+          "type": "number",
+          "example": 157
+        },
+        "losses": {
+          "type": "number",
+          "example": 68
+        },
+        "ot": {
+          "type": "number",
+          "example": 7,
+          "description": "Overtime losses"
+        },
+        "shotsAgainst": {
+          "type": "number",
+          "example": 5920
+        },
+        "saves": {
+          "type": "number",
+          "example": 5294
+        },
+        "goalsAgainst": {
+          "type": "number",
+          "example": 626
+        },
+        "gaa": {
+          "type": "string",
+          "example": "2.77"
+        },
+        "shutouts": {
+          "type": "number",
+          "example": 29
+        },
+        "savePct": {
+          "type": "string",
+          "example": "0.894"
+        },
+        "stillActive": {
+          "type": "boolean",
+          "example": false
+        }
+      }
+    }
+  },
+  "externalDocs": {
+    "description": "Find out more about Swagger",
+    "url": "http://swagger.io"
+  }
+}

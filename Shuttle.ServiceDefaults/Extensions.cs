@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -73,9 +74,11 @@ public static class Extensions {
                                 !context.Request.Path.StartsWithSegments(HealthEndpointPath)
                                 && !context.Request.Path.StartsWithSegments(AlivenessEndpointPath)
                         )
+
                         // Uncomment the following line to enable gRPC instrumentation (requires the OpenTelemetry.Instrumentation.GrpcNetClient package)
                         //.AddGrpcClientInstrumentation()
-                        .AddHttpClientInstrumentation();
+                        .AddHttpClientInstrumentation()
+                        .AddConsoleExporter();
                 }
             )
             .WithLogging(
@@ -151,5 +154,11 @@ public static class Extensions {
         .AllowAnonymous();
 
         return app;
+    }
+    
+    public static IHostApplicationBuilder AddTelemetryService(this IHostApplicationBuilder builder, ActivitySource activitySource) {
+        builder.Services.AddOpenTelemetry()
+            .WithTracing(tracing => tracing.AddSource(activitySource.Name));
+        return builder;
     }
 }

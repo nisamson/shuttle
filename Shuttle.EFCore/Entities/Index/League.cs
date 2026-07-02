@@ -1,49 +1,53 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Shuttle.Shl.Api.Models.Common;
 
 namespace Shuttle.EFCore.Entities.Index;
 
+[EntityTypeConfiguration(typeof(LeagueEntityConfiguration))]
 public record League : IEntityConvertible<League, Shl.Api.Models.Index.V1.League> {
 
-    public required int Id { get; set; }
+    [DatabaseGenerated(DatabaseGeneratedOption.None)]
+    public required int LeagueId { get; set; }
 
     [MaxLength(128)] public required string Name { get; set; }
 
     [MaxLength(16)] public required string Abbreviation { get; set; }
 
+    [NotMapped]
     public KnownLeague KnownLeague => KnownLeague.FromAbbreviation(Abbreviation);
 
-    public static League From(Shl.Api.Models.Index.V1.League target) {
+    public static League FromModel(Shl.Api.Models.Index.V1.League target) {
         return new League() {
-            Id = target.Id,
+            LeagueId = target.Id,
             Name = target.Name,
             Abbreviation = target.Abbreviation
         };
     }
 
-    public Shl.Api.Models.Index.V1.League To() {
-        return new(Id, Name, Abbreviation);
+    public Shl.Api.Models.Index.V1.League ToModel() {
+        return new(LeagueId, Name, Abbreviation);
     }
 }
 
+[EntityTypeConfiguration(typeof(LeagueSeasonEntityConfiguration))]
 public record LeagueSeason : IEntityConvertible<LeagueSeason, Shl.Api.Models.Index.V1.LeagueSeason> {
-    public int LeagueId { get; set; }
-    public int Season { get; set; }
-    public League? League { get; set; }
+    public required int LeagueId { get; set; }
+    public required int Season { get; set; }
+    public League League { get; set; } = null!;
 
-    public KnownLeague KnownLeague =>
-        League is not null ? KnownLeague.FromAbbreviation(League.Abbreviation) : KnownLeague.Shl;
+    public KnownLeague KnownLeague => KnownLeague.FromAbbreviation(League.Abbreviation);
 
-    public static LeagueSeason From(Shl.Api.Models.Index.V1.LeagueSeason original) {
+    public static LeagueSeason FromModel(Shl.Api.Models.Index.V1.LeagueSeason original) {
         return new LeagueSeason() {
             Season = original.Season,
             LeagueId = original.Id,
         };
     }
 
-    public Shl.Api.Models.Index.V1.LeagueSeason To() {
+    public Shl.Api.Models.Index.V1.LeagueSeason ToModel() {
         if (League is null) {
             throw new InvalidOperationException("Cannot convert LeagueSeason to API model when League is null.");
         }
@@ -55,13 +59,13 @@ public record LeagueSeason : IEntityConvertible<LeagueSeason, Shl.Api.Models.Ind
 public class LeagueEntityConfiguration : IEntityTypeConfiguration<League> {
 
     public void Configure(EntityTypeBuilder<League> builder) {
-        builder.HasKey(l => l.Id);
+        builder.HasKey(l => l.LeagueId);
         builder.HasIndex(l => l.Name).IsUnique();
         builder.HasIndex(l => l.Abbreviation).IsUnique();
-
         builder.HasMany<LeagueSeason>()
             .WithOne(ls => ls.League)
             .HasForeignKey(ls => ls.LeagueId)
+            .HasPrincipalKey(ls => ls.LeagueId)
             .OnDelete(DeleteBehavior.Cascade)
             .IsRequired();
     }
@@ -71,5 +75,6 @@ public class LeagueSeasonEntityConfiguration : IEntityTypeConfiguration<LeagueSe
     public void Configure(EntityTypeBuilder<LeagueSeason> builder) {
         builder.HasKey(ls => new { ls.LeagueId, ls.Season });
         builder.HasIndex(ls => ls.Season);
+        builder.Navigation(ls => ls.League).AutoInclude();
     }
 }

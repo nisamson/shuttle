@@ -9,6 +9,9 @@ namespace Shuttle.EFCore;
 
 public class DesignTimeContextFactory : IDesignTimeDbContextFactory<ShlDbContext> {
     public ShlDbContext CreateDbContext(string[] args) {
+        if (!Debugger.IsAttached) {
+            // Debugger.Launch();
+        }
         dotenv.net.DotEnv.Load();
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings() {
             Args = args,

@@ -1,4 +1,5 @@
 ﻿using Refit;
+using Shuttle.Shl.Api.Models.Common;
 using Shuttle.Shl.Api.Models.Index.V1;
 
 namespace Shuttle.Shl.Api.Client;
@@ -16,6 +17,14 @@ public interface IShlIndexV1Client {
     Task<IList<Conference>> GetConferences(
         int league,
         int? season = null,
+        CancellationToken cancellationToken = default
+    );
+
+    [Get("/divisions")]
+    Task<IList<Division>> GetDivisions(
+        int league = 0,
+        int season = 0,
+        int? conference = null,
         CancellationToken cancellationToken = default
     );
 

@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using System.Runtime.InteropServices;
 using CrystalQuartz.Application;
 using CrystalQuartz.Application.Startup;
 using CrystalQuartz.AspNetCore;
@@ -13,6 +14,7 @@ using Quartz.Impl;
 using Shuttle.Api.Jobs.Jobs;
 using Shuttle.Api.Jobs.Quartz;
 using Shuttle.EFCore;
+using Shuttle.ServiceDefaults;
 
 namespace Shuttle.Api.Jobs;
 
@@ -65,13 +67,14 @@ public static class Startup {
                     t.AddQuartzInstrumentation();
                 }
             );
+        builder.AddTelemetryService(ActivitySources.ShuttleJobs);
         builder.Services.AddSingleton(new CrystalQuartzOptions());
         builder.Services.AddSingleton(provider => {
                 var scheduleFactory = provider.GetRequiredService<ISchedulerFactory>();
                 var options = provider.GetRequiredService<CrystalQuartzOptions>();
                 var app = new CrystalQuartzPanelApplication(
                     new FuncSchedulerProvider(() => scheduleFactory.GetScheduler().GetAwaiter().GetResult()),
-                    options.ToRuntimeOptions(SchedulerEngineProviders.SchedulerEngineResolvers, ".NET Standard 2.1")
+                    options.ToRuntimeOptions(SchedulerEngineProviders.SchedulerEngineResolvers, RuntimeInformation.FrameworkDescription)
                 );
                 return app.Run();
             }

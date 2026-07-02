@@ -7,6 +7,7 @@ using LeagueSeason = Shuttle.EFCore.Entities.Index.LeagueSeason;
 
 namespace Shuttle.EFCore.Entities.Ratings;
 
+[EntityTypeConfiguration(typeof(SkaterRatingsEntityConfiguration))]
 public class IndexSkaterRatings : ISkaterRatings, IEntityConvertible<IndexSkaterRatings, SkaterRatings> {
     public required int PlayerId { get; set; }
     public required int Season { get; set; }
@@ -41,11 +42,11 @@ public class IndexSkaterRatings : ISkaterRatings, IEntityConvertible<IndexSkater
     public required int Fighting { get; set; }
     public required int AppliedTpe { get; set; }
     public required int Faceoffs { get; set; }
+
+    public PlayerRef Player { get; } = null!;
+    public LeagueSeason LeagueSeason { get; } = null!;
     
-    public PlayerRef? Player { get; }
-    public Index.LeagueSeason? LeagueSeason { get; }
-    
-    public static IndexSkaterRatings From(SkaterRatings original) {
+    public static IndexSkaterRatings FromModel(SkaterRatings original) {
         return new() {
             PlayerId = original.Id,
             Season = original.Season,
@@ -82,7 +83,7 @@ public class IndexSkaterRatings : ISkaterRatings, IEntityConvertible<IndexSkater
             Faceoffs = original.Faceoffs
         };
     }
-    public SkaterRatings To() {
+    public SkaterRatings ToModel() {
         return new(
             PlayerId,
             LeagueId,
@@ -174,11 +175,13 @@ public class SkaterRatingsEntityConfiguration : IEntityTypeConfiguration<IndexSk
         builder.HasOne<PlayerRef>()
             .WithMany()
             .HasForeignKey(p => p.PlayerId)
+            .HasPrincipalKey(p => p.Id)
             .OnDelete(DeleteBehavior.Cascade)
             .IsRequired();
         builder.HasOne<LeagueSeason>(p => p.LeagueSeason)
             .WithMany()
             .HasForeignKey(p => new { p.LeagueId, p.Season })
+            .HasPrincipalKey(ls => new { ls.LeagueId, ls.Season })
             .OnDelete(DeleteBehavior.Cascade)
             .IsRequired();
     }

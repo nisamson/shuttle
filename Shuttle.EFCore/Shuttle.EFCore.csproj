@@ -30,6 +30,7 @@
     
     <ItemGroup>
         <ProjectReference Include="..\Shuttle.Core\Shuttle.Core.csproj" />
+        <ProjectReference Include="..\Shuttle.Shl.Api.Client\Shuttle.Shl.Api.Client.csproj" />
         <ProjectReference Include="..\Shuttle.Shl.Api.Models\Shuttle.Shl.Api.Models.csproj" />
         <EmbeddedResource Include="Migrations\SqlScript\*" />
     </ItemGroup>

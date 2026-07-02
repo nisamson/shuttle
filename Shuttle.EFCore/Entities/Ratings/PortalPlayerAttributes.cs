@@ -7,15 +7,14 @@ namespace Shuttle.EFCore.Entities.Ratings;
 
 public class PortalPlayerAttributes {
     public required int PlayerId { get; set; }
-    public required int UserId { get; set; }
     
     /// <summary>
     /// Navigation property to the player
     /// </summary>
-    public PlayerInfo Player { get; set; } = null!;
+    public PlayerInformation Player { get; set; } = null!;
 }
 
-[EntityTypeConfiguration(typeof(PortalSkaterAttributes))]
+[EntityTypeConfiguration(typeof(PortalSkaterAttributesConfiguration))]
 public class PortalSkaterAttributes : PortalPlayerAttributes, ISkaterRatings {
     public int Screening { get; set; }
     public int GettingOpen { get; set; }
@@ -47,7 +46,7 @@ public class PortalSkaterAttributes : PortalPlayerAttributes, ISkaterRatings {
     public int Fighting { get; set; }
 }
 
-[EntityTypeConfiguration(typeof(PortalGoaltenderAttributes))]
+[EntityTypeConfiguration(typeof(PortalGoaltenderAttributesConfiguration))]
 public class PortalGoaltenderAttributes : PortalPlayerAttributes, IGoaltenderRatings {
     public int Aggression { get; set; }
     public int MentalToughness { get; set; }
@@ -72,13 +71,13 @@ public class PortalGoaltenderAttributes : PortalPlayerAttributes, IGoaltenderRat
 public static class AttrBaseConfiguration<T> where T : PortalPlayerAttributes {
     public static void Configure(EntityTypeBuilder<T> builder, string tableName) {
         builder.HasKey(p => p.PlayerId);
-        builder.HasIndex(p => p.UserId);
         builder.HasOne(p => p.Player)
             .WithOne()
             .HasForeignKey<T>(inf => new {
                     inf.PlayerId
                 }
             )
+            .HasPrincipalKey<PlayerInformation>(p => new { p.PlayerId })
             .OnDelete(DeleteBehavior.Cascade);
         builder.AddTemporalTableSupport(tableName);
     }

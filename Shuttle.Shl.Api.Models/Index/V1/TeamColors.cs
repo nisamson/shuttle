@@ -8,7 +8,9 @@ public record TeamColors(
     [property: JsonConverter(typeof(ColorJsonConverter))]
     Color Primary,
     [property: JsonConverter(typeof(ColorJsonConverter))]
-    Color Secondary
+    Color Secondary,
+    [property: JsonConverter(typeof(ColorJsonConverter))]
+    Color? Text
 );
 
 public class ColorJsonConverter : JsonConverter<Color> {
