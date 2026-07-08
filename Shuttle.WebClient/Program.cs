@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using MudBlazor;
-using MudBlazor.Services;
+using Microsoft.FluentUI.AspNetCore.Components;
 using Shuttle.WebClient;
 using Shuttle.WebClient.Services;
 
@@ -16,9 +15,7 @@ builder.Services.AddMsalAuthentication(options => {
     }
 );
 
-builder.Services.AddMudServices();
-builder.Services.AddMudBlazorDialog();
-builder.Services.AddMudMarkdownServices();
+builder.Services.AddFluentUIComponents();
 builder.Services.AddLocalStorageServices();
 builder.Services.AddSingleton<IShuttleOptionsStorage, ShuttleOptionsLocalStorage>();
 if (builder.HostEnvironment.IsDevelopment()) {

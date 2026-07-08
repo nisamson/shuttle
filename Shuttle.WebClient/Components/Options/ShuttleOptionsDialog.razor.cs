@@ -1,23 +1,18 @@
-﻿using Microsoft.AspNetCore.Components;
-using MudBlazor;
-using MudBlazor.Extensions;
-using MudBlazor.Extensions.Components.ObjectEdit;
-using MudBlazor.Extensions.Options;
-using Shuttle.WebClient.Components.Dev;
+using Microsoft.AspNetCore.Components;
+using Microsoft.FluentUI.AspNetCore.Components;
 using Shuttle.WebClient.Models.Options;
-using Shuttle.WebClient.Services;
 
 namespace Shuttle.WebClient.Components.Options;
 
-public partial class ShuttleOptionsDialog : ComponentBase {
-    private bool IsTouched => !IShuttleOptions.Equals(OptionsModel, Options);
-    
+public partial class ShuttleOptionsDialog : ComponentBase, IDialogContentComponent<ShuttleOptions> {
+    private bool IsTouched => !IShuttleOptions.Equals(OptionsModel, Content);
+
     [CascadingParameter]
-    public IMudDialogInstance Dialog { get; set; } = null!;
+    public FluentDialog Dialog { get; set; } = null!;
 
     [Parameter, EditorRequired]
-    public required ShuttleOptions Options { get; set; }
-    
+    public required ShuttleOptions Content { get; set; }
+
     private ShuttleOptionsModel OptionsModel { get; set; } = ShuttleOptionsModel.FromOptions(ShuttleOptions.Default);
 
     [Inject]
@@ -25,29 +20,28 @@ public partial class ShuttleOptionsDialog : ComponentBase {
 
     protected override void OnParametersSet() {
         Logger.LogTrace("Updating options from context");
-        
-        if (IShuttleOptions.Equals(OptionsModel, Options)) {
+
+        if (IShuttleOptions.Equals(OptionsModel, Content)) {
             return;
         }
 
-        OptionsModel = ShuttleOptionsModel.FromOptions(Options);
+        OptionsModel = ShuttleOptionsModel.FromOptions(Content);
         StateHasChanged();
     }
 
-    private void OnOptionsEdited() {
-        if (IShuttleOptions.Equals(OptionsModel, Options)) {
+    private async Task OnOptionsEdited() {
+        if (IShuttleOptions.Equals(OptionsModel, Content)) {
             Logger.LogDebug("Options edited, but options are the same as current options, ignoring");
-            Dialog.Close(DialogResult.Ok(null as ShuttleOptions));
+            await Dialog.CancelAsync();
             return;
         }
         Logger.LogDebug("Options edited, closing dialog with new options {OptionsModel}", OptionsModel);
         var options = OptionsModel.ToOptions();
-        Dialog.Close(DialogResult.Ok(options));
+        await Dialog.CloseAsync(options);
     }
 
-    private void OnCancelEdit() {
-        Dialog.Close(DialogResult.Cancel());
+    private async Task OnCancelEdit() {
+        await Dialog.CancelAsync();
     }
-    
+
 }
-
