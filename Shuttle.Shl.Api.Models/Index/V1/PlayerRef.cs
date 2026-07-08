@@ -9,7 +9,7 @@ public interface IPlayerSeason : IPlayerRef, ILeagueSeason;
 
 public record PlayerRef(int Id, string Name) : IPlayerRef;
 
-public record Player(
+public record IndexPlayer(
     int Id,
     string Name,
     int League,

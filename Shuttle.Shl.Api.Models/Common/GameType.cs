@@ -26,6 +26,12 @@ public static class GameTypeExtensions {
             };
         }
 
+        public static GameType FromId(int value) {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(value, 3);
+            return (GameType)value;
+        }
+
         public string ToShortString() {
             return gameType switch {
                 GameType.Playoffs => "po",

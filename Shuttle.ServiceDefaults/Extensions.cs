@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -8,8 +9,6 @@ using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
-using Serilog;
-using Serilog.Enrichers.Span;
 using Shuttle.Core;
 
 namespace Shuttle.ServiceDefaults;
@@ -26,7 +25,6 @@ public static class Extensions {
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder {
         builder.ConfigureOpenTelemetry();
-        builder.AddShuttleSerilog();
 
         builder.AddDefaultHealthChecks();
 
@@ -41,6 +39,9 @@ public static class Extensions {
             }
         );
 
+        builder.Services.AddRequestTimeouts();
+        builder.Services.AddOutputCache();
+
         // Uncomment the following to restrict the allowed schemes for service discovery.
         // builder.Services.Configure<ServiceDiscoveryOptions>(options =>
         // {
@@ -52,11 +53,10 @@ public static class Extensions {
 
     public static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder {
-        builder.Logging.AddOpenTelemetry(logging => {
-                logging.IncludeFormattedMessage = true;
-                logging.IncludeScopes = true;
-            }
-        );
+        if (builder.Environment.IsDevelopment()) {
+            builder.Logging.SetMinimumLevel(LogLevel.Trace)
+                .AddEventSourceLogger();
+        }
 
         builder.Services.AddOpenTelemetry()
             .WithMetrics(metrics => {
@@ -67,43 +67,30 @@ public static class Extensions {
             )
             .WithTracing(tracing => {
                     tracing.AddSource(builder.Environment.ApplicationName)
-                        .AddAspNetCoreInstrumentation(tracing =>
+                        .AddAspNetCoreInstrumentation(ancTracing =>
 
                             // Exclude health check requests from tracing
-                            tracing.Filter = context =>
+                            ancTracing.Filter = context =>
                                 !context.Request.Path.StartsWithSegments(HealthEndpointPath)
                                 && !context.Request.Path.StartsWithSegments(AlivenessEndpointPath)
                         )
 
                         // Uncomment the following line to enable gRPC instrumentation (requires the OpenTelemetry.Instrumentation.GrpcNetClient package)
                         //.AddGrpcClientInstrumentation()
-                        .AddHttpClientInstrumentation();
+                        .AddHttpClientInstrumentation()
+                        .AddConsoleExporter();
+                }
+            )
+            .WithLogging(
+                configureBuilder: null,
+                configureOptions: logging => {
+                    logging.IncludeFormattedMessage = true;
+                    logging.IncludeScopes = true;
                 }
             );
 
         builder.AddOpenTelemetryExporters();
 
-        return builder;
-    }
-
-    private static TBuilder AddShuttleSerilog<TBuilder>(this TBuilder builder) 
-        where TBuilder : IHostApplicationBuilder {
-        var useOtlpExporter = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
-        var loggerConfiguration = new LoggerConfiguration()
-            .ReadFrom.Configuration(builder.Configuration)
-            .WriteTo.Console()
-            .Enrich.FromLogContext()
-            .Enrich.WithSpan();
-
-        if (useOtlpExporter) {
-            loggerConfiguration.WriteTo.OpenTelemetry(options => {
-                    options.Endpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] ?? "http://localhost:4317";
-                }
-            );
-        }
-
-        Log.Logger = loggerConfiguration.CreateBootstrapLogger();
-        
         return builder;
     }
 
@@ -128,6 +115,16 @@ public static class Extensions {
     public static TBuilder AddDefaultHealthChecks<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder {
         HealthChecksDoneOnlyOnce.Ensure();
+        
+        builder.Services.AddRequestTimeouts(
+            configure: static timeouts =>
+                timeouts.AddPolicy("HealthChecks", TimeSpan.FromSeconds(5)));
+
+        builder.Services.AddOutputCache(
+            configureOptions: static caching =>
+                caching.AddPolicy("HealthChecks",
+                    build: static policy => policy.Expire(TimeSpan.FromSeconds(10))));
+        
         builder.Services.AddHealthChecks()
 
             // Add a default liveness check to ensure app is responsive
@@ -137,21 +134,31 @@ public static class Extensions {
     }
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app) {
-        // Adding health checks endpoints to applications in non-development environments has security implications.
-        // See https://aka.ms/dotnet/aspire/healthchecks for details before enabling these endpoints in non-development environments.
-        if (app.Environment.IsDevelopment()) {
-            // All health checks must pass for app to be considered ready to accept traffic after starting
-            app.MapHealthChecks(HealthEndpointPath);
 
-            // Only health checks tagged with the "live" tag must pass for app to be considered alive
-            app.MapHealthChecks(
-                AlivenessEndpointPath,
-                new HealthCheckOptions {
-                    Predicate = r => r.Tags.Contains("live")
-                }
-            );
-        }
+        var healthChecks = app.MapGroup("");
+        
+        healthChecks.MapHealthChecks(HealthEndpointPath)
+            .CacheOutput("HealthChecks")
+            .WithRequestTimeout("HealthChecks")
+            .AllowAnonymous();
+
+        // Only health checks tagged with the "live" tag must pass for app to be considered alive
+        healthChecks.MapHealthChecks(
+            AlivenessEndpointPath,
+            new HealthCheckOptions {
+                Predicate = r => r.Tags.Contains("live")
+            }
+        )
+        .CacheOutput("HealthChecks")
+        .WithRequestTimeout("HealthChecks")
+        .AllowAnonymous();
 
         return app;
+    }
+    
+    public static IHostApplicationBuilder AddTelemetryService(this IHostApplicationBuilder builder, ActivitySource activitySource) {
+        builder.Services.AddOpenTelemetry()
+            .WithTracing(tracing => tracing.AddSource(activitySource.Name));
+        return builder;
     }
 }

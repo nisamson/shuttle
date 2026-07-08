@@ -1,0 +1,13 @@
+﻿
+<AuthorizeView>
+    <Authorized>
+        @foreach (var claim in context.User.Claims) {
+            <p>@claim.Type: @claim.Value</p>
+        }
+        Hello, @context.User.Identity?.Name
+    </Authorized>
+    <NotAuthorized>
+        Not logged in.
+    </NotAuthorized>
+</AuthorizeView>
+

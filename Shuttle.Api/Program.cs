@@ -1,13 +1,7 @@
-using Azure.Monitor.OpenTelemetry.AspNetCore;
-using LinqToDB;
 using LinqToDB.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
-using Serilog;
-using Shuttle.Api.Entities;
+using Shuttle.EFCore;
 using Shuttle.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -43,35 +37,9 @@ builder.Services.AddCors(options => {
     }
 );
 
+builder.AddShuttleDatabase();
+
 builder.Services.AddControllers();
-
-var databaseName = Environment.GetEnvironmentVariable("DATABASE_NAME");
-ArgumentException.ThrowIfNullOrWhiteSpace(databaseName);
-
-var dbServer = Environment.GetEnvironmentVariable("SHUTTLESQLSERVER_URI");
-ArgumentException.ThrowIfNullOrWhiteSpace(dbServer);
-
-var authMethod = SqlAuthenticationMethod.ActiveDirectoryDefault;
-if (builder.Environment.IsDevelopment()) {
-    authMethod = SqlAuthenticationMethod.ActiveDirectoryInteractive;
-}
-
-var connectionStringBuilder = new SqlConnectionStringBuilder() {
-    DataSource = dbServer,
-    InitialCatalog = databaseName,
-    PersistSecurityInfo = false,
-    Encrypt = true,
-    TrustServerCertificate = false,
-    ConnectTimeout = 30,
-    Authentication = authMethod
-};
-var connectionString = connectionStringBuilder.ToString();
-
-var optionsBuilder = new DbContextOptionsBuilder<ShlDbContext>();
-optionsBuilder.UseSqlServer(connectionString);
-optionsBuilder.UseLinqToDB(ldb => {
-    ldb.AddCustomOptions(o => o.UseSqlServer(connectionString));
-});
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -97,4 +65,9 @@ app.MapControllers();
 app.MapDefaultEndpoints();
 app.MapStaticAssets();
 
-app.Run();
+app.UseOutputCache();
+app.UseRequestTimeouts();
+
+await app.StartAsync();
+await app.EnsureShuttleDatabaseConnectivity();
+await app.WaitForShutdownAsync();

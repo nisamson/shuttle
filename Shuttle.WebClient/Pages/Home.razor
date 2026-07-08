@@ -1,7 +1,13 @@
 ﻿@page "/"
+@using Shuttle.WebClient.Components
+@using Shuttle.WebClient.Components.Dev
 
 <PageTitle>Home</PageTitle>
 
-<h1>Hello, world!</h1>
+<MudContainer>
+    <h1>Hello, world!</h1>
 
-Welcome to your new app.
+    Welcome to your new app.
+
+    <AccountView/>
+</MudContainer>

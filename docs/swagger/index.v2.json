@@ -1,0 +1,1138 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "description": "This is the V2 API documentation for the Simulation Hockey League API. You can find out more about the SHL at [simulationhockey.com](https://simulationhockey.com/index.php).",
+    "version": "2.0.0",
+    "title": "Simulation Hockey League V2",
+    "contact": {
+      "email": "simulationhockeysite@gmail.com"
+    },
+    "license": {
+      "name": "MIT License",
+      "url": "https://mit-license.org/"
+    }
+  },
+  "host": "index.simulationhockey.com",
+  "basePath": "/api/v2",
+  "tags": [
+    {
+      "name": "schedule",
+      "description": "Game schedule and stats"
+    },
+    {
+      "name": "players",
+      "description": "playerName and playerSearch"
+    },
+    {
+      "name": "standings",
+      "description": "updated playoffs"
+    }
+  ],
+  "schemes": ["https", "http"],
+  "paths": {
+    "/schedule/game/boxscore/summary": {
+      "get": {
+        "tags": ["schedule"],
+        "summary": "Get game boxscore summary",
+        "description": "Returns a summary of the game including period scores, shots, team stats, and three stars",
+        "operationId": "getBoxscoreSummary",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "gameid",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/BoxscoreSummary"
+            }
+          }
+        }
+      }
+    },
+    "/schedule/game/boxscore/skaters": {
+      "get": {
+        "tags": ["schedule"],
+        "summary": "Get boxscore skater stats",
+        "description": "Returns detailed statistics for all skaters in the game",
+        "operationId": "getBoxscoreSkaters",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "gameid",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "away": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/BoxscoreSkater"
+                  }
+                },
+                "home": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/BoxscoreSkater"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedule/game/boxscore/penalties": {
+      "get": {
+        "tags": ["schedule"],
+        "summary": "Get boxscore penalties",
+        "description": "Returns all penalties called in the game",
+        "operationId": "getBoxscorePenalties",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "gameid",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/BoxscorePenalty"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedule/game/skaterStats": {
+      "get": {
+        "tags": ["schedule"],
+        "summary": "Get skater statistics",
+        "description": "Returns basic statistics for all skaters on both teams",
+        "operationId": "getSkaterStats",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "season",
+            "in": "query",
+            "required": true,
+            "type": "number",
+            "description": "Season ID"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "required": true,
+            "type": "number",
+            "description": "League ID"
+          },
+          {
+            "name": "away",
+            "in": "query",
+            "required": true,
+            "type": "number",
+            "description": "Away team ID"
+          },
+          {
+            "name": "home",
+            "in": "query",
+            "required": true,
+            "type": "number",
+            "description": "Home team ID"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "enum": ["Pre-Season", "Regular Season", "Playoffs"],
+            "description": "Season type"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "away": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/SkaterStats"
+                  }
+                },
+                "home": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/SkaterStats"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedule/game/previousMatchups": {
+      "get": {
+        "tags": ["schedule"],
+        "summary": "Get previous matchups between teams",
+        "description": "Returns a list of previous games played between two teams in the current season",
+        "operationId": "getPreviousMatchups",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "season",
+            "in": "query",
+            "required": true,
+            "type": "number",
+            "description": "Season ID"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "required": true,
+            "type": "number",
+            "description": "League ID"
+          },
+          {
+            "name": "away",
+            "in": "query",
+            "required": true,
+            "type": "number",
+            "description": "Away team ID"
+          },
+          {
+            "name": "home",
+            "in": "query",
+            "required": true,
+            "type": "number",
+            "description": "Home team ID"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "enum": ["Pre-Season", "Regular Season", "Playoffs"],
+            "description": "Season type"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Game"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedule/game/preview": {
+      "get": {
+        "tags": ["schedule"],
+        "summary": "Get game preview information",
+        "description": "Returns detailed game preview information including team identities and stats",
+        "operationId": "getGamePreview",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "description": "Game slug identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/GamePreviewData"
+            }
+          }
+        }
+      }
+    },
+    "/schedule/game/boxscore/scoring": {
+      "get": {
+        "tags": ["schedule"],
+        "summary": "Get boxscore scoring details",
+        "description": "Returns all goals scored in the game with scorer and assist information",
+        "operationId": "getBoxscoreScoring",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "gameid",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/BoxscoreScoring"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedule/game/goalieStats": {
+      "get": {
+        "tags": ["schedule"],
+        "summary": "Get goalie stats for a game",
+        "description": "Returns goalie statistics for both teams in a game",
+        "operationId": "getGameGoalieStats",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "season",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "away",
+            "in": "query",
+            "required": true,
+            "type": "number",
+            "description": "Away team ID"
+          },
+          {
+            "name": "home",
+            "in": "query",
+            "required": true,
+            "type": "number",
+            "description": "Home team ID"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "description": "Season type (regular, playoffs, etc)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "away": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/GoalieGameStats"
+                  }
+                },
+                "home": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/GoalieGameStats"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedule/game/boxscore/goalies": {
+      "get": {
+        "tags": ["schedule"],
+        "summary": "Get boxscore goalie stats",
+        "description": "Returns detailed goalie statistics from a game's boxscore",
+        "operationId": "getBoxscoreGoalies",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "gameid",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "away": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/BoxscoreGoalie"
+                  }
+                },
+                "home": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/BoxscoreGoalie"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/player/playerName": {
+      "get": {
+        "tags": ["players"],
+        "summary": "Gets name of the player by ID",
+        "description": "returns player name",
+        "operationId": "getPlayerName",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "playerId",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "seasonId",
+            "in": "query",
+            "required": false,
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/playerName"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/player/playerSearch": {
+      "get": {
+        "tags": ["players"],
+        "summary": "Gets all player names of a league",
+        "description": "returns player names",
+        "operationId": "getPlayerSearch",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "isGoalie",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/playerSearch"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/standings/playoffs": {
+      "get": {
+        "tags": ["standings"],
+        "summary": "List Playoff Bracket",
+        "description": "Returns Playoff Bracket by League",
+        "operationId": "getPlayoffsByLeague",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/playoffs"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+
+  "definitions": {
+    "BoxscoreSummary": {
+      "type": "object",
+      "properties": {
+        "summary": {
+          "type": "object",
+          "properties": {
+            "home": {
+              "$ref": "#/definitions/TeamSummaryStats"
+            },
+            "away": {
+              "$ref": "#/definitions/TeamSummaryStats"
+            }
+          }
+        },
+        "stars": {
+          "type": "object",
+          "properties": {
+            "star1": {
+              "$ref": "#/definitions/StarPlayer"
+            },
+            "star2": {
+              "$ref": "#/definitions/StarPlayer"
+            },
+            "star3": {
+              "$ref": "#/definitions/StarPlayer"
+            }
+          }
+        },
+        "periodByPeriodStats": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "home": {
+                "type": "object",
+                "properties": {
+                  "goals": {
+                    "type": "number"
+                  },
+                  "shots": {
+                    "type": "number"
+                  }
+                }
+              },
+              "away": {
+                "type": "object",
+                "properties": {
+                  "goals": {
+                    "type": "number"
+                  },
+                  "shots": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "TeamSummaryStats": {
+      "type": "object",
+      "properties": {
+        "shots": {
+          "type": "number",
+          "example": 32
+        },
+        "pim": {
+          "type": "number",
+          "example": 8
+        },
+        "hits": {
+          "type": "number",
+          "example": 24
+        },
+        "giveaways": {
+          "type": "number",
+          "example": 12
+        },
+        "takeaways": {
+          "type": "number",
+          "example": 8
+        },
+        "faceoffWins": {
+          "type": "number",
+          "example": 28
+        },
+        "powerPlayGoals": {
+          "type": "number",
+          "example": 1
+        },
+        "powerPlayOpportunities": {
+          "type": "number",
+          "example": 3
+        }
+      }
+    },
+    "StarPlayer": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 123
+        },
+        "name": {
+          "type": "string",
+          "example": "John Smith"
+        },
+        "team": {
+          "type": "number",
+          "example": 1
+        }
+      }
+    },
+    "BoxscoreSkater": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "example": "John Smith"
+        },
+        "id": {
+          "type": "number",
+          "example": 123
+        },
+        "goals": {
+          "type": "number",
+          "example": 1
+        },
+        "assists": {
+          "type": "number",
+          "example": 2
+        },
+        "plusMinus": {
+          "type": "number",
+          "example": 1
+        },
+        "pim": {
+          "type": "number",
+          "example": 2
+        },
+        "shots": {
+          "type": "number",
+          "example": 4
+        },
+        "faceoffs": {
+          "type": "number",
+          "example": 15
+        },
+        "faceoffWins": {
+          "type": "number",
+          "example": 9
+        },
+        "hits": {
+          "type": "number",
+          "example": 3
+        },
+        "blocks": {
+          "type": "number",
+          "example": 2
+        },
+        "giveaways": {
+          "type": "number",
+          "example": 1
+        },
+        "takeaways": {
+          "type": "number",
+          "example": 2
+        },
+        "timeOnIce": {
+          "type": "string",
+          "example": "18:45"
+        },
+        "ppTimeOnIce": {
+          "type": "string",
+          "example": "02:30"
+        },
+        "shTimeOnIce": {
+          "type": "string",
+          "example": "01:45"
+        },
+        "shifts": {
+          "type": "number",
+          "example": 22
+        },
+        "gameRating": {
+          "type": "number",
+          "example": 85
+        },
+        "offensiveGameRating": {
+          "type": "number",
+          "example": 82
+        },
+        "defensiveGameRating": {
+          "type": "number",
+          "example": 88
+        }
+      }
+    },
+    "BoxscorePenalty": {
+      "type": "object",
+      "properties": {
+        "period": {
+          "type": "number",
+          "example": 1
+        },
+        "time": {
+          "type": "number",
+          "example": 840
+        },
+        "readableTime": {
+          "type": "string",
+          "example": "14:00"
+        },
+        "teamAbbr": {
+          "type": "string",
+          "example": "BUF"
+        },
+        "player": {
+          "type": "string",
+          "example": "Smith"
+        },
+        "reason": {
+          "type": "string",
+          "example": "Tripping"
+        },
+        "length": {
+          "type": "number",
+          "example": 2
+        }
+      }
+    },
+    "BoxscoreScoring": {
+      "type": "object",
+      "properties": {
+        "period": {
+          "type": "number",
+          "example": 1
+        },
+        "time": {
+          "type": "number",
+          "example": 840
+        },
+        "readableTime": {
+          "type": "string",
+          "example": "14:00"
+        },
+        "teamAbbr": {
+          "type": "string",
+          "example": "BUF"
+        },
+        "scorer": {
+          "$ref": "#/definitions/ScoringPlayer"
+        },
+        "primaryAssist": {
+          "$ref": "#/definitions/ScoringPlayer"
+        },
+        "secondaryAssist": {
+          "$ref": "#/definitions/ScoringPlayer"
+        },
+        "goalType": {
+          "type": "string",
+          "enum": ["ES", "PP", "SH", "ES, ENG"],
+          "example": "ES"
+        }
+      }
+    },
+    "ScoringPlayer": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "example": "Smith"
+        },
+        "id": {
+          "type": "number",
+          "example": 123
+        }
+      }
+    },
+    "GamePreviewData": {
+      "type": "object",
+      "properties": {
+        "game": {
+          "$ref": "#/definitions/Game"
+        },
+        "teams": {
+          "type": "object",
+          "properties": {
+            "away": {
+              "$ref": "#/definitions/TeamIdentity"
+            },
+            "home": {
+              "$ref": "#/definitions/TeamIdentity"
+            }
+          }
+        },
+        "teamStats": {
+          "type": "object",
+          "properties": {
+            "away": {
+              "$ref": "#/definitions/TeamStats"
+            },
+            "home": {
+              "$ref": "#/definitions/TeamStats"
+            }
+          }
+        }
+      }
+    },
+    "Game": {
+      "type": "object",
+      "properties": {
+        "season": {
+          "type": "number",
+          "example": 69
+        },
+        "league": {
+          "type": "number",
+          "example": 0
+        },
+        "date": {
+          "type": "string",
+          "example": "2023-12-25"
+        },
+        "homeTeam": {
+          "type": "number",
+          "example": 1
+        },
+        "homeScore": {
+          "type": "number",
+          "example": 3
+        },
+        "awayTeam": {
+          "type": "number",
+          "example": 2
+        },
+        "awayScore": {
+          "type": "number",
+          "example": 2
+        },
+        "type": {
+          "type": "string",
+          "example": "Regular Season"
+        },
+        "played": {
+          "type": "number",
+          "example": 1
+        },
+        "overtime": {
+          "type": "number",
+          "example": 0
+        },
+        "shootout": {
+          "type": "number",
+          "example": 0
+        },
+        "slug": {
+          "type": "string",
+          "example": "S69-L0-RS-1-BUF-TOR"
+        },
+        "gameid": {
+          "type": "number",
+          "example": 12345
+        }
+      }
+    },
+    "TeamIdentity": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "example": "Toronto"
+        },
+        "nickname": {
+          "type": "string",
+          "example": "Maple Leafs"
+        },
+        "abbr": {
+          "type": "string",
+          "example": "TOR"
+        },
+        "primaryColor": {
+          "type": "string",
+          "example": "#00205B"
+        }
+      }
+    },
+    "TeamStats": {
+      "type": "object",
+      "properties": {
+        "gamesPlayed": {
+          "type": "number",
+          "example": 82
+        },
+        "goalsFor": {
+          "type": "number",
+          "example": 245
+        },
+        "goalsAgainst": {
+          "type": "number",
+          "example": 220
+        },
+        "record": {
+          "type": "string",
+          "example": "45-30-7"
+        }
+      }
+    },
+    "SkaterStats": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "example": "Smith"
+        },
+        "goals": {
+          "type": "number",
+          "example": 25
+        },
+        "assists": {
+          "type": "number",
+          "example": 40
+        },
+        "plusMinus": {
+          "type": "number",
+          "example": 15
+        }
+      }
+    },
+    "GoalieGameStats": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "example": "John Smith"
+        },
+        "wins": {
+          "type": "number",
+          "example": 10
+        },
+        "losses": {
+          "type": "number",
+          "example": 5
+        },
+        "OT": {
+          "type": "number",
+          "example": 2
+        },
+        "GAA": {
+          "type": "number",
+          "format": "float",
+          "example": 2.45
+        },
+        "savePct": {
+          "type": "number",
+          "format": "float",
+          "example": 0.923
+        },
+        "shutouts": {
+          "type": "number",
+          "example": 3
+        }
+      }
+    },
+    "BoxscoreGoalie": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 123
+        },
+        "name": {
+          "type": "string",
+          "example": "John Smith"
+        },
+        "shotsAgainst": {
+          "type": "number",
+          "example": 32
+        },
+        "goalsAgainst": {
+          "type": "number",
+          "example": 2
+        },
+        "saves": {
+          "type": "number",
+          "example": 30
+        },
+        "savePct": {
+          "type": "number",
+          "format": "float",
+          "example": 0.938
+        },
+        "pim": {
+          "type": "number",
+          "example": 2
+        },
+        "gameRating": {
+          "type": "number",
+          "example": 85
+        },
+        "minutesPlayed": {
+          "type": "string",
+          "example": "60:00"
+        }
+      }
+    },
+    "playerName": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 123
+        },
+        "name": {
+          "type": "string",
+          "example": "John Smith"
+        }
+      }
+    },
+    "playerSearch": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 123
+        },
+        "name": {
+          "type": "string",
+          "example": "John Smith"
+        }
+      }
+    },
+    "playoffs": {
+      "type": "object",
+      "properties": {
+        "team1": {
+          "type": "number",
+          "example": 3
+        },
+        "team2": {
+          "type": "number",
+          "example": 12
+        },
+        "LeagueID": {
+          "type": "number",
+          "example": 0
+        },
+        "SeasonID": {
+          "type": "number",
+          "example": 58
+        },
+        "team1Wins": {
+          "type": "number",
+          "example": 4
+        },
+        "team2Wins": {
+          "type": "number",
+          "example": 3
+        },
+        "team1_Name": {
+          "type": "string",
+          "example": "Toronto"
+        },
+        "team1_Nickname": {
+          "type": "string",
+          "example": "North Stars"
+        },
+        "team1_Abbr": {
+          "type": "string",
+          "example": "TOR"
+        },
+        "team2_Name": {
+          "type": "string",
+          "example": "San Francisco"
+        },
+        "team2_Nickname": {
+          "type": "string",
+          "example": "Pride"
+        },
+        "team2_Abbr": {
+          "type": "string",
+          "example": "SFP"
+        }
+      }
+    }
+  }
+}

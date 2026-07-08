@@ -4,6 +4,7 @@ using Shuttle.Math;
 
 namespace Shuttle.EloCalc.Sinks.Entities;
 
+[EntityTypeConfiguration(typeof(RankingUpdateEntityConfiguration))]
 public record RankingUpdate {
 
     public RankingUpdate() {}
@@ -28,9 +29,11 @@ public record RankingUpdate {
 public class RankingUpdateEntityConfiguration : IEntityTypeConfiguration<RankingUpdate> {
 
     public void Configure(EntityTypeBuilder<RankingUpdate> builder) {
-        builder.HasKey(r => new { r.TeamId, r.GamesPlayed, r.Season });
+        builder.HasKey(r => new { r.TeamId, r.Season, r.GamesPlayed });
         builder.HasOne(r => r.Team)
             .WithMany()
-            .HasForeignKey(r => r.TeamId);
+            .HasForeignKey(r => new { r.TeamId, r.Season })
+            .HasPrincipalKey(t => new { t.TeamId, t.Season })
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

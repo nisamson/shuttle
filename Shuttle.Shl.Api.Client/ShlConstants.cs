@@ -43,6 +43,15 @@ public static class ShlConstants {
                     c.DefaultRequestHeaders.Add("User-Agent", UserAgent);
                 }
             );
+        
+        var portalPolicy = CreatePolicy();
+        services.AddRefitClient<IShlPortalV1Client>()
+            .AddPolicyHandler(portalPolicy)
+            .ConfigureHttpClient(c => {
+                    c.BaseAddress = new Uri(IShlPortalV1Client.BaseUrl);
+                    c.DefaultRequestHeaders.Add("User-Agent", UserAgent);
+                }
+            );
 
         return services;
     }

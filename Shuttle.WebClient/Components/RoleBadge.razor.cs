@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Components;
 
-namespace SHLAnalytics.Shuttle.Components;
+namespace Shuttle.WebClient.Components;
 
 public partial class RoleBadge : ComponentBase {
     

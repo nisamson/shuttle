@@ -12,11 +12,12 @@
         <PackageReference Include="Aspire.Hosting.Azure.AppService" />
         <PackageReference Include="Aspire.Hosting.Azure.Sql" />
         <PackageReference Include="Aspire.Hosting.Azure.Functions" />
+        <PackageReference Include="StreamJsonRpc" />
     </ItemGroup>
     
     <ItemGroup>
         <ProjectReference Include="..\Shuttle.Api\Shuttle.Api.csproj" />
-        <ProjectReference Include="..\Shuttle.Jobs\Shuttle.Jobs.csproj" />
+        <ProjectReference Include="..\Shuttle.Api.Jobs\Shuttle.Api.Jobs.csproj" />
     </ItemGroup>
 
 </Project>

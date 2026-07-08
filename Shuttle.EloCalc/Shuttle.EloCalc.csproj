@@ -14,6 +14,7 @@
         <PackageReference Include="dotenv.net"/>
         <PackageReference Include="CsvHelper"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite"/>
+        <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore"/>
         <PackageReference Include="FlexLabs.EntityFrameworkCore.Upsert"/>
         <PackageReference Include="System.Commandline"/>
