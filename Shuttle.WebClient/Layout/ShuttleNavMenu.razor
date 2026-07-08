@@ -1,16 +1,16 @@
 ﻿@using Shuttle.WebClient.Models
-<MudNavMenu>
-    <MudNavLink Icon="@Icons.Material.Filled.Home" Href="@Routes.Home" Match="NavLinkMatch.All">Home</MudNavLink>
-    <MudDivider FlexItem="true"/>
+<FluentNavMenu Expanded="@Expanded" Width="250" Title="Navigation menu">
+    <FluentNavLink Href="@Routes.Home" Match="NavLinkMatch.All" Icon="@(new Icons.Regular.Size20.Home())">Home</FluentNavLink>
+    <FluentDivider/>
     <AuthorizeView>
         <Authorized>
-            <MudNavLink Icon="@Icons.Material.Filled.Logout" Href="@Routes.Authentication.Logout" Match="NavLinkMatch.All">Logout</MudNavLink>
+            <FluentNavLink Href="@Routes.Authentication.Logout" Match="NavLinkMatch.All" Icon="@(new Icons.Regular.Size20.SignOut())">Logout</FluentNavLink>
         </Authorized>
         <NotAuthorized>
-            <MudNavLink Icon="@Icons.Material.Filled.Login" Href="@Routes.Authentication.Login" Match="NavLinkMatch.All">Login</MudNavLink>
+            <FluentNavLink Href="@Routes.Authentication.Login" Match="NavLinkMatch.All" Icon="@(new Icons.Regular.Size20.PersonArrowRight())">Login</FluentNavLink>
         </NotAuthorized>
     </AuthorizeView>
-    <MudNavGroup Title="Legal" Icon="@Icons.Material.Filled.Gavel">
-        <MudNavLink Icon="@Icons.Material.Filled.PrivacyTip" Href="@Routes.Privacy" Match="NavLinkMatch.All">Privacy Policy</MudNavLink>
-    </MudNavGroup>
-</MudNavMenu>
+    <FluentNavGroup Title="Legal" Icon="@(new Icons.Regular.Size20.Gavel())">
+        <FluentNavLink Href="@Routes.Privacy" Match="NavLinkMatch.All" Icon="@(new Icons.Regular.Size20.ShieldKeyhole())">Privacy Policy</FluentNavLink>
+    </FluentNavGroup>
+</FluentNavMenu>

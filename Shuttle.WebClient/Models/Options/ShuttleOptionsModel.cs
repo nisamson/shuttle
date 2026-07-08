@@ -1,11 +1,9 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using MudBlazor;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Shuttle.WebClient.Models.Options;
 
 [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
 public record ShuttleOptionsModel : IShuttleOptions {
-    [Label("Use Dark Mode")]
     public bool DarkMode { get; set; }
     
     public static readonly ShuttleOptionsModel Default = new() {

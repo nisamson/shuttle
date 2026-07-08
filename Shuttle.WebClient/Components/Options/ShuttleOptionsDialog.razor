@@ -1,23 +1,9 @@
-﻿<MudDialog>
-    <TitleContent>
-        <MudText Typo="Typo.h6">Shuttle Options</MudText>
-        <MudIcon Title="Locally-saved options for the Shuttle app."/>
-    </TitleContent>
-    <DialogContent>
-        <MudForm>
-            <MudSwitch For="() => OptionsModel.DarkMode" @bind-Value="OptionsModel.DarkMode"/>
-        </MudForm>
-    </DialogContent>
-    <DialogActions>
-        <MudButton
-            OnClick="@(_ => OnCancelEdit())">
-            Cancel
-        </MudButton>
-        <MudButton
-            Color="Color.Success"
-            Disabled="!IsTouched"
-            OnClick="@(_ => OnOptionsEdited())">
-            Save
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+@implements Microsoft.FluentUI.AspNetCore.Components.IDialogContentComponent<Shuttle.WebClient.Models.Options.ShuttleOptions>
+
+<FluentDialogBody>
+    <FluentSwitch @bind-Value="OptionsModel.DarkMode" Label="Use Dark Mode"/>
+    <FluentStack HorizontalAlignment="HorizontalAlignment.End" Style="margin-top: 1rem;">
+        <FluentButton Appearance="Appearance.Neutral" OnClick="OnCancelEdit">Cancel</FluentButton>
+        <FluentButton Appearance="Appearance.Accent" Disabled="@(!IsTouched)" OnClick="OnOptionsEdited">Save</FluentButton>
+    </FluentStack>
+</FluentDialogBody>

@@ -2,19 +2,27 @@
 @layout MainLayout
 
 <PageTitle>Privacy Policy</PageTitle>
-<MudPageContentNavigation @ref="contents"/>
-<MudContainer MaxWidth="MaxWidth.Medium">
-    <MudText Typo="Typo.h2">Privacy Policy</MudText>
-    <MudDivider DividerType="DividerType.FullWidth"/>
-    <MudText id="@IntroId" Typo="Typo.h3">Introduction</MudText>
-    <MudText Typo="Typo.body1">
+
+<div class="privacy-content">
+    <h2>Privacy Policy</h2>
+    <FluentDivider/>
+
+    <nav class="privacy-toc">
+        <ul>
+            <li><a href="#@IntroId">Introduction</a></li>
+            <li><a href="#@WhatICollectId">What I Collect</a></li>
+        </ul>
+    </nav>
+
+    <h3 id="@IntroId">Introduction</h3>
+    <p>
         The Shuttle web application was designed with the goal to collect as little personal information as possible
         because I do not <em>want</em> to collect it. This is a personal project and I have no desire to collect or
         monetize user data.
 
         It's also a royal pain in the butt to protect user data, so the less I have, the better. That being said, there are some things I have to collect
         to make the app work, so this policy outlines what I collect, why I collect it, and how I protect it.
-    </MudText>
+    </p>
 
-    <MudText id="@WhatICollectId" Typo="Typo.h3">What I Collect</MudText>
-</MudContainer>
+    <h3 id="@WhatICollectId">What I Collect</h3>
+</div>
