@@ -67,4 +67,5 @@ if (app.Environment.IsDevelopment()) {
 app.AddQuartz();
 app.MapDefaultEndpoints();
 await app.EnsureShuttleDatabaseConnectivity();
+await app.EnsureQuartzSchema();
 await app.RunAsync();

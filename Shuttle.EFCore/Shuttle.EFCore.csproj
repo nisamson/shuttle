@@ -13,8 +13,8 @@
         <PackageReference Include="Microsoft.EntityFrameworkCore" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
-        <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
-        <PackageReference Include="Microsoft.Data.SqlClient"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+        <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
         <PackageReference Include="linq2db.EntityFrameworkCore" />
         <PackageReference Include="OpenTelemetry" />
         <PackageReference Include="OpenTelemetry.Api" />
@@ -24,7 +24,6 @@
         
         <PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" />
         
-        <PackageReference Include="OpenTelemetry.Instrumentation.SqlClient" />
         <PackageReference Include="Polly.Core"/>
     </ItemGroup>
     
@@ -32,11 +31,16 @@
         <ProjectReference Include="..\Shuttle.Core\Shuttle.Core.csproj" />
         <ProjectReference Include="..\Shuttle.Shl.Api.Client\Shuttle.Shl.Api.Client.csproj" />
         <ProjectReference Include="..\Shuttle.Shl.Api.Models\Shuttle.Shl.Api.Models.csproj" />
-        <EmbeddedResource Include="Migrations\SqlScript\*" />
+        <EmbeddedResource Include="Migrations\SqlScripts\*" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="Shuttle.Tests" />
     </ItemGroup>
     
     <ItemGroup>
       <Folder Include="Instrumentation\" />
+      <Folder Include="Migrations\SqlScripts\" />
     </ItemGroup>
 
 </Project>

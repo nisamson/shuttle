@@ -1,6 +1,4 @@
 ﻿using System.Diagnostics;
-using LinqToDB.Data;
-using LinqToDB.DataProvider.SqlServer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;

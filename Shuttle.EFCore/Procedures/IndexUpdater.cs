@@ -1,5 +1,4 @@
-﻿using LinqToDB;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Shuttle.EFCore.Entities;
 using Shuttle.EFCore.Entities.Index;
@@ -51,12 +50,17 @@ public class IndexUpdater {
         var leagues = await indexClient.GetLeagues(token);
         logger.LogInformation("Retrieved {Count} leagues from index", leagues.Count);
         var leagueEntities = leagues.Select(League.FromModel).ToList();
-        var updated = await dbContext.Leagues.Merge()
-            .Using(leagueEntities)
-            .OnTargetKey()
-            .UpdateWhenMatchedAnd((t, s) => t.Abbreviation != s.Abbreviation || t.Name != s.Name)
-            .InsertWhenNotMatched()
-            .MergeAsync(token);
+        var updated = await dbContext.UpsertAsync(
+            leagueEntities,
+            dbContext.Leagues,
+            l => l.LeagueId,
+            changed: (t, s) => t.Abbreviation != s.Abbreviation || t.Name != s.Name,
+            apply: (t, s) => {
+                t.Abbreviation = s.Abbreviation;
+                t.Name = s.Name;
+            },
+            token
+        );
         logger.LogInformation("Updated {Count} leagues from index", updated);
     }
 
@@ -76,11 +80,14 @@ public class IndexUpdater {
         }
 
         logger.LogInformation("Retrieved {Count} league seasons from index", leagueSeasons.Count);
-        var added = await dbContext.Seasons.Merge()
-            .Using(leagueSeasons)
-            .OnTargetKey()
-            .InsertWhenNotMatched()
-            .MergeAsync(token);
+        var added = await dbContext.UpsertAsync(
+            leagueSeasons,
+            dbContext.Seasons.IgnoreAutoIncludes(),
+            ls => (ls.LeagueId, ls.Season),
+            changed: null,
+            apply: null,
+            token
+        );
         logger.LogInformation("Added {Count} seasons from index", added);
     }
 
@@ -101,12 +108,14 @@ public class IndexUpdater {
         }
 
         logger.LogInformation("Retrieved {Count} conferences from index", conferences.Count);
-        var updated = await dbContext.Conferences.Merge()
-            .Using(conferences)
-            .OnTargetKey()
-            .InsertWhenNotMatched()
-            .UpdateWhenMatchedAnd((t, s) => t.Name != s.Name)
-            .MergeAsync(token);
+        var updated = await dbContext.UpsertAsync(
+            conferences,
+            dbContext.Conferences.IgnoreAutoIncludes(),
+            c => (c.ConferenceId, c.LeagueId, c.Season),
+            changed: (t, s) => t.Name != s.Name,
+            apply: (t, s) => t.Name = s.Name,
+            token
+        );
         logger.LogInformation("Updated {Count} conferences from index", updated);
     }
 
@@ -121,12 +130,15 @@ public class IndexUpdater {
             divisions.AddRange(seasonDivisions.Select(Division.FromModel));
         }
         logger.LogInformation("Retrieved {Count} divisions from index", divisions.Count);
-        var updated = dbContext.Divisions.Merge()
-            .Using(divisions)
-            .OnTargetKey()
-            .InsertWhenNotMatched()
-            .UpdateWhenMatchedAnd(Division.Changed)
-            .MergeAsync(token);
+        var divisionChanged = Division.Changed.Compile();
+        var updated = await dbContext.UpsertAsync(
+            divisions,
+            dbContext.Divisions,
+            d => (d.DivisionId, d.Season, d.LeagueId, d.ConferenceId),
+            changed: (t, s) => divisionChanged(t, s),
+            apply: (t, s) => t.Name = s.Name,
+            token
+        );
         logger.LogInformation("Updated {Count} divisions from index", updated);
     }
 
@@ -185,12 +197,29 @@ public class IndexUpdater {
         var games = await indexClient.GetSchedule(league.Id, season, token);
         logger.LogInformation("Retrieved {Count} games from index", games.Count);
         var gameEntities = games.Select(GameResult.FromModel).ToList();
-        var updated = dbContext.GameResults.Merge()
-            .Using(gameEntities)
-            .OnTargetKey()
-            .InsertWhenNotMatched()
-            .UpdateWhenMatchedAnd(GameResult.ChangedExpr)
-            .MergeAsync(token);
+        var gameChanged = GameResult.ChangedExpr.Compile();
+        var leagueId = league.Id;
+        var updated = await dbContext.UpsertAsync(
+            gameEntities,
+            dbContext.GameResults.IgnoreAutoIncludes().Where(g => g.LeagueId == leagueId && g.Season == season),
+            g => g.Slug,
+            changed: (t, s) => gameChanged(t, s),
+            apply: (t, s) => {
+                t.GameId = s.GameId;
+                t.Season = s.Season;
+                t.LeagueId = s.LeagueId;
+                t.SimDate = s.SimDate;
+                t.HomeTeamId = s.HomeTeamId;
+                t.AwayTeamId = s.AwayTeamId;
+                t.HomeScore = s.HomeScore;
+                t.AwayScore = s.AwayScore;
+                t.GameType = s.GameType;
+                t.Played = s.Played;
+                t.Overtime = s.Overtime;
+                t.Shootout = s.Shootout;
+            },
+            token
+        );
         logger.LogInformation("Updated {Count} games from index", updated);
     }
 }

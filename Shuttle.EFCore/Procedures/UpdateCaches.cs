@@ -1,6 +1,4 @@
-﻿using LinqToDB;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Shuttle.EFCore.Entities.Performance;
 using Shuttle.EFCore.Entities.Portal;
@@ -25,29 +23,29 @@ public static class UpdateCaches {
 
         private async Task UpdateMostRecentPlayers(CancellationToken token = default) {
             using var activity = ActivitySources.ShuttleEfCore.StartActivity();
-            var mostRecentPlayers = ctx.PlayerInformation
-                .GroupBy(pi => pi.User)
-                .Select(grp => grp.MaxBy(pi => pi.CreationTime)!);
+            var mostRecentPlayers = (await ctx.PlayerInformation
+                    .AsNoTracking()
+                    .Select(pi => new { pi.UserId, pi.PlayerId, pi.CreationTime })
+                    .ToListAsync(token))
+                .GroupBy(pi => pi.UserId)
+                .Select(grp => grp.MaxBy(pi => pi.CreationTime)!)
+                .Select(pi => new MostRecentUserPlayer {
+                        UserId = pi.UserId,
+                        PlayerId = pi.PlayerId,
+                    }
+                )
+                .ToList();
             int changed;
             try {
                 ctx.Logger.LogInformation("Starting update of most recent players cache table");
-                changed = await ctx.MostRecentUserPlayers.Merge()
-                    .Using(mostRecentPlayers)
-                    .On(tgt => tgt.UserId, src => src.UserId)
-                    .InsertWhenNotMatched(src => new() {
-                            UserId = src.UserId,
-                            PlayerId = src.PlayerId,
-                        }
-                    )
-                    .UpdateWhenMatchedAnd(
-                        (tgt, src) => tgt.PlayerId != src.PlayerId,
-                        (tgt, src) =>
-                            new() {
-                                UserId = src.UserId,
-                                PlayerId = src.PlayerId,
-                            }
-                    )
-                    .MergeAsync(token);
+                changed = await ctx.UpsertAsync(
+                    mostRecentPlayers,
+                    ctx.MostRecentUserPlayers.IgnoreAutoIncludes(),
+                    m => m.UserId,
+                    changed: (t, s) => t.PlayerId != s.PlayerId,
+                    apply: (t, s) => t.PlayerId = s.PlayerId,
+                    token
+                );
             } catch (Exception ex) {
                 activity?.AddException(ex);
                 ctx.Logger.LogError(ex, "Error updating most recent players cache table");

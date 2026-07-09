@@ -1,7 +1,8 @@
-﻿using System.Diagnostics;
+﻿using System.Reflection;
 using LinqToDB;
+using LinqToDB.DataProvider.SQLite;
 using LinqToDB.EntityFrameworkCore;
-using Microsoft.Data.SqlClient;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -15,10 +16,9 @@ public static class ShuttleEfCoreExtensions {
     internal static T AddShuttleDatabase<T>(
         this T builder,
         out DbContextOptionsBuilder<ShlDbContext> options,
-        string? databaseName = null,
-        string? dbUri = null
+        string? databasePath = null
     ) where T : IHostApplicationBuilder {
-        var shuttleConnStr = GetConnectionString(databaseName, dbUri);
+        var shuttleConnStr = GetConnectionString(databasePath);
         var connectionString = shuttleConnStr.ConnectionString;
 
         var optionsBuilder = new DbContextOptionsBuilder<ShlDbContext>();
@@ -29,37 +29,33 @@ public static class ShuttleEfCoreExtensions {
                 builder.PrepareShuttleOptionsBuilder(options, connectionString);
             }
         );
-        builder.Services.AddScoped<IDbConnectionResilienceService<ShlDbContext>, ShlDbConnectionResilienceService>();
         builder.ConfigureEfCoreLogging();
         return builder;
     }
 
     private static DbContextOptionsBuilder PrepareShuttleOptionsBuilder<T>(this T builder, DbContextOptionsBuilder optionsBuilder, string connectionString) where T : IHostApplicationBuilder {
-        optionsBuilder.UseAzureSql(connectionString)
+        optionsBuilder.UseSqlite(connectionString)
             .EnableDetailedErrors(builder.Environment.IsDevelopment());
-        optionsBuilder.UseLinqToDB(ldb => { ldb.AddCustomOptions(o => o.UseSqlServer(connectionString)); });
+        optionsBuilder.UseLinqToDB(ldb => { ldb.AddCustomOptions(o => o.UseSQLite(connectionString, SQLiteProvider.Microsoft)); });
         return optionsBuilder;
     }
 
     public static ShuttleConnectionString GetConnectionString(
-        string? databaseName = null,
-        string? dbHost = null
+        string? databasePath = null
     ) {
-        databaseName ??= Environment.GetEnvironmentVariable(ShuttleEfCoreConstants.DatabaseEnvironmentKey);
-        ArgumentException.ThrowIfNullOrWhiteSpace(databaseName);
+        databasePath ??= Environment.GetEnvironmentVariable(ShuttleEfCoreConstants.DatabasePathKey);
+        if (string.IsNullOrWhiteSpace(databasePath)) {
+            databasePath = ShuttleEfCoreConstants.DefaultDatabaseFileName;
+        }
 
-        dbHost ??= Environment.GetEnvironmentVariable(ShuttleEfCoreConstants.DatabaseHostKey);
-        ArgumentException.ThrowIfNullOrWhiteSpace(dbHost);
-        var baseConnStr = BaseConnectionString(dbHost, databaseName);
-        var connectionStringBuilder = new SqlConnectionStringBuilder(baseConnStr) {
-            Authentication = SqlAuthenticationMethod.ActiveDirectoryDefault,
-            PersistSecurityInfo = false,
-            ConnectTimeout = 30,
-            ConnectRetryCount = 5,
-            ConnectRetryInterval = 10,
+        var connectionStringBuilder = new SqliteConnectionStringBuilder {
+            DataSource = databasePath,
+            Mode = SqliteOpenMode.ReadWriteCreate,
+            Cache = SqliteCacheMode.Shared,
+            ForeignKeys = true,
+            Pooling = true,
         };
-        var connectionString = connectionStringBuilder.ToString();
-        return new(connectionString);
+        return new(connectionStringBuilder.ToString());
     }
 
     private static IHostApplicationBuilder ConfigureEfCoreLogging(this IHostApplicationBuilder host) {
@@ -67,27 +63,58 @@ public static class ShuttleEfCoreExtensions {
             .WithTracing(t => {
                     t.AddSource(ActivitySources.ShuttleEfCore.Name);
                     t.AddEntityFrameworkCoreInstrumentation();
-                    t.AddSqlClientInstrumentation();
                 }
             );
         return host;
     }
 
-    private static string BaseConnectionString(string dbHost, string databaseName) {
-        var server = $"tcp:{dbHost},1433";
-        var startingConStr =
-            $"Server={server};Initial Catalog={databaseName};Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;";
-        return startingConStr;
+    public static T AddShuttleDatabase<T>(this T builder, string? databasePath = null)
+        where T : IHostApplicationBuilder {
+        return AddShuttleDatabase(builder, out _, databasePath);
     }
 
-    public static T AddShuttleDatabase<T>(this T builder, string? databaseName = null, string? dbUri = null)
-        where T : IHostApplicationBuilder {
-        return AddShuttleDatabase(builder, out _, databaseName, dbUri);
-    }
-    
     public static async Task EnsureShuttleDatabaseConnectivity(this IHost host, CancellationToken cancellationToken = default) {
         using var scope = host.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<IDbConnectionResilienceService<ShlDbContext>>();
-        await dbContext.EnsureDbConnectivity(cancellationToken);
+        var dbContext = scope.ServiceProvider.GetRequiredService<ShlDbContext>();
+        await dbContext.Database.MigrateAsync(cancellationToken);
+        await dbContext.ConfigureSqlitePragmas(cancellationToken);
+        await dbContext.EnsureTemporalHistory(cancellationToken);
+    }
+
+    internal static async Task ConfigureSqlitePragmas(this ShlDbContext dbContext, CancellationToken cancellationToken = default) {
+        // WAL is persisted in the database file; busy_timeout is per-connection but harmless to
+        // (re)apply here to reduce "database is locked" errors from concurrent updater jobs.
+        // recursive_triggers stays OFF (the default) so the ValidFrom bump inside the temporal
+        // update trigger does not re-fire the trigger.
+        await dbContext.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;", cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("PRAGMA busy_timeout=30000;", cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("PRAGMA recursive_triggers=OFF;", cancellationToken);
+    }
+
+    /// <summary>
+    /// Applies the official Quartz.NET SQLite schema on a fresh database. The upstream script
+    /// contains DROP statements, so it is only executed when the Quartz tables are absent to
+    /// avoid discarding persisted scheduler state on restart.
+    /// </summary>
+    public static async Task EnsureQuartzSchema(this IHost host, CancellationToken cancellationToken = default) {
+        using var scope = host.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ShlDbContext>();
+        var tableCount = await dbContext.Database
+            .SqlQueryRaw<long>("SELECT COUNT(*) AS Value FROM sqlite_master WHERE type = 'table' AND name = 'QRTZ_LOCKS'")
+            .SingleAsync(cancellationToken);
+        if (tableCount > 0) {
+            return;
+        }
+
+        var script = ReadEmbeddedScript("Shuttle.EFCore.Migrations.SqlScripts.quartz_sqlite.sql");
+        await dbContext.Database.ExecuteSqlRawAsync(script, cancellationToken);
+    }
+
+    private static string ReadEmbeddedScript(string resourceName) {
+        var assembly = typeof(ShuttleEfCoreExtensions).Assembly;
+        using var stream = assembly.GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException($"Embedded resource '{resourceName}' was not found.");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 }

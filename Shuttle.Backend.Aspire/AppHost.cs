@@ -11,9 +11,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var shuttleRg = builder.AddParameter("shuttleRg")
     .WithDescription("The name of the resource group to deploy to");
-var databaseServerName = builder.AddParameter("databaseServerName", secret: true)
-    .WithDescription("The server name of the Azure SQL Database to use");
-var databaseName = builder.Configuration.GetValue<string>("DatabaseName") ?? throw new InvalidOperationException("DatabaseName must be configured.");
+var sqlitePath = builder.Configuration.GetValue<string>("SqlitePath") ?? "shuttle.db";
 var appInsightsName = builder.AddParameter("appInsightsName")
     .WithDescription("The name of the Application Insights resource to create or use");
 var devAppInsightsName = builder.AddParameter("devAppInsightsName", "shlanalyticsdevinsights")
@@ -23,10 +21,6 @@ var umiName = builder.AddParameter("umiName")
 
 var umi = builder.AddAzureUserAssignedIdentity("shuttle-umi")
     .PublishAsExisting(umiName, shuttleRg);
-
-var sqlServer = builder.AddAzureSqlServer("shuttleSqlServer")
-    .WithRelationship(umi.Resource, "DbAccess")
-    .AsExisting(databaseServerName, shuttleRg);
 
 var insights = builder.AddAzureApplicationInsights("shuttle-app-insights")
     .PublishAsExisting(appInsightsName, shuttleRg)
@@ -47,10 +41,8 @@ var appServicePlan = builder.AddAzureAppServiceEnvironment("shuttle-app-service-
 
 #pragma warning disable ASPIREPROBES001
 var api = builder.AddProject<Shuttle_Api>("shuttle-api")
-    .WithReference(sqlServer)
-    .WaitFor(sqlServer)
     .WithAzureUserAssignedIdentity(umi)
-    .WithEnvironment("SHUTTLESQLSERVER_DATABASE", databaseName)
+    .WithEnvironment("SHUTTLE_SQLITE_PATH", sqlitePath)
     .WithUrlForEndpoint("https",
         c => {
             c.DisplayText = "OpenAPI Spec";
@@ -65,10 +57,8 @@ var api = builder.AddProject<Shuttle_Api>("shuttle-api")
     });
 
 var jobs = builder.AddProject<Shuttle_Api_Jobs>("shuttle-api-jobs")
-    .WithReference(sqlServer)
-    .WaitFor(sqlServer)
     .WithAzureUserAssignedIdentity(umi)
-    .WithEnvironment("SHUTTLESQLSERVER_DATABASE", databaseName)
+    .WithEnvironment("SHUTTLE_SQLITE_PATH", sqlitePath)
     .WithExternalHttpEndpoints()
     .WithHttpProbe(ProbeType.Liveness, "/alive", initialDelaySeconds: 5)
     .WithUrlForEndpoint("https",

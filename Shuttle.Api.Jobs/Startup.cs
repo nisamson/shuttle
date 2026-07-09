@@ -39,7 +39,7 @@ public static class Startup {
             q.UsePersistentStore(pso => {
                 pso.UseSystemTextJsonSerializer();
                 pso.UseProperties = true;
-                pso.UseSqlServer(
+                pso.UseMicrosoftSQLite(
                     configure => {
                         configure.ConnectionString = connStr;
                         configure.TablePrefix = ShuttleEfCoreConstants.QuartzTablePrefix;

@@ -1,5 +1,4 @@
-﻿using LinqToDB;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Shuttle.EFCore.Entities;
 using Shuttle.EFCore.Entities.Portal;
@@ -65,14 +64,17 @@ public class PortalUpdater {
                     UserId = pinfo.UserId,
                     Name = pinfo.Username
                 }
-            );
+            )
+            .ToList();
 
-        var updated = await dbContext.Users.Merge()
-            .Using(users)
-            .OnTargetKey()
-            .InsertWhenNotMatched()
-            .UpdateWhenMatchedAnd((t, s) => t.Name != s.Name)
-            .MergeAsync(token);
+        var updated = await dbContext.UpsertAsync(
+            users,
+            dbContext.Users,
+            u => u.UserId,
+            changed: (t, s) => t.Name != s.Name,
+            apply: (t, s) => t.Name = s.Name,
+            token
+        );
         logger.LogInformation("Updated {Updated} users", updated);
     }
 
@@ -115,12 +117,17 @@ public class PortalUpdater {
             }
         }
         
-        var changed = await dbContext.IndexRecords.Merge()
-            .Using(indexEntries)
-            .OnTargetKey()
-            .InsertWhenNotMatched()
-            .UpdateWhenMatched()
-            .MergeAsync(token);
+        var changed = await dbContext.UpsertAsync(
+            indexEntries,
+            dbContext.IndexRecords,
+            r => (r.PlayerId, r.LeagueId, r.StartSeason),
+            changed: (t, s) => t.UserId != s.UserId || t.IndexId != s.IndexId,
+            apply: (t, s) => {
+                t.UserId = s.UserId;
+                t.IndexId = s.IndexId;
+            },
+            token
+        );
         logger.LogInformation("Changed {Count} player index entries", changed);
     }
 }
