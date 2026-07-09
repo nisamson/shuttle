@@ -22,27 +22,30 @@ public class IndexUpdater {
     public async Task UpdateIndex(CancellationToken token = default) {
         using var activity = ActivitySources.ShuttleEfCore.StartActivity();
         logger.LogInformation("Updating data from SHL index");
-        await using var tx = await dbContext.Database.BeginTransactionAsync(token);
-        try {
-            await UpdateLeagues(token);
-            dbContext.ChangeTracker.Clear();
-            await UpdateLeagueSeasons(token);
-            dbContext.ChangeTracker.Clear();
-            await UpdateConferences(token);
-            dbContext.ChangeTracker.Clear();
-            await UpdateDivisions(token);
-            dbContext.ChangeTracker.Clear();
-            await UpdateTeams(token);
-            dbContext.ChangeTracker.Clear();
-            await UpdateAllGameResults(token);
-            dbContext.ChangeTracker.Clear();
-        } catch (Exception exception) {
-            activity?.AddException(exception);
-            logger.LogError(exception, "Error occurred while updating index tables");
-            throw;
-        }
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () => {
+            await using var tx = await dbContext.Database.BeginTransactionAsync(token);
+            try {
+                await UpdateLeagues(token);
+                dbContext.ChangeTracker.Clear();
+                await UpdateLeagueSeasons(token);
+                dbContext.ChangeTracker.Clear();
+                await UpdateConferences(token);
+                dbContext.ChangeTracker.Clear();
+                await UpdateDivisions(token);
+                dbContext.ChangeTracker.Clear();
+                await UpdateTeams(token);
+                dbContext.ChangeTracker.Clear();
+                await UpdateAllGameResults(token);
+                dbContext.ChangeTracker.Clear();
+            } catch (Exception exception) {
+                activity?.AddException(exception);
+                logger.LogError(exception, "Error occurred while updating index tables");
+                throw;
+            }
 
-        await tx.CommitAsync(token);
+            await tx.CommitAsync(token);
+        });
     }
 
     private async Task UpdateLeagues(CancellationToken token = default) {
