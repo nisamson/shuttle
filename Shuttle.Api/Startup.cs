@@ -15,7 +15,6 @@ using Shuttle.Api.Jobs.Jobs;
 using Shuttle.Api.Jobs.Quartz;
 using Shuttle.EFCore;
 using Shuttle.EFCore.Procedures;
-using Shuttle.Shl.Api.Client;
 using Shuttle.ServiceDefaults;
 
 namespace Shuttle.Api.Jobs;
@@ -34,7 +33,6 @@ public static class Startup {
                 options["quartz.plugin.triggerHistory.type"] = "Quartz.Plugin.History.LoggingTriggerHistoryPlugin, Quartz.Plugins";
             }
         );
-        builder.Services.AddShlApiClients();
         builder.Services.AddScoped<IndexUpdater>();
         builder.Services.AddScoped<PortalUpdater>();
         var connStr = ShuttleEfCoreExtensions.GetConnectionString();

@@ -6,6 +6,7 @@ using Microsoft.Identity.Web.UI;
 using Shuttle.Api.Jobs;
 using Shuttle.EFCore;
 using Shuttle.ServiceDefaults;
+using Shuttle.Shl.Api.Client;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -50,6 +51,8 @@ builder.Services.AddCors(options => {
         );
     }
 );
+
+builder.Services.AddShlApiClients();
 
 builder.AddShuttleDatabase();
 builder.AddQuartz();
