@@ -1,7 +1,7 @@
-﻿using Quartz;
+using Quartz;
 using Shuttle.EFCore.Procedures;
 
-namespace Shuttle.Api.Jobs.Jobs;
+namespace Shuttle.Api.Jobs;
 
 public class DbUpdateJob : ISelfRegisteringJob {
 
@@ -19,7 +19,7 @@ public class DbUpdateJob : ISelfRegisteringJob {
 
     public async Task Execute(IJobExecutionContext context) {
         var token = context.CancellationToken;
-        using var activity = ActivitySources.ShuttleJobs.StartActivity();
+        using var activity = ActivitySources.ShuttleApi.StartActivity();
         logger.LogInformation("Starting database update");
         await indexUpdater.UpdateIndex(token);
         logger.LogInformation("Finished index update");

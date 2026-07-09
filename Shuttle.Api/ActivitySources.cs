@@ -1,7 +1,7 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 
-namespace Shuttle.Api.Jobs;
+namespace Shuttle.Api;
 
 internal static class ActivitySources {
-    public static readonly ActivitySource ShuttleJobs = new ActivitySource("Shuttle.Api.Jobs");
+    public static readonly ActivitySource ShuttleApi = new ActivitySource("Shuttle.Api");
 }

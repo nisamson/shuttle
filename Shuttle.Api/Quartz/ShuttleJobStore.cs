@@ -1,11 +1,11 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using Quartz;
 using Quartz.Impl.AdoJobStore;
 using Quartz.Impl.Matchers;
 using Quartz.Spi;
 using Quartz.Util;
 
-namespace Shuttle.Api.Jobs.Quartz;
+namespace Shuttle.Api.Quartz;
 
 [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.AllConstructors 
     | DynamicallyAccessedMemberTypes.AllProperties)]

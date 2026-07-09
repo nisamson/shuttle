@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Identity.Web;
 using Microsoft.Identity.Web.TokenCacheProviders.InMemory;
 using Microsoft.Identity.Web.UI;
-using Shuttle.Api.Jobs;
+using Shuttle.Api;
 using Shuttle.EFCore;
 using Shuttle.ServiceDefaults;
 using Shuttle.Shl.Api.Client;
