@@ -11,14 +11,14 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var shuttleRg = builder.AddParameter("shuttleRg")
     .WithDescription("The name of the resource group to deploy to");
-var databaseServerName = builder.AddParameter("databaseServerName", secret: true)
-    .WithDescription("The server name of the Azure SQL Database to use");
+var databaseServerName = builder.Configuration.GetValue<string>("DatabaseServerName") ?? throw new InvalidOperationException("DatabaseServerName must be configured.");
+var dbServerNameParam = builder.AddParameter("dbServerName", databaseServerName);
 var databaseName = builder.Configuration.GetValue<string>("DatabaseName") ?? throw new InvalidOperationException("DatabaseName must be configured.");
 var appInsightsName = builder.AddParameter("appInsightsName")
     .WithDescription("The name of the Application Insights resource to create or use");
 var devAppInsightsName = builder.AddParameter("devAppInsightsName", "shlanalyticsdevinsights")
     .WithDescription("The name of the Application Insights resource to create or use for the development environment");
-var umiName = builder.AddParameter("umiName")
+var umiName = builder.AddParameter("umiName", "shl-app-umi")
     .WithDescription("The name of the User Managed Identity to create or use");
 
 var umi = builder.AddAzureUserAssignedIdentity("shuttle-umi")
@@ -26,7 +26,7 @@ var umi = builder.AddAzureUserAssignedIdentity("shuttle-umi")
 
 var sqlServer = builder.AddAzureSqlServer("shuttleSqlServer")
     .WithRelationship(umi.Resource, "DbAccess")
-    .AsExisting(databaseServerName, shuttleRg);
+    .AsExisting(dbServerNameParam, shuttleRg);
 
 var insights = builder.AddAzureApplicationInsights("shuttle-app-insights")
     .PublishAsExisting(appInsightsName, shuttleRg)
