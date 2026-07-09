@@ -17,7 +17,6 @@
     
     <ItemGroup>
         <ProjectReference Include="..\Shuttle.Api\Shuttle.Api.csproj" />
-        <ProjectReference Include="..\Shuttle.Api.Jobs\Shuttle.Api.Jobs.csproj" />
     </ItemGroup>
 
 </Project>
