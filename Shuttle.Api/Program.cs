@@ -1,6 +1,9 @@
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Identity.Web;
+using Microsoft.Identity.Web.TokenCacheProviders.InMemory;
+using Microsoft.Identity.Web.UI;
+using Shuttle.Api.Jobs;
 using Shuttle.EFCore;
 using Shuttle.ServiceDefaults;
 
@@ -9,8 +12,19 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
 // Add services to the container.
+// JWT bearer is the default scheme so API endpoints keep their JWT/anonymous behaviour.
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+
+// The Quartz dashboard uses interactive OpenID Connect sign-in. Registered without
+// changing the default scheme, so it only applies to endpoints that opt in via policy.
+builder.Services.AddAuthentication()
+    .AddMicrosoftIdentityWebApp(
+        builder.Configuration,
+        Startup.OptionsSectionName,
+        displayName: Startup.OptionsSectionName
+    );
+builder.Services.AddInMemoryTokenCaches();
 
 var corsOrigins = builder.Configuration
     .GetSection("Shuttle:AllowedCorsOrigins")
@@ -38,8 +52,10 @@ builder.Services.AddCors(options => {
 );
 
 builder.AddShuttleDatabase();
+builder.AddQuartz();
 
-builder.Services.AddControllers();
+builder.Services.AddControllersWithViews()
+    .AddMicrosoftIdentityUI();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -62,6 +78,23 @@ app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapControllers();
+app.MapGet("/MicrosoftIdentity/Account/AccessDenied", () =>
+    Results.Text("403 Forbidden — you do not have the required role to access this resource.\n\nSign out and back in at /MicrosoftIdentity/Account/SignOut", statusCode: 403))
+    .AllowAnonymous();
+
+if (app.Environment.IsDevelopment()) {
+    app.MapGet("/debug/claims", (HttpContext context) => {
+        if (context.User.Identity?.IsAuthenticated != true)
+            return Results.Text("Not authenticated");
+
+        var claims = context.User.Claims
+            .Select(c => $"{c.Type} = {c.Value}");
+        return Results.Text(string.Join("\n", claims));
+    }).RequireAuthorization();
+}
+
+app.AddQuartz();
+
 app.MapDefaultEndpoints();
 app.MapStaticAssets();
 

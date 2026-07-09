@@ -18,7 +18,8 @@ websites, stores it in Azure SQL, and serves it to the front end.
 - **Index** — `index.simulationhockey.com`: season-by-season competition/statistics data.
 
 `Shuttle.Shl.Api.Client` provides typed clients for the **Index** and **Portal** APIs, and
-`Shuttle.Api.Jobs` periodically pulls from them to keep the database current.
+`Shuttle.Api` periodically pulls from them (via its background Quartz jobs) to keep the
+database current.
 
 ### Competitions
 
@@ -79,26 +80,27 @@ Teams also consider whether a player is a **first-gen** (a new member with their
 player) or a **recreate** (a new player created by a member who has usually already been in
 the league for a few seasons).
 
-There are three **shipped** projects, backed by several shared libraries and an Aspire
+There are two **shipped** projects, backed by several shared libraries and an Aspire
 orchestration host.
 
 ### Shipped projects
 
 - **`Shuttle.Api`** — ASP.NET Core Web API (`Microsoft.NET.Sdk.Web`) that exposes the
-  backend API consumed by `Shuttle.WebClient`. Controllers live in
-  `Shuttle.Api/Controllers`; supporting logic in `Shuttle.Api/Services`. Authenticates
-  incoming requests as a protected API using JWT bearer tokens via
-  `Microsoft.Identity.Web` (Entra ID, `AzureAd` config section). CORS origins are read
-  from `Shuttle:AllowedCorsOrigins` and are **required in production**. Reads data through
-  `Shuttle.EFCore` (EF Core + linq2db).
-- **`Shuttle.Api.Jobs`** — background worker (also `Microsoft.NET.Sdk.Web`) responsible
-  for scheduled tasks such as periodically updating the database from the SHL API. Uses
-  **Quartz.NET** with a persistent SQL Server job store (table prefix in
-  `ShuttleEfCoreConstants.QuartzTablePrefix`). Jobs live in `Shuttle.Api.Jobs/Jobs` and
-  self-register through the `ISelfRegisteringJob` interface (see `DbUpdateJob`, which runs
-  every 6 hours and drives `IndexUpdater`/`PortalUpdater`). Ships the **CrystalQuartz**
-  dashboard at `/quartz`, gated by the `Shuttle.Jobs.Admin` role via OpenID Connect
-  (interactive web-app auth, `QuartzDashAuth` config section).
+  backend API consumed by `Shuttle.WebClient` **and** hosts the scheduled background jobs.
+  Controllers live in `Shuttle.Api/Controllers`; supporting logic in `Shuttle.Api/Services`.
+  Authenticates incoming API requests as a protected API using JWT bearer tokens via
+  `Microsoft.Identity.Web` (Entra ID, `AzureAd` config section) — this is the **default**
+  authentication scheme. CORS origins are read from `Shuttle:AllowedCorsOrigins` and are
+  **required in production**. Reads data through `Shuttle.EFCore` (EF Core + linq2db).
+
+  Background jobs run in-process via **Quartz.NET** with a persistent SQL Server job store
+  (table prefix in `ShuttleEfCoreConstants.QuartzTablePrefix`). Jobs live in
+  `Shuttle.Api/Jobs` (namespace `Shuttle.Api.Jobs.Jobs`) and self-register through the
+  `ISelfRegisteringJob` interface (see `DbUpdateJob`, which runs every 6 hours and drives
+  `IndexUpdater`/`PortalUpdater`). Ships the **CrystalQuartz** dashboard at `/quartz`, gated
+  by the `Shuttle.Jobs.Admin` role via interactive OpenID Connect sign-in (`QuartzDashAuth`
+  config section, registered as a non-default scheme so it does not affect JWT or anonymous
+  access to the API endpoints).
 - **`Shuttle.WebClient`** — Blazor WebAssembly **Standalone** front end
   (`Microsoft.NET.Sdk.BlazorWebAssembly`). Built with **MudBlazor**. Authenticates users
   with MSAL (`Microsoft.Authentication.WebAssembly.Msal`, `AzureAd` config) and calls
@@ -112,17 +114,17 @@ orchestration host.
   stored-procedure/updater logic (`Procedures/`), and the `AddShuttleDatabase` /
   `EnsureShuttleDatabaseConnectivity` host extensions. Uses **Azure SQL** with
   `ActiveDirectoryDefault` auth and layers **linq2db** (`linq2db.EntityFrameworkCore`)
-  on top of EF Core. Both `Shuttle.Api` and `Shuttle.Api.Jobs` depend on it.
+  on top of EF Core. Both server-side entry points live in `Shuttle.Api`, which depends on it.
 - **`Shuttle.ServiceDefaults`** — shared Aspire service defaults: OpenTelemetry wiring,
   health endpoints (`/health`, `/alive`), and `MapDefaultEndpoints`/`AddServiceDefaults`.
-  Referenced by both server projects.
+  Referenced by the server project.
 - **`Shuttle.Shl.Api.Client`** / **`Shuttle.Shl.Api.Models`** — typed clients and DTOs for
   the upstream SHL Index and Portal APIs.
 - **`Shuttle.Models`**, **`Shuttle.Core`**, **`Shuttle.EloCalc`**, **`Shuttle.Math`** —
   domain models and shared utility/calculation libraries.
-- **`Shuttle.Backend.Aspire`** — .NET Aspire AppHost that orchestrates `shuttle-api` and
-  `shuttle-api-jobs`, wiring them to Azure SQL and Application Insights and publishing them
-  as Azure App Service websites. Run this project for local orchestration.
+- **`Shuttle.Backend.Aspire`** — .NET Aspire AppHost that orchestrates `shuttle-api`,
+  wiring it to Azure SQL and Application Insights and publishing it
+  as an Azure App Service website. Run this project for local orchestration.
 - **`Shuttle.Tests`** — the test project (see Test section below).
 
 ### Cross-cutting notes
