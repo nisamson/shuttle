@@ -1,24 +1,21 @@
-﻿using System.Reflection;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using CrystalQuartz.Application;
 using CrystalQuartz.Application.Startup;
 using CrystalQuartz.AspNetCore;
 using CrystalQuartz.Core.SchedulerProviders;
 using CrystalQuartz.WebFramework;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using OpenTelemetry.Trace;
 using Quartz;
 using Quartz.AspNetCore;
-using Quartz.Impl;
-using Shuttle.Api.Jobs.Jobs;
-using Shuttle.Api.Jobs.Quartz;
+using Shuttle.Api.Jobs;
+using Shuttle.Api.Services.Logging;
 using Shuttle.EFCore;
 using Shuttle.ServiceDefaults;
 
-namespace Shuttle.Api.Jobs;
+namespace Shuttle.Api.Quartz;
 
-public static class Startup {
+public static class QuartzSetup {
     public const string OptionsAuthorizationPolicy = "QuartzDashboard";
     public const string OptionsSectionName = "QuartzDashAuth";
     public const string OptionsAuthScheme = OpenIdConnectDefaults.AuthenticationScheme;

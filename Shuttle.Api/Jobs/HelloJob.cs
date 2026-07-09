@@ -1,17 +1,17 @@
 ﻿using Quartz;
 
-namespace Shuttle.Api.Jobs.Jobs;
+namespace Shuttle.Api.Jobs;
 
 public class HelloJob : ISelfRegisteringJob {
     public static readonly JobKey Key = new(nameof(HelloJob), "debug");
     public static readonly TriggerKey TriggerKey = new(nameof(HelloJob) + "Trigger", "debug");
-    
+
     private readonly ILogger<HelloJob> logger;
-    
+
     public HelloJob(ILogger<HelloJob> logger) {
         this.logger = logger;
     }
-    
+
     public Task Execute(IJobExecutionContext context) {
         logger.LogInformation("Hello from {JobKey} at {ExecutionTime}", Key, DateTimeOffset.UtcNow);
         return Task.CompletedTask;

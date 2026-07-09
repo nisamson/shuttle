@@ -9,18 +9,24 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Aspire.Microsoft.Data.SqlClient" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" NoWarn="NU1605"/>
         <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" NoWarn="NU1605"/>
         <PackageReference Include="Microsoft.AspNetCore.OpenApi"/>
         <PackageReference Include="Microsoft.OpenApi"/>
         <PackageReference Include="Microsoft.Identity.Web"/>
+        <PackageReference Include="Microsoft.Identity.Web.UI"/>
         <PackageReference Include="Microsoft.Identity.Web.DownstreamApi"/>
+
+        <PackageReference Include="CrystalQuartz.AspNetCore" />
+        <PackageReference Include="Quartz"/>
+        <PackageReference Include="Quartz.AspNetCore"/>
+        <PackageReference Include="Quartz.Plugins"/>
+        <PackageReference Include="Quartz.Serialization.SystemTextJson"/>
+        <PackageReference Include="OpenTelemetry.Instrumentation.Quartz" />
 
         <PackageReference Include="Azure.Identity"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design"/>
-        <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer"/>
         <PackageReference Include="linq2db.EntityFrameworkCore"/>
         <PackageReference Include="Nerdbank.GitVersioning"/>
 

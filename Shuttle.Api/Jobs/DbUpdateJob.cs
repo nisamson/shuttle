@@ -1,7 +1,8 @@
 ﻿using Quartz;
+using Shuttle.Api.Services.Logging;
 using Shuttle.EFCore.Procedures;
 
-namespace Shuttle.Api.Jobs.Jobs;
+namespace Shuttle.Api.Jobs;
 
 public class DbUpdateJob : ISelfRegisteringJob {
 
@@ -10,7 +11,7 @@ public class DbUpdateJob : ISelfRegisteringJob {
     private readonly PortalUpdater portalUpdater;
     private static readonly JobKey JobKey = JobKey.Create(nameof(DbUpdateJob), "data");
     private static readonly TriggerKey TriggerKey = new($"{nameof(DbUpdateJob)}Trigger", "data");
-    
+
     public DbUpdateJob(ILogger<DbUpdateJob> logger, IndexUpdater indexUpdater, PortalUpdater portalUpdater) {
         this.logger = logger;
         this.indexUpdater = indexUpdater;

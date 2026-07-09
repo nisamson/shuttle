@@ -48,24 +48,13 @@ var api = builder.AddProject<Shuttle_Api>("shuttle-api")
             c.DisplayText = "OpenAPI Spec";
             c.Url = "/openapi.json";
         })
-    .WithExternalHttpEndpoints()
-    .WithHttpProbe(ProbeType.Liveness, "/alive", initialDelaySeconds: 5)
-    .PublishAsAzureAppServiceWebsite((infra, site) => {
-        site.IsHttpsOnly = true;
-        site.SiteConfig.IsAlwaysOn = true;
-        site.SiteConfig.NumberOfWorkers = 1;
-    });
-
-var jobs = builder.AddProject<Shuttle_Api_Jobs>("shuttle-api-jobs")
-    .WithAzureUserAssignedIdentity(umi)
-    .WithEnvironment("SHUTTLE_SQLITE_PATH", sqlitePath)
-    .WithExternalHttpEndpoints()
-    .WithHttpProbe(ProbeType.Liveness, "/alive", initialDelaySeconds: 5)
     .WithUrlForEndpoint("https",
         c => {
             c.DisplayText = "Job Dashboard";
             c.Url = "/quartz";
         })
+    .WithExternalHttpEndpoints()
+    .WithHttpProbe(ProbeType.Liveness, "/alive", initialDelaySeconds: 5)
     .PublishAsAzureAppServiceWebsite((infra, site) => {
         site.IsHttpsOnly = true;
         site.SiteConfig.IsAlwaysOn = true;
