@@ -28,6 +28,21 @@
         "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:20250",
         "DASHBOARD__TELEMETRYLIMITS__MAXLOGCOUNT": "50000"
       }
+    },
+    "https (debug frontend in Rider)": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:17040;http://localhost:15270",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21047",
+        "ASPIRE_DASHBOARD_MCP_ENDPOINT_URL": "https://localhost:23229",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22194",
+        "DASHBOARD__TELEMETRYLIMITS__MAXLOGCOUNT": "50000",
+        "LaunchWebClient": "false"
+      }
     }
   }
 }

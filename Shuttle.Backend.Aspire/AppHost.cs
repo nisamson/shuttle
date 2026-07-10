@@ -70,4 +70,20 @@ var api = builder.AddProject<Shuttle_Api>("shuttle-api")
     });
 #pragma warning restore ASPIREPROBES001
 
+// The Blazor WebAssembly front end is only orchestrated for local development. It runs via
+// the Blazor dev server and is excluded from publish so it does not affect the Azure App
+// Service deployment of the API.
+//
+// Set LaunchWebClient=false (see the "https (debug frontend in Rider)" launch profile) to
+// omit this tile so the WebClient can instead be run/debugged directly in Rider with full
+// WASM debugging while this AppHost provides the backend. The WebClient reads its API URL
+// from wwwroot/appsettings.Development.json, so it targets the same local API either way.
+if (builder.ExecutionContext.IsRunMode
+    && builder.Configuration.GetValue("LaunchWebClient", true)) {
+    builder.AddProject<Shuttle_WebClient>("webclient")
+        .WithReference(api)
+        .WaitFor(api)
+        .WithExternalHttpEndpoints();
+}
+
 builder.Build().Run();

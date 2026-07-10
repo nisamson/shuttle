@@ -17,6 +17,7 @@
     
     <ItemGroup>
         <ProjectReference Include="..\Shuttle.Api\Shuttle.Api.csproj" />
+        <ProjectReference Include="..\Shuttle.WebClient\Shuttle.WebClient.csproj" />
     </ItemGroup>
 
 </Project>
