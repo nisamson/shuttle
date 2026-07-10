@@ -62,14 +62,28 @@ public class GameResult : IEntityConvertible<GameResult, Shl.Api.Models.Index.V1
             AwayTeamId = original.AwayTeam,
             HomeScore = original.HomeScore,
             AwayScore = original.AwayScore,
-            GameType = GameType.FromString(
-                original.GameType
-            ),
+            GameType = ResolveGameType(original),
             Played = original.Played,
             Overtime = original.Overtime,
             Shootout = original.Shootout,
             Slug = original.Slug
         };
+    }
+
+    // The Index API sometimes omits the GameType string, so fall back to the game type
+    // encoded in the slug (see Shl.Api.Models.Index.V1.GameSlug) before giving up.
+    private static GameType ResolveGameType(Shl.Api.Models.Index.V1.GameResult original) {
+        if (GameType.TryFromString(original.GameType, out var fromString)) {
+            return fromString;
+        }
+
+        if (Shl.Api.Models.Index.V1.GameSlug.TryParse(original.Slug, null, out var slug)) {
+            return slug.GameType;
+        }
+
+        throw new FormatException(
+            $"Cannot determine game type for game '{original.Slug}': " +
+            $"GameType string was '{original.GameType ?? "<null>"}' and the slug could not be parsed.");
     }
 
     public Shl.Api.Models.Index.V1.GameResult ToModel() {

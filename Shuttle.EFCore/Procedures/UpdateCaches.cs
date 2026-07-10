@@ -25,9 +25,14 @@ public static class UpdateCaches {
 
         private async Task UpdateMostRecentPlayers(CancellationToken token = default) {
             using var activity = ActivitySources.ShuttleEfCore.StartActivity();
+            // Select the most recent player per user (max CreationTime, tie-broken by max PlayerId) using an
+            // anti-join. This translates to a single SQL NOT EXISTS query; LINQ operators such as GroupBy/MaxBy
+            // are not translatable by linq2db as a MERGE source.
             var mostRecentPlayers = ctx.PlayerInformation
-                .GroupBy(pi => pi.User)
-                .Select(grp => grp.MaxBy(pi => pi.CreationTime)!);
+                .Where(pi => !ctx.PlayerInformation.Any(other =>
+                    other.UserId == pi.UserId
+                    && (other.CreationTime > pi.CreationTime
+                        || (other.CreationTime == pi.CreationTime && other.PlayerId > pi.PlayerId))));
             int changed;
             try {
                 ctx.Logger.LogInformation("Starting update of most recent players cache table");

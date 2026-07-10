@@ -75,7 +75,7 @@ public class IndexUpdater {
             logger.LogInformation("Fetching data for league {LeagueId}", league);
             var seasons = await indexClient.GetLeagueSeasons(league, token);
             logger.LogInformation("Retrieved {Count} seasons from index", seasons.Count);
-            leagueSeasons.AddRange(seasons.Select(LeagueSeason.FromModel));
+            leagueSeasons.AddRange(seasons.Where(s => s.Season > 65).Select(LeagueSeason.FromModel));
         }
 
         logger.LogInformation("Retrieved {Count} league seasons from index", leagueSeasons.Count);
@@ -187,8 +187,12 @@ public class IndexUpdater {
         activity?.SetTag("season", season.ToString());
         var games = await indexClient.GetSchedule(league.Id, season, token);
         logger.LogInformation("Retrieved {Count} games from index", games.Count);
-        var gameEntities = games.Select(GameResult.FromModel).ToList();
-        var updated = dbContext.GameResults.Merge()
+        var gameEntities = new List<GameResult>();
+        foreach (var game in games) {
+            logger.LogDebug("Converting game result: {@Game}", game);
+            gameEntities.Add(GameResult.FromModel(game));
+        }
+        var updated = await dbContext.GameResults.Merge()
             .Using(gameEntities)
             .OnTargetKey()
             .InsertWhenNotMatched()

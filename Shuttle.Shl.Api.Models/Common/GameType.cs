@@ -18,12 +18,28 @@ public static class GameTypeExtensions {
         }
         
         public static GameType FromString(string value) {
-            return value switch {
-                "Pre-Season" => GameType.PreSeason,
-                "Regular Season" => GameType.RegularSeason,
-                "Playoffs" => GameType.Playoffs,
-                _ => throw new ArgumentOutOfRangeException(nameof(value), value, null)
-            };
+            if (TryFromString(value, out var result)) {
+                return result;
+            }
+
+            throw new ArgumentOutOfRangeException(nameof(value), value, null);
+        }
+
+        public static bool TryFromString(string? value, out GameType result) {
+            switch (value?.ToLowerInvariant()) {
+                case "pre-season":
+                    result = GameType.PreSeason;
+                    return true;
+                case "regular season":
+                    result = GameType.RegularSeason;
+                    return true;
+                case "playoffs":
+                    result = GameType.Playoffs;
+                    return true;
+                default:
+                    result = default;
+                    return false;
+            }
         }
 
         public static GameType FromId(int value) {

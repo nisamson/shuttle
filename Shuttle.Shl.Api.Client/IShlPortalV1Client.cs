@@ -6,6 +6,6 @@ namespace Shuttle.Shl.Api.Client;
 public interface IShlPortalV1Client {
     public const string BaseUrl = "https://portal.simulationhockey.com/api/v1";
     
-    [Get("/players")]
+    [Get("/player")]
     public Task<IList<PlayerInfo>> GetPlayers(CancellationToken token = default);
 }
