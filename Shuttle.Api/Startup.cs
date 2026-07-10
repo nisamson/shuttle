@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using CrystalQuartz.Application;
 using CrystalQuartz.Application.Startup;
@@ -11,12 +11,13 @@ using OpenTelemetry.Trace;
 using Quartz;
 using Quartz.AspNetCore;
 using Quartz.Impl;
-using Shuttle.Api.Jobs.Jobs;
-using Shuttle.Api.Jobs.Quartz;
+using Shuttle.Api.Jobs;
+using Shuttle.Api.Quartz;
 using Shuttle.EFCore;
+using Shuttle.EFCore.Procedures;
 using Shuttle.ServiceDefaults;
 
-namespace Shuttle.Api.Jobs;
+namespace Shuttle.Api;
 
 public static class Startup {
     public const string OptionsAuthorizationPolicy = "QuartzDashboard";
@@ -32,6 +33,8 @@ public static class Startup {
                 options["quartz.plugin.triggerHistory.type"] = "Quartz.Plugin.History.LoggingTriggerHistoryPlugin, Quartz.Plugins";
             }
         );
+        builder.Services.AddScoped<IndexUpdater>();
+        builder.Services.AddScoped<PortalUpdater>();
         var connStr = ShuttleEfCoreExtensions.GetConnectionString();
         builder.Services.AddQuartz(q => {
             q.InterruptJobsOnShutdownWithWait = true;
@@ -46,6 +49,7 @@ public static class Startup {
                     });
             });
             HelloJob.RegisterJob(q);
+            DbUpdateJob.RegisterJob(q);
         });
         builder.Services.AddQuartzServer(o => {
                 o.AwaitApplicationStarted = true;
@@ -67,7 +71,7 @@ public static class Startup {
                     t.AddQuartzInstrumentation();
                 }
             );
-        builder.AddTelemetryService(ActivitySources.ShuttleJobs);
+        builder.AddTelemetryService(ActivitySources.ShuttleApi);
         builder.Services.AddSingleton(new CrystalQuartzOptions());
         builder.Services.AddSingleton(provider => {
                 var scheduleFactory = provider.GetRequiredService<ISchedulerFactory>();

@@ -22,27 +22,30 @@ public class IndexUpdater {
     public async Task UpdateIndex(CancellationToken token = default) {
         using var activity = ActivitySources.ShuttleEfCore.StartActivity();
         logger.LogInformation("Updating data from SHL index");
-        await using var tx = await dbContext.Database.BeginTransactionAsync(token);
-        try {
-            await UpdateLeagues(token);
-            dbContext.ChangeTracker.Clear();
-            await UpdateLeagueSeasons(token);
-            dbContext.ChangeTracker.Clear();
-            await UpdateConferences(token);
-            dbContext.ChangeTracker.Clear();
-            await UpdateDivisions(token);
-            dbContext.ChangeTracker.Clear();
-            await UpdateTeams(token);
-            dbContext.ChangeTracker.Clear();
-            await UpdateAllGameResults(token);
-            dbContext.ChangeTracker.Clear();
-        } catch (Exception exception) {
-            activity?.AddException(exception);
-            logger.LogError(exception, "Error occurred while updating index tables");
-            throw;
-        }
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () => {
+            await using var tx = await dbContext.Database.BeginTransactionAsync(token);
+            try {
+                await UpdateLeagues(token);
+                dbContext.ChangeTracker.Clear();
+                await UpdateLeagueSeasons(token);
+                dbContext.ChangeTracker.Clear();
+                await UpdateConferences(token);
+                dbContext.ChangeTracker.Clear();
+                await UpdateDivisions(token);
+                dbContext.ChangeTracker.Clear();
+                await UpdateTeams(token);
+                dbContext.ChangeTracker.Clear();
+                await UpdateAllGameResults(token);
+                dbContext.ChangeTracker.Clear();
+            } catch (Exception exception) {
+                activity?.AddException(exception);
+                logger.LogError(exception, "Error occurred while updating index tables");
+                throw;
+            }
 
-        await tx.CommitAsync(token);
+            await tx.CommitAsync(token);
+        });
     }
 
     private async Task UpdateLeagues(CancellationToken token = default) {
@@ -72,7 +75,7 @@ public class IndexUpdater {
             logger.LogInformation("Fetching data for league {LeagueId}", league);
             var seasons = await indexClient.GetLeagueSeasons(league, token);
             logger.LogInformation("Retrieved {Count} seasons from index", seasons.Count);
-            leagueSeasons.AddRange(seasons.Select(LeagueSeason.FromModel));
+            leagueSeasons.AddRange(seasons.Where(s => s.Season > 65).Select(LeagueSeason.FromModel));
         }
 
         logger.LogInformation("Retrieved {Count} league seasons from index", leagueSeasons.Count);
@@ -184,8 +187,12 @@ public class IndexUpdater {
         activity?.SetTag("season", season.ToString());
         var games = await indexClient.GetSchedule(league.Id, season, token);
         logger.LogInformation("Retrieved {Count} games from index", games.Count);
-        var gameEntities = games.Select(GameResult.FromModel).ToList();
-        var updated = dbContext.GameResults.Merge()
+        var gameEntities = new List<GameResult>();
+        foreach (var game in games) {
+            logger.LogDebug("Converting game result: {@Game}", game);
+            gameEntities.Add(GameResult.FromModel(game));
+        }
+        var updated = await dbContext.GameResults.Merge()
             .Using(gameEntities)
             .OnTargetKey()
             .InsertWhenNotMatched()

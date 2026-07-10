@@ -1,6 +1,6 @@
-﻿using Quartz;
+using Quartz;
 
-namespace Shuttle.Api.Jobs.Jobs;
+namespace Shuttle.Api.Jobs;
 
 public class HelloJob : ISelfRegisteringJob {
     public static readonly JobKey Key = new(nameof(HelloJob), "debug");

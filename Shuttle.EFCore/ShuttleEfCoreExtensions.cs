@@ -57,6 +57,10 @@ public static class ShuttleEfCoreExtensions {
             ConnectTimeout = 30,
             ConnectRetryCount = 5,
             ConnectRetryInterval = 10,
+            // Enable MARS: EF Core and the linq2db layer share a single connection when
+            // work is pinned to an explicit transaction, so a linq2db merge reader can
+            // still be open when the next EF Core query executes.
+            MultipleActiveResultSets = true,
         };
         var connectionString = connectionStringBuilder.ToString();
         return new(connectionString);

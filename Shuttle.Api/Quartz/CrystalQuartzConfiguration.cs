@@ -1,10 +1,10 @@
-﻿using CrystalQuartz.Application;
+using CrystalQuartz.Application;
 using CrystalQuartz.Application.Startup;
 using CrystalQuartz.AspNetCore;
 using CrystalQuartz.Core.SchedulerProviders;
 using Microsoft.AspNetCore.Http.Features;
 
-namespace Shuttle.Api.Jobs.Quartz;
+namespace Shuttle.Api.Quartz;
 
 public static class CrystalQuartzConfiguration
 {

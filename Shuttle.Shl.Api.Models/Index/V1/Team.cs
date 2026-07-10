@@ -1,4 +1,6 @@
-﻿namespace Shuttle.Shl.Api.Models.Index.V1;
+﻿using System.Text.Json.Serialization;
+
+namespace Shuttle.Shl.Api.Models.Index.V1;
 
 public record Team(
     int Id,
@@ -25,5 +27,7 @@ public record TeamSeasonStats(
     int Points,
     int GoalsFor,
     int GoalsAgainst,
+    // The SHL API sends this as either a JSON number or a JSON string.
+    [property: JsonConverter(typeof(FlexibleFloatJsonConverter))]
     float WinPercent
 );

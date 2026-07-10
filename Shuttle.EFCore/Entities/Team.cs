@@ -110,8 +110,8 @@ public class TeamEntityConfiguration : IEntityTypeConfiguration<Team> {
         builder.HasKey(t => new { t.TeamId, t.Season, t.LeagueId });
         builder.HasOne<Division>(t => t.Division)
             .WithMany()
-            .HasForeignKey(t => new { t.DivisionId, t.Season, t.LeagueId })
-            .HasPrincipalKey(d => new { d.DivisionId, d.Season, d.LeagueId })
+            .HasForeignKey(t => new { t.ConferenceId, t.DivisionId, t.Season, t.LeagueId })
+            .HasPrincipalKey(d => new { d.ConferenceId, d.DivisionId, d.Season, d.LeagueId })
             .OnDelete(DeleteBehavior.ClientCascade);
         builder.HasOne<Conference>(t => t.Conference)
             .WithMany()

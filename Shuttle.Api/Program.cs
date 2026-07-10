@@ -3,9 +3,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Identity.Web;
 using Microsoft.Identity.Web.TokenCacheProviders.InMemory;
 using Microsoft.Identity.Web.UI;
-using Shuttle.Api.Jobs;
+using Shuttle.Api;
 using Shuttle.EFCore;
 using Shuttle.ServiceDefaults;
+using Shuttle.Shl.Api.Client;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -50,6 +51,8 @@ builder.Services.AddCors(options => {
         );
     }
 );
+
+builder.Services.AddShlApiClients();
 
 builder.AddShuttleDatabase();
 builder.AddQuartz();

@@ -20,7 +20,7 @@ public class ColorJsonConverter : JsonConverter<Color> {
         if (text is null) {
             throw new JsonException("Color value is null");
         }
-        return ColorTranslator.FromHtml(text);
+        return ColorTranslator.FromHtml(text.Replace("$", "#"));
     }
 
     public override void Write(Utf8JsonWriter writer, Color value, JsonSerializerOptions options) {

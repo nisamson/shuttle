@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Shuttle.EFCore;
 
@@ -12,9 +13,11 @@ using Shuttle.EFCore;
 namespace Shuttle.EFCore.Migrations
 {
     [DbContext(typeof(ShlDbContext))]
-    partial class ShlDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260709215450_InitialModel")]
+    partial class InitialModel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -673,7 +676,7 @@ namespace Shuttle.EFCore.Migrations
 
                     b.HasIndex("ConferenceId", "Season", "LeagueId");
 
-                    b.HasIndex("ConferenceId", "DivisionId", "Season", "LeagueId");
+                    b.HasIndex("DivisionId", "Season", "LeagueId");
 
                     b.ToTable("Teams");
                 });
@@ -783,8 +786,8 @@ namespace Shuttle.EFCore.Migrations
 
                     b.HasOne("Shuttle.EFCore.Entities.Index.Division", "Division")
                         .WithMany()
-                        .HasForeignKey("ConferenceId", "DivisionId", "Season", "LeagueId")
-                        .HasPrincipalKey("ConferenceId", "DivisionId", "Season", "LeagueId")
+                        .HasForeignKey("DivisionId", "Season", "LeagueId")
+                        .HasPrincipalKey("DivisionId", "Season", "LeagueId")
                         .OnDelete(DeleteBehavior.ClientCascade);
 
                     b.Navigation("Conference");

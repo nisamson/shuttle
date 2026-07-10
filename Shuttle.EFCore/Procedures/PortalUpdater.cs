@@ -22,20 +22,23 @@ public class PortalUpdater {
 
     public async Task UpdatePortal(CancellationToken token = default) {
         using var activity = ActivitySources.ShuttleEfCore.StartActivity();
-        await using var tx = await dbContext.Database.BeginTransactionAsync(token);
-        logger.LogInformation("Updating portal");
-        try {
-            await UpdatePlayers(token);
-            dbContext.ChangeTracker.Clear();
-            await dbContext.UpdatePortalCacheTables(token);
-            dbContext.ChangeTracker.Clear();
-        } catch (Exception ex) {
-            activity?.AddException(ex);
-            logger.LogError(ex, "Error updating portal");
-            throw;
-        }
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () => {
+            await using var tx = await dbContext.Database.BeginTransactionAsync(token);
+            logger.LogInformation("Updating portal");
+            try {
+                await UpdatePlayers(token);
+                dbContext.ChangeTracker.Clear();
+                await dbContext.UpdatePortalCacheTables(token);
+                dbContext.ChangeTracker.Clear();
+            } catch (Exception ex) {
+                activity?.AddException(ex);
+                logger.LogError(ex, "Error updating portal");
+                throw;
+            }
 
-        await tx.CommitAsync(token);
+            await tx.CommitAsync(token);
+        });
     }
 
     private async Task UpdatePlayers(CancellationToken token = default) {
