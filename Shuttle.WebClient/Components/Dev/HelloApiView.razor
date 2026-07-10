@@ -1,0 +1,19 @@
+﻿@inject HttpClient Http
+
+<FluentCard Width="100%">
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+        <FluentLabel Typo="Typography.H5">API connectivity check</FluentLabel>
+
+        @if (loading) {
+            <FluentProgressRing/>
+        } else if (error is not null) {
+            <FluentLabel Color="Color.Error">Failed to reach the API: @error</FluentLabel>
+        } else {
+            <FluentLabel Typo="Typography.Body">API says: <strong>@message</strong></FluentLabel>
+        }
+
+        <FluentButton Appearance="Appearance.Accent" OnClick="LoadAsync" Disabled="loading">
+            Call /hello
+        </FluentButton>
+    </FluentStack>
+</FluentCard>
