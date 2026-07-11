@@ -9,6 +9,8 @@ namespace Shuttle.Analysis;
 /// A flattened, analysis-friendly projection of a <see cref="PlayerInformation"/> row.
 /// Height is expressed as integer inches, the skater/goaltender attribute sets are kept as
 /// nested objects, and navigation data (owning user, index records) is deliberately excluded.
+/// Mental attributes that are constant (15) for every player are dropped during serialization
+/// (see <see cref="PlayerExportJson"/>).
 /// </summary>
 public sealed record PlayerExportRecord {
     public required int UserId { get; init; }
