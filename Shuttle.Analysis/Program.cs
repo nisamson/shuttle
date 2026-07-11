@@ -9,6 +9,7 @@
 
 using System.CommandLine;
 using Shuttle.Analysis;
+using Shuttle.Analysis.Flows;
 using Shuttle.Shl.Api.Models.Common;
 
 var outputOption = new Option<FileInfo?>("--output", "-o") {
@@ -82,6 +83,82 @@ downloadCommand.SetAction((parseResult, cancellationToken) => {
 var rootCommand = new RootCommand("Shuttle data-analysis command-line tools.") {
     downloadCommand,
 };
+
+var analysisRegistry = AnalysisFlowRegistry.CreateDefault();
+
+var flowOption = new Option<string?>("--flow", "-f") {
+    Description = "Name of the analysis flow to run. Use --list to see the available flows.",
+};
+
+var flowInputOption = new Option<FileInfo?>("--input", "-i") {
+    Description = "Path of the CSV data file (produced by download-players) to ingest and analyze.",
+};
+
+var flowOutputOption = new Option<DirectoryInfo?>("--output", "-o") {
+    Description = "Directory for any artifacts the flow produces. Defaults to ./analysis-output.",
+};
+
+var listFlowsOption = new Option<bool>("--list") {
+    Description = "List the available analysis flows and exit.",
+};
+
+var flowArgOption = new Option<string[]>("--arg", "-a") {
+    Description = "Flow-specific argument as key=value. Repeat to pass multiple (e.g. --arg k=3 --arg seed=42).",
+    Arity = ArgumentArity.ZeroOrMore,
+    AllowMultipleArgumentsPerToken = true,
+};
+
+var analyzeCommand = new Command(
+    "analyze",
+    "Ingest a data file and run it through a named analysis flow."
+) {
+    flowOption,
+    flowInputOption,
+    flowOutputOption,
+    listFlowsOption,
+    flowArgOption,
+};
+
+analyzeCommand.SetAction((parseResult, cancellationToken) => {
+    if (parseResult.GetValue(listFlowsOption)) {
+        if (analysisRegistry.Flows.Count == 0) {
+            Console.WriteLine("No analysis flows are registered.");
+        } else {
+            Console.WriteLine("Available analysis flows:");
+            foreach (var registered in analysisRegistry.Flows) {
+                Console.WriteLine($"  {registered.Name,-24} {registered.Description}");
+            }
+        }
+
+        return Task.FromResult(0);
+    }
+
+    var flow = parseResult.GetValue(flowOption);
+    if (string.IsNullOrWhiteSpace(flow)) {
+        Console.Error.WriteLine("A flow name is required. Pass --flow <name> or --list to see the options.");
+        return Task.FromResult(1);
+    }
+
+    var input = parseResult.GetValue(flowInputOption);
+    if (input is null) {
+        Console.Error.WriteLine("An input file is required. Pass --input <file>.");
+        return Task.FromResult(1);
+    }
+
+    var output = parseResult.GetValue(flowOutputOption) ?? new DirectoryInfo("analysis-output");
+
+    IReadOnlyDictionary<string, string> arguments;
+    try {
+        arguments = FlowArguments.Parse(parseResult.GetValue(flowArgOption));
+    } catch (FormatException ex) {
+        Console.Error.WriteLine(ex.Message);
+        return Task.FromResult(1);
+    }
+
+    return AnalysisFlowRunner.RunAsync(flow, input, output, analysisRegistry, arguments, cancellationToken);
+});
+
+rootCommand.Subcommands.Add(analyzeCommand);
 
 using var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) => {
