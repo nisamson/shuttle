@@ -195,3 +195,9 @@ Example:
 
 When declaring or updating package versions, introduce a property for any group of
 related packages so the relationship is explicit and updates stay consistent.
+
+## Skills
+
+When asked to create a skill, place it in the repository (e.g.
+`.github/skills/<skill-name>/SKILL.md`) so it is version-controlled and shared with
+collaborators, unless the request explicitly says otherwise.

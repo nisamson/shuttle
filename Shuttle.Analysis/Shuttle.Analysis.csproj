@@ -8,7 +8,9 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="CsvHelper" />
         <PackageReference Include="Microsoft.Extensions.Hosting" />
+        <PackageReference Include="Microsoft.ML" />
         <PackageReference Include="dotenv.net" />
         <PackageReference Include="linq2db.EntityFrameworkCore" />
         <PackageReference Include="System.Commandline" />

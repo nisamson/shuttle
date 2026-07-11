@@ -61,6 +61,7 @@
     <PackageVersion Include="Microsoft.Identity.Web" Version="$(MicrosoftIdentityWebVersion)" />
     <PackageVersion Include="Microsoft.Identity.Web.UI" Version="$(MicrosoftIdentityWebVersion)" />
     <PackageVersion Include="Microsoft.Identity.Web.DownstreamApi" Version="$(MicrosoftIdentityWebVersion)" />
+    <PackageVersion Include="Microsoft.ML" Version="5.0.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="Microsoft.OpenApi" Version="2.7.5" />
     <PackageVersion Include="Nerdbank.GitVersioning" Version="3.9.50" />
