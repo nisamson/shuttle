@@ -14,12 +14,14 @@ namespace Shuttle.Analysis;
 public static class PlayerInformationExporter {
 
     /// <summary>
-    /// Reads every player from the Shuttle database and writes a flat JSON array to <paramref name="output"/>.
+    /// Reads every player from the Shuttle database and writes them to <paramref name="output"/> in
+    /// the requested <paramref name="format"/> (a flat JSON array or a flat CSV table).
     /// </summary>
     /// <returns>A process exit code: 0 on success, 130 if cancelled, 1 on failure.</returns>
     public static async Task<int> RunAsync(
         FileInfo output,
         string? database,
+        ExportFormat format,
         bool pretty,
         CancellationToken cancellationToken
     ) {
@@ -49,12 +51,20 @@ public static class PlayerInformationExporter {
             var records = players.Select(PlayerExportRecord.FromEntity).ToList();
 
             output.Directory?.Create();
-            var options = PlayerExportJson.CreateOptions(pretty);
             await using (var stream = output.Open(FileMode.Create, FileAccess.Write, FileShare.None)) {
-                await JsonSerializer.SerializeAsync(stream, records, options, cancellationToken);
+                if (format == ExportFormat.Csv) {
+                    await PlayerCsvExport.WriteAsync(stream, records, cancellationToken);
+                } else {
+                    var options = PlayerExportJson.CreateOptions(pretty);
+                    await JsonSerializer.SerializeAsync(stream, records, options, cancellationToken);
+                }
             }
 
-            logger.LogInformation("Wrote {Count} players to {Path}", records.Count, output.FullName);
+            logger.LogInformation(
+                "Wrote {Count} players to {Path} ({Format})",
+                records.Count,
+                output.FullName,
+                format);
             return 0;
         } catch (OperationCanceledException) {
             logger.LogWarning("Player information download cancelled");
