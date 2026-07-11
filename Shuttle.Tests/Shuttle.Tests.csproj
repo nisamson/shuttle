@@ -25,6 +25,7 @@
     <ProjectReference Include="..\Shuttle.Core\Shuttle.Core.csproj" />
     <ProjectReference Include="..\Shuttle.Math\Shuttle.Math.csproj" />
     <ProjectReference Include="..\Shuttle.Api\Shuttle.Api.csproj" />
+    <ProjectReference Include="..\Shuttle.Analysis\Shuttle.Analysis.csproj" />
   </ItemGroup>
 
   <ItemGroup>

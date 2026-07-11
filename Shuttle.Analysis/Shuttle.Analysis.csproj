@@ -9,12 +9,13 @@
 
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.Hosting" />
+        <PackageReference Include="dotenv.net" />
         <PackageReference Include="linq2db.EntityFrameworkCore" />
+        <PackageReference Include="System.Commandline" />
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\Shuttle.EFCore\Shuttle.EFCore.csproj" />
-        <ProjectReference Include="..\Shuttle.Shl.Api.Client\Shuttle.Shl.Api.Client.csproj" />
     </ItemGroup>
 
 </Project>
