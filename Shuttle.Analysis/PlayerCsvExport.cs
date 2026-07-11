@@ -23,6 +23,7 @@ public static class PlayerCsvExport {
     public static async Task WriteAsync(
         Stream stream,
         IReadOnlyList<PlayerExportRecord> records,
+        StatNorm norm,
         CancellationToken cancellationToken
     ) {
         ArgumentNullException.ThrowIfNull(stream);
@@ -41,6 +42,7 @@ public static class PlayerCsvExport {
         foreach (var record in records) {
             cancellationToken.ThrowIfCancellationRequested();
             var node = JsonSerializer.SerializeToNode(record, options)!.AsObject();
+            PlayerStatNorms.Apply(node, norm);
             var row = new Dictionary<string, string?>(StringComparer.Ordinal);
             Flatten(node, prefix: null, row, columns, columnSet);
             rows.Add(row);

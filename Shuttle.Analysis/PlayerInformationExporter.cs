@@ -1,5 +1,4 @@
-﻿using System.Text.Json;
-using LinqToDB.EntityFrameworkCore;
+﻿using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -15,13 +14,16 @@ public static class PlayerInformationExporter {
 
     /// <summary>
     /// Reads every player from the Shuttle database and writes them to <paramref name="output"/> in
-    /// the requested <paramref name="format"/> (a flat JSON array or a flat CSV table).
+    /// the requested <paramref name="format"/> (a flat JSON array or a flat CSV table). When
+    /// <paramref name="norm"/> is not <see cref="StatNorm.None"/>, each player's stat attributes are
+    /// replaced in place with their normalized form.
     /// </summary>
     /// <returns>A process exit code: 0 on success, 130 if cancelled, 1 on failure.</returns>
     public static async Task<int> RunAsync(
         FileInfo output,
         string? database,
         ExportFormat format,
+        StatNorm norm,
         bool pretty,
         CancellationToken cancellationToken
     ) {
@@ -53,18 +55,18 @@ public static class PlayerInformationExporter {
             output.Directory?.Create();
             await using (var stream = output.Open(FileMode.Create, FileAccess.Write, FileShare.None)) {
                 if (format == ExportFormat.Csv) {
-                    await PlayerCsvExport.WriteAsync(stream, records, cancellationToken);
+                    await PlayerCsvExport.WriteAsync(stream, records, norm, cancellationToken);
                 } else {
-                    var options = PlayerExportJson.CreateOptions(pretty);
-                    await JsonSerializer.SerializeAsync(stream, records, options, cancellationToken);
+                    await PlayerJsonExport.WriteAsync(stream, records, pretty, norm, cancellationToken);
                 }
             }
 
             logger.LogInformation(
-                "Wrote {Count} players to {Path} ({Format})",
+                "Wrote {Count} players to {Path} ({Format}, norm: {Norm})",
                 records.Count,
                 output.FullName,
-                format);
+                format,
+                norm);
             return 0;
         } catch (OperationCanceledException) {
             logger.LogWarning("Player information download cancelled");

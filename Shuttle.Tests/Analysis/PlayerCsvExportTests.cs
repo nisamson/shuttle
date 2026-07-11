@@ -45,10 +45,13 @@ public class PlayerCsvExportTests {
         Blocker: 11, Glove: 12, Rebound: 13, Recovery: 14, Puckhandling: 15,
         LowShots: 16, Skating: 17, Reflexes: 18);
 
-    private static async Task<string> WriteCsvAsync(params PlayerInformation[] players) {
+    private static async Task<string> WriteCsvAsync(params PlayerInformation[] players) =>
+        await WriteCsvAsync(StatNorm.None, players);
+
+    private static async Task<string> WriteCsvAsync(StatNorm norm, params PlayerInformation[] players) {
         var records = players.Select(PlayerExportRecord.FromEntity).ToList();
         using var stream = new MemoryStream();
-        await PlayerCsvExport.WriteAsync(stream, records, CancellationToken.None);
+        await PlayerCsvExport.WriteAsync(stream, records, norm, CancellationToken.None);
         stream.Position = 0;
         // StreamReader detects and strips the UTF-8 BOM, decoding the content as UTF-8.
         using var reader = new StreamReader(stream, Encoding.UTF8);
@@ -135,7 +138,7 @@ public class PlayerCsvExportTests {
         var records = new[] { PlayerExportRecord.FromEntity(CreatePlayer(skater: SampleSkater())) };
         using var stream = new MemoryStream();
 
-        await PlayerCsvExport.WriteAsync(stream, records, CancellationToken.None);
+        await PlayerCsvExport.WriteAsync(stream, records, StatNorm.None, CancellationToken.None);
 
         var bytes = stream.ToArray();
         Assert.True(bytes.Length >= 3);
@@ -162,5 +165,27 @@ public class PlayerCsvExportTests {
 
         // Combined case: non-ASCII glyphs and RFC 4180 special characters together.
         Assert.Contains("\"Reykjavík, Ísland — Þór \"\"Goði\"\"\"", csv);
+    }
+
+    [Fact]
+    public async Task WriteAsync_L1Norm_ReplacesValuesInPlaceKeepingOriginalColumns() {
+        var csv = await WriteCsvAsync(StatNorm.L1, CreatePlayer(skater: SampleSkater()));
+
+        var lines = SplitLines(csv);
+        var header = lines[0].Split(',');
+
+        // Original column names are preserved (no renamed/suffixed norm columns).
+        Assert.Contains("skaterAttributes.checking", header);
+        Assert.DoesNotContain(header, h => h.Contains("Normalized", StringComparison.Ordinal));
+
+        var values = lines[1].Split(',');
+        var skaterCells = header
+            .Select((name, i) => (name, i))
+            .Where(x => x.name.StartsWith("skaterAttributes.", StringComparison.Ordinal))
+            .Select(x => double.Parse(values[x.i], System.Globalization.CultureInfo.InvariantCulture))
+            .ToList();
+
+        // The in-place L1-normalized skater components sum to 1.
+        Assert.Equal(1.0, skaterCells.Sum(), 9);
     }
 }

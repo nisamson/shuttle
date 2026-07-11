@@ -22,6 +22,12 @@ var formatOption = new Option<ExportFormat?>("--format", "-f") {
     Description = "Output format (json or csv). Defaults to the --output extension (.csv => csv), otherwise json.",
 };
 
+var normOption = new Option<StatNorm>("--norm", "-n") {
+    Description = "Replace each player's stat attributes in place with a normalized form of their vector "
+                  + "(none, l1, or l2). Default: none (raw values).",
+    DefaultValueFactory = _ => StatNorm.None,
+};
+
 var prettyOption = new Option<bool>("--pretty") {
     Description = "Write indented, human-readable JSON (ignored for CSV; default: true).",
     DefaultValueFactory = _ => true,
@@ -34,6 +40,7 @@ var downloadCommand = new Command(
     outputOption,
     databaseOption,
     formatOption,
+    normOption,
     prettyOption,
 };
 downloadCommand.Aliases.Add("download-player-information");
@@ -42,6 +49,7 @@ downloadCommand.SetAction((parseResult, cancellationToken) => {
     var output = parseResult.GetValue(outputOption);
     var explicitFormat = parseResult.GetValue(formatOption);
     var database = parseResult.GetValue(databaseOption);
+    var norm = parseResult.GetValue(normOption);
     var pretty = parseResult.GetValue(prettyOption);
 
     var format = explicitFormat
@@ -50,7 +58,7 @@ downloadCommand.SetAction((parseResult, cancellationToken) => {
             : ExportFormat.Json);
     output ??= new FileInfo(format == ExportFormat.Csv ? "player-information.csv" : "player-information.json");
 
-    return PlayerInformationExporter.RunAsync(output, database, format, pretty, cancellationToken);
+    return PlayerInformationExporter.RunAsync(output, database, format, norm, pretty, cancellationToken);
 });
 
 var rootCommand = new RootCommand("Shuttle data-analysis command-line tools.") {
