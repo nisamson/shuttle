@@ -46,15 +46,35 @@ public static class PositionExtensions {
         }
 
         public static PlayerPosition FromString(string shortString) {
-            return shortString.ToLower() switch {
-                "g" or "goalie" => PlayerPosition.Goalie,
-                "c" or "center" => PlayerPosition.Center,
-                "lw" or "left wing" => PlayerPosition.LeftWing,
-                "rw" or "right wing" => PlayerPosition.RightWing,
-                "ld" or "left defense" => PlayerPosition.LeftDefense,
-                "rd" or "right defense" => PlayerPosition.RightDefense,
-                _ => throw new ArgumentException("Invalid position string", nameof(shortString)),
-            };
+            return TryFromString(shortString, out var position)
+                ? position
+                : throw new ArgumentException("Invalid position string", nameof(shortString));
+        }
+
+        public static bool TryFromString(string? shortString, out PlayerPosition position) {
+            switch (shortString?.Trim().ToLowerInvariant()) {
+                case "g" or "goalie":
+                    position = PlayerPosition.Goalie;
+                    return true;
+                case "c" or "center":
+                    position = PlayerPosition.Center;
+                    return true;
+                case "lw" or "left wing":
+                    position = PlayerPosition.LeftWing;
+                    return true;
+                case "rw" or "right wing":
+                    position = PlayerPosition.RightWing;
+                    return true;
+                case "ld" or "left defense":
+                    position = PlayerPosition.LeftDefense;
+                    return true;
+                case "rd" or "right defense":
+                    position = PlayerPosition.RightDefense;
+                    return true;
+                default:
+                    position = default;
+                    return false;
+            }
         }
 
         public bool IsForward => playerPosition.HasFlag(PlayerPosition.Forward);
