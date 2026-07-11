@@ -48,7 +48,9 @@ public static class PlayerCsvExport {
 
         await using var writer = new StreamWriter(
             stream,
-            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+            // Emit a UTF-8 BOM so consumers (e.g. Excel) unambiguously detect UTF-8 and render
+            // non-ASCII glyphs (accented names, CJK, etc.) correctly instead of mojibake.
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: true),
             leaveOpen: true) {
             NewLine = "\r\n",
         };

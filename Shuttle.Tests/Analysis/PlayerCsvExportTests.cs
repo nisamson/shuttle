@@ -49,7 +49,10 @@ public class PlayerCsvExportTests {
         var records = players.Select(PlayerExportRecord.FromEntity).ToList();
         using var stream = new MemoryStream();
         await PlayerCsvExport.WriteAsync(stream, records, CancellationToken.None);
-        return Encoding.UTF8.GetString(stream.ToArray());
+        stream.Position = 0;
+        // StreamReader detects and strips the UTF-8 BOM, decoding the content as UTF-8.
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        return await reader.ReadToEndAsync();
     }
 
     private static string[] SplitLines(string csv) =>
@@ -125,5 +128,39 @@ public class PlayerCsvExportTests {
 
         // A comma and embedded quotes must be RFC 4180 quoted/escaped.
         Assert.Contains("\"Do,e \"\"The\"\" Man\"", csv);
+    }
+
+    [Fact]
+    public async Task WriteAsync_EmitsUtf8Bom() {
+        var records = new[] { PlayerExportRecord.FromEntity(CreatePlayer(skater: SampleSkater())) };
+        using var stream = new MemoryStream();
+
+        await PlayerCsvExport.WriteAsync(stream, records, CancellationToken.None);
+
+        var bytes = stream.ToArray();
+        Assert.True(bytes.Length >= 3);
+        Assert.Equal(new byte[] { 0xEF, 0xBB, 0xBF }, bytes[..3]);
+    }
+
+    [Theory]
+    [InlineData("Åström Øyvind")]
+    [InlineData("François Dupré")]
+    [InlineData("日本語のプレーヤー")]
+    [InlineData("Müller-Głowacki")]
+    public async Task WriteAsync_PreservesNonAsciiGlyphs(string name) {
+        var csv = await WriteCsvAsync(CreatePlayer(name: name, skater: SampleSkater()));
+
+        // The non-ASCII name round-trips through the UTF-8 encoded output without corruption.
+        Assert.Contains(name, csv);
+    }
+
+    [Fact]
+    public async Task WriteAsync_QuotesAndPreservesNonAsciiWithSpecialCharacters() {
+        var name = "Reykjavík, Ísland — Þór \"Goði\"";
+
+        var csv = await WriteCsvAsync(CreatePlayer(name: name, skater: SampleSkater()));
+
+        // Combined case: non-ASCII glyphs and RFC 4180 special characters together.
+        Assert.Contains("\"Reykjavík, Ísland — Þór \"\"Goði\"\"\"", csv);
     }
 }
