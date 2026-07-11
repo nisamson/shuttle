@@ -8,7 +8,6 @@
 // Azure SQL uses ActiveDirectoryDefault auth, so a signed-in Azure identity
 // (e.g. `az login`) that can access the database is also required.
 
-using dotenv.net;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -17,7 +16,7 @@ using Shuttle.EFCore;
 using Shuttle.EFCore.Procedures;
 using Shuttle.Shl.Api.Client;
 
-LoadEnvironment();
+ShuttleEnvironment.LoadDotEnv();
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -60,27 +59,3 @@ try {
 }
 
 return 0;
-
-// Loads database configuration from the shared Shuttle.EFCore/.env file (the same
-// file the EF Core design-time factory uses), regardless of the current working
-// directory, then any real environment variables. Existing environment variables
-// always win, so machine/user-level configuration still overrides the .env file.
-static void LoadEnvironment() {
-    // Walk up from the executable location and the current directory looking for the
-    // solution root, then load the well-known .env alongside Shuttle.EFCore.
-    foreach (var start in new[] { AppContext.BaseDirectory, Directory.GetCurrentDirectory() }) {
-        var dir = new DirectoryInfo(start);
-        while (dir is not null) {
-            var envPath = Path.Combine(dir.FullName, "Shuttle.EFCore", ".env");
-            if (File.Exists(envPath)) {
-                DotEnv.Load(new DotEnvOptions(envFilePaths: [envPath], overwriteExistingVars: false));
-                return;
-            }
-
-            dir = dir.Parent;
-        }
-    }
-
-    // Fall back to the default behaviour (a .env in the current directory, if any).
-    DotEnv.Load(new DotEnvOptions(overwriteExistingVars: false));
-}
