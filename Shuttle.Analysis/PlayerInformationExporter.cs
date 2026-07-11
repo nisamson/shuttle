@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Shuttle.EFCore;
+using Shuttle.Shl.Api.Models.Common;
 
 namespace Shuttle.Analysis;
 
@@ -16,7 +17,8 @@ public static class PlayerInformationExporter {
     /// Reads every player from the Shuttle database and writes them to <paramref name="output"/> in
     /// the requested <paramref name="format"/> (a flat JSON array or a flat CSV table). When
     /// <paramref name="norm"/> is not <see cref="StatNorm.None"/>, each player's stat attributes are
-    /// replaced in place with their normalized form.
+    /// replaced in place with their normalized form. When <paramref name="positions"/> is non-null,
+    /// only players whose position is in the set are exported.
     /// </summary>
     /// <returns>A process exit code: 0 on success, 130 if cancelled, 1 on failure.</returns>
     public static async Task<int> RunAsync(
@@ -24,6 +26,7 @@ public static class PlayerInformationExporter {
         string? database,
         ExportFormat format,
         StatNorm norm,
+        IReadOnlySet<PlayerPosition>? positions,
         bool pretty,
         CancellationToken cancellationToken
     ) {
@@ -43,10 +46,21 @@ public static class PlayerInformationExporter {
             using var scope = app.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ShlDbContext>();
 
-            logger.LogInformation("Reading the PlayerInformation table");
-            var players = await db.PlayerInformation
+            var query = db.PlayerInformation
                 .AsNoTracking()
                 .IgnoreAutoIncludes()
+                .AsQueryable();
+
+            if (positions is { Count: > 0 }) {
+                var positionValues = positions.ToArray();
+                query = query.Where(p => positionValues.Contains(p.Position));
+                logger.LogInformation(
+                    "Filtering to positions: {Positions}",
+                    string.Join(", ", positions.Select(p => p.ToShortString())));
+            }
+
+            logger.LogInformation("Reading the PlayerInformation table");
+            var players = await query
                 .OrderBy(p => p.PlayerId)
                 .ToListAsync(cancellationToken);
 

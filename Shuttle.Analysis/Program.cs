@@ -9,6 +9,7 @@
 
 using System.CommandLine;
 using Shuttle.Analysis;
+using Shuttle.Shl.Api.Models.Common;
 
 var outputOption = new Option<FileInfo?>("--output", "-o") {
     Description = "Path of the file to write. Defaults to player-information.<json|csv> based on the format.",
@@ -28,6 +29,21 @@ var normOption = new Option<StatNorm>("--norm", "-n") {
     DefaultValueFactory = _ => StatNorm.None,
 };
 
+var positionsOption = new Option<IReadOnlySet<PlayerPosition>?>("--positions", "-p") {
+    Description = "Filter to a comma-separated list of shorthand positions (G, C, LW, RW, LD, RD). "
+                  + "Group aliases: F = forwards (C,LW,RW), D = defense (LD,RD). Case-insensitive; "
+                  + "omit to export all players.",
+    CustomParser = result => {
+        var spec = string.Join(',', result.Tokens.Select(t => t.Value));
+        if (PositionFilter.TryParse(spec, out var positions, out var error)) {
+            return positions;
+        }
+
+        result.AddError(error!);
+        return null;
+    },
+};
+
 var prettyOption = new Option<bool>("--pretty") {
     Description = "Write indented, human-readable JSON (ignored for CSV; default: true).",
     DefaultValueFactory = _ => true,
@@ -41,6 +57,7 @@ var downloadCommand = new Command(
     databaseOption,
     formatOption,
     normOption,
+    positionsOption,
     prettyOption,
 };
 downloadCommand.Aliases.Add("download-player-information");
@@ -50,6 +67,7 @@ downloadCommand.SetAction((parseResult, cancellationToken) => {
     var explicitFormat = parseResult.GetValue(formatOption);
     var database = parseResult.GetValue(databaseOption);
     var norm = parseResult.GetValue(normOption);
+    var positions = parseResult.GetValue(positionsOption);
     var pretty = parseResult.GetValue(prettyOption);
 
     var format = explicitFormat
@@ -58,7 +76,7 @@ downloadCommand.SetAction((parseResult, cancellationToken) => {
             : ExportFormat.Json);
     output ??= new FileInfo(format == ExportFormat.Csv ? "player-information.csv" : "player-information.json");
 
-    return PlayerInformationExporter.RunAsync(output, database, format, norm, pretty, cancellationToken);
+    return PlayerInformationExporter.RunAsync(output, database, format, norm, positions, pretty, cancellationToken);
 });
 
 var rootCommand = new RootCommand("Shuttle data-analysis command-line tools.") {
