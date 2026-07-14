@@ -16,11 +16,13 @@ builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new(apiBaseAddre
 
 builder.Services.AddMsalAuthentication(options => {
         builder.Configuration.Bind("AzureAd", options.ProviderOptions.Authentication);
+        options.UserOptions.RoleClaim = "roles";
     }
-);
+).AddAccountClaimsPrincipalFactory<ArrayClaimsPrincipalFactory>();
 
 builder.Services.AddFluentUIComponents();
 builder.Services.AddLocalStorageServices();
+builder.Services.AddSingleton<IBlogService, BlogService>();
 builder.Services.AddSingleton<IShuttleOptionsStorage, ShuttleOptionsLocalStorage>();
 if (builder.HostEnvironment.IsDevelopment()) {
     builder.Logging.AddFilter("Microsoft.AspNetCore.Components.RenderTree.*", LogLevel.None);

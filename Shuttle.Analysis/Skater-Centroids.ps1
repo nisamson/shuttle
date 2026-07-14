@@ -1,6 +1,7 @@
 param([int]$MinTpe = 250, [string]$database = "ShuttleDev")
 
-foreach ($kind in ('C', "LW,RW", "D", "F", "F,D")) {
+#foreach ($kind in ('C', "LW,RW", "D", "F", "F,D", "G")) {
+foreach ($kind in ("G")) {
     $label = $kind
     if ($kind -eq "C") {
         $label = "centers"
@@ -10,6 +11,8 @@ foreach ($kind in ('C', "LW,RW", "D", "F", "F,D")) {
         $label = "defensemen"
     } elseif ($kind -eq "F") {
         $label = "forwards"
+    } elseif ($kind -eq "G") {
+        $label = "goalies"
     } else {
         $label = "skaters"
     }
@@ -20,9 +23,9 @@ foreach ($kind in ('C', "LW,RW", "D", "F", "F,D")) {
     New-Item -Path $skaterDir -ItemType Directory
     dotnet run --project $PSScriptRoot/../Shuttle.Analysis -- download-player-information --database $database -n L1 -p $kind -f csv -o $tmpFile
     Import-Csv -Path $tmpFile | Where-Object { $_.TotalTpe -ge $MinTpe } | Export-Csv -Path $skaterFile -NoTypeInformation
-    dotnet run --project $PSScriptRoot/../Shuttle.Analysis -- analyze -i $skaterFile --flow kmeans-centroids --arg k=1 -o $skaterDir
+    dotnet run --project $PSScriptRoot/../Shuttle.Analysis -- analyze -i $skaterFile --flow kmeans-centroids --arg k=2 -o $skaterDir
     foreach ($file in Get-ChildItem -Path $skaterDir -Filter "*.csv") {
-        (Get-Content -Path ($file.FullName)).Replace("skaterAttributes.", "") | Set-Content -Path $file.FullName
+        (Get-Content -Path ($file.FullName)).Replace("goalieAttributes.", "").Replace("skaterAttributes.", "") | Set-Content -Path $file.FullName
     }
 }
 

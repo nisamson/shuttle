@@ -1,19 +1,12 @@
 ﻿@page "/privacy"
 @layout MainLayout
+@using Shuttle.WebClient.Models
 
 <PageTitle>Privacy Policy</PageTitle>
 
 <div class="privacy-content">
     <h2>Privacy Policy</h2>
     <FluentDivider/>
-
-    <nav class="privacy-toc">
-        <ul>
-            <li><a href="#@IntroId">Introduction</a></li>
-            <li><a href="#@WhatICollectId">What I Collect</a></li>
-        </ul>
-    </nav>
-
     <h3 id="@IntroId">Introduction</h3>
     <p>
         The Shuttle web application was designed with the goal to collect as little personal information as possible
@@ -24,5 +17,63 @@
         to make the app work, so this policy outlines what I collect, why I collect it, and how I protect it.
     </p>
 
-    <h3 id="@WhatICollectId">What I Collect</h3>
+    <h3 id="@WhatICollectId">What I Collect and How I Use It</h3>
+    <h4>Data Necessary to Provide Services Regardless of Login Status</h4>
+    <p>
+        I have to collect your
+        <ul>
+            <li>IP Address</li>
+            <li>HTTP requests to Shuttle services and their contents</li>
+        </ul>
+        Without these, it is impossible for the service to function. IP addresses are retained during the duration of request
+        processing and tracked for rate limiting purposes for less than 24 hours. They are not persisted long-term.
+        
+        Contents of HTTP request bodies and responses when not logged in do not contain information pertaining to who made the request.
+        
+        Additionally, <FluentLink Href="https://www.cloudflare.com/privacypolicy/">Cloudflare</FluentLink> is used to provide DNS caching and bot protection
+        to the site and their privacy policies describe the information they collect when you interact with this site.
+    </p>
+    
+    <h4>Data Necessary to Provide Services When Logged In</h4>
+    <p>
+        When you are logged in, in addition to the above, I collect your User ID as well through Entra login logs and Application Insights logs when you make HTTP requests.
+        This is used in logging and metrics to enable easier debugging and allow me to understand how the site is being used through user flows (this user made this request, then this request, etc)
+        and see if a particular user is making excessive or malicious requests. This data is retained for 90 days.
+        
+        Login records are retained for 7 days.
+    </p>
+    
+    <h4>Data Collected During Account Creation</h4>
+    <p>
+        During account creation I collect your
+        <ul>
+            <li>Username</li>
+            <li>Email</li>
+            <li>If applicable, display name</li>
+        </ul>
+        I am required to collect this information to enable login through Microsoft Entra authentication. I have access to
+        this information for as long as you remain a user on the site.
+    </p>
+    
+    <h4>Data Collected for SHL Users during SHL Data Collection</h4>
+    <p>
+        During data collection on the SHL sites, I collect Discord usernames to enable easier scouting. This data is already publicly available.
+        These usernames are refreshed every day. If your account is removed from the SHL site or your Discord username is cleared,
+        it will be cleared during the next run of my SHL scanning service. 
+    </p>
+    
+    <h3>How is this Data Protected?</h3>
+    <p>
+        Your login information is stored in and protected by Microsoft Entra ID services. I do not have access to your passwords
+        or hashes of your passwords. That is solely the domain of Microsoft Entra.
+        
+        The Application Insights logs are stored in Azure Log Analytics. The site administration team (currently just me) has access to
+        these logs.
+        
+        Information collected by Cloudflare is protected by Cloudflare.
+        
+        I do not store personal information other than the Discord usernames on my own servers. This data is stored in an Azure SQL Database
+        using Entra authentication. There is no password to be stolen and no personal data that isn't otherwise publicly available stored in the server.
+    </p>
+    
 </div>

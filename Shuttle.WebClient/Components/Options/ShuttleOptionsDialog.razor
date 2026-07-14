@@ -1,9 +1,5 @@
-@implements Microsoft.FluentUI.AspNetCore.Components.IDialogContentComponent<Shuttle.WebClient.Models.Options.ShuttleOptions>
+@inherits Microsoft.FluentUI.AspNetCore.Components.FluentDialogInstance
 
 <FluentDialogBody>
     <FluentSwitch @bind-Value="OptionsModel.DarkMode" Label="Use Dark Mode"/>
-    <FluentStack HorizontalAlignment="HorizontalAlignment.End" Style="margin-top: 1rem;">
-        <FluentButton Appearance="Appearance.Neutral" OnClick="OnCancelEdit">Cancel</FluentButton>
-        <FluentButton Appearance="Appearance.Accent" Disabled="@(!IsTouched)" OnClick="OnOptionsEdited">Save</FluentButton>
-    </FluentStack>
 </FluentDialogBody>

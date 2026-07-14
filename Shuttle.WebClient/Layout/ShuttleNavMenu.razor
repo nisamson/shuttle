@@ -1,16 +1,32 @@
-﻿@using Shuttle.WebClient.Models
-<FluentNavMenu Expanded="@Expanded" Width="250" Title="Navigation menu">
-    <FluentNavLink Href="@Routes.Home" Match="NavLinkMatch.All" Icon="@(new Icons.Regular.Size20.Home())">Home</FluentNavLink>
+@using Shuttle.WebClient.Models
+@using Microsoft.AspNetCore.Components.WebAssembly.Hosting
+@inject IWebAssemblyHostEnvironment Env
+<FluentNav Style="height: 100%;">
+    <FluentNavItem Href="@Routes.Home" Match="NavLinkMatch.All" IconRest="@(new Icons.Regular.Size20.Home())">Home</FluentNavItem>
     <FluentDivider/>
     <AuthorizeView>
         <Authorized>
-            <FluentNavLink Href="@Routes.Authentication.Logout" Match="NavLinkMatch.All" Icon="@(new Icons.Regular.Size20.SignOut())">Logout</FluentNavLink>
+            <FluentNavItem OnClick="BeginLogout" IconRest="@(new Icons.Regular.Size20.SignOut())">Logout</FluentNavItem>
         </Authorized>
         <NotAuthorized>
-            <FluentNavLink Href="@Routes.Authentication.Login" Match="NavLinkMatch.All" Icon="@(new Icons.Regular.Size20.PersonArrowRight())">Login</FluentNavLink>
+            <FluentNavItem OnClick="BeginLogin" IconRest="@(new Icons.Regular.Size20.PersonArrowRight())">Login</FluentNavItem>
         </NotAuthorized>
     </AuthorizeView>
-    <FluentNavGroup Title="Legal" Icon="@(new Icons.Regular.Size20.Gavel())">
-        <FluentNavLink Href="@Routes.Privacy" Match="NavLinkMatch.All" Icon="@(new Icons.Regular.Size20.ShieldKeyhole())">Privacy Policy</FluentNavLink>
-    </FluentNavGroup>
-</FluentNavMenu>
+    <AuthorizeView Roles="@RoleNames.Admin">
+        <Authorized>
+            <FluentNavCategory Title="Admin" IconRest="@(new Icons.Regular.Size20.Shield())">
+                <FluentNavItem Href="@Routes.Admin.Hello" Match="NavLinkMatch.All" IconRest="@(new Icons.Regular.Size20.Cloud())">API Check</FluentNavItem>
+            </FluentNavCategory>
+        </Authorized>
+    </AuthorizeView>
+    @if (Env.IsDevelopment()) {
+        <FluentNavCategory Title="Debug" IconRest="@(new Icons.Regular.Size20.Bug())">
+            <FluentNavItem Href="@Routes.Debug.Claims" Match="NavLinkMatch.All" IconRest="@(new Icons.Regular.Size20.Key())">Claims</FluentNavItem>
+            <FluentNavItem Href="@Routes.Debug.Roles" Match="NavLinkMatch.All" IconRest="@(new Icons.Regular.Size20.PersonBoard())">Roles</FluentNavItem>
+        </FluentNavCategory>
+    }
+    <FluentNavItem Href="@Routes.Articles.Blogs" Match="NavLinkMatch.All" IconRest="@(new Icons.Regular.Size20.News())">Blogs</FluentNavItem>
+    <FluentNavCategory Title="Legal" IconRest="@(new Icons.Regular.Size20.Gavel())">
+        <FluentNavItem Href="@Routes.Privacy" Match="NavLinkMatch.All" IconRest="@(new Icons.Regular.Size20.ShieldKeyhole())">Privacy Policy</FluentNavItem>
+    </FluentNavCategory>
+</FluentNav>
