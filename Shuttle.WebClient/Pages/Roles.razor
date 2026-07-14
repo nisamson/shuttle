@@ -1,0 +1,38 @@
+@page "/debug/roles"
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.WebAssembly.Hosting
+@inject IWebAssemblyHostEnvironment Env
+
+<PageTitle>Roles</PageTitle>
+
+@if (Env.IsDevelopment()) {
+    <FluentStack Orientation="Orientation.Vertical">
+        <h1>Roles</h1>
+        <AuthorizeView>
+            <Authorized>
+                @{
+                    var identity = context.User.Identity as ClaimsIdentity;
+                    var roleClaimType = identity?.RoleClaimType ?? ClaimTypes.Role;
+                    var roles = context.User.FindAll(roleClaimType)
+                        .Select(c => c.Value)
+                        .OrderBy(r => r, StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                }
+                @if (roles.Count == 0) {
+                    <p>No site roles are assigned to the current user.</p>
+                } else {
+                    <ul>
+                        @foreach (var role in roles) {
+                            <li>@role</li>
+                        }
+                    </ul>
+                }
+            </Authorized>
+            <NotAuthorized>
+                <p>Not logged in.</p>
+            </NotAuthorized>
+        </AuthorizeView>
+    </FluentStack>
+} else {
+    <p>This page is only available in the development environment.</p>
+}

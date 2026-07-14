@@ -23,27 +23,21 @@ public partial class ShuttleOptionsButton : ComponentBase {
             return;
         }
 
-        DialogParameters parameters = new() {
-            Title = "Shuttle Options",
-            PrimaryAction = string.Empty,
-            SecondaryAction = string.Empty,
-            Width = "400px",
-            TrapFocus = true,
-            Modal = true,
-        };
+        var result = await DialogService.ShowDialogAsync<ShuttleOptionsDialog>(options => {
+            options.Modal = true;
+            options.Width = "400px";
+            options.Parameters.Add(nameof(ShuttleOptionsDialog.Content), shuttleOptions);
+        });
 
-        var dialog = await DialogService.ShowDialogAsync<ShuttleOptionsDialog>(shuttleOptions, parameters);
-        var res = await dialog.Result;
-
-        if (res is null) {
-            Logger.LogDebug("Dialog result is null, not saving options");
+        if (result.Cancelled) {
+            Logger.LogDebug("Dialog cancelled, not saving options");
             return;
         }
 
-        if (!res.Cancelled && res.Data is ShuttleOptions options) {
-            Logger.LogDebug("Dialog result data is of type ShuttleOptions, saving options {Options}", options);
+        if (result.Value is ShuttleOptions updatedOptions) {
+            Logger.LogDebug("Dialog result data is of type ShuttleOptions, saving options {Options}", updatedOptions);
             if (OptionsContext is not null) {
-                await OptionsContext.SaveOptions(options);
+                await OptionsContext.SaveOptions(updatedOptions);
             }
         } else {
             Logger.LogDebug("Dialog result data is not of type ShuttleOptions, not saving options");

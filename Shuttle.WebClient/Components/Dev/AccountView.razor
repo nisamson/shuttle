@@ -1,6 +1,7 @@
 ﻿
 <AuthorizeView>
     <Authorized>
+        <p><strong>User ID (oid):</strong> @(context.User.GetUserId() ?? "(none)")</p>
         @foreach (var claim in context.User.Claims) {
             <p>@claim.Type: @claim.Value</p>
         }

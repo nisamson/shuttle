@@ -1,0 +1,29 @@
+@page "/blogs/{Slug}"
+@using Shuttle.WebClient.Components
+@using Shuttle.WebClient.Models
+@using Shuttle.WebClient.Services
+@inject IBlogService BlogService
+
+@if (entry is null) {
+    <PageTitle>Article not found</PageTitle>
+    <h1>Article not found</h1>
+    <p>The requested article could not be found.</p>
+} else {
+    <PageTitle>@entry.Title</PageTitle>
+    <article class="blog-post">
+        <FluentText Size="TextSize.Size200" Block="true">@entry.Date.ToString("MMMM d, yyyy")</FluentText>
+        @((MarkupString)BlogService.RenderHtml(entry.Markdown))
+    </article>
+    <BackToTopButton/>
+}
+
+@code {
+    [Parameter]
+    public string? Slug { get; set; }
+
+    private BlogEntry? entry;
+
+    protected override void OnParametersSet() {
+        entry = Slug is null ? null : BlogService.GetEntry(Slug);
+    }
+}

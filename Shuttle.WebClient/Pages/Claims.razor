@@ -1,0 +1,15 @@
+@page "/debug/claims"
+@using Microsoft.AspNetCore.Components.WebAssembly.Hosting
+@using Shuttle.WebClient.Components.Dev
+@inject IWebAssemblyHostEnvironment Env
+
+<PageTitle>Claims</PageTitle>
+
+@if (Env.IsDevelopment()) {
+    <FluentStack Orientation="Orientation.Vertical">
+        <h1>Claims</h1>
+        <AccountView/>
+    </FluentStack>
+} else {
+    <p>This page is only available in the development environment.</p>
+}

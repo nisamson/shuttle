@@ -9,6 +9,7 @@
 
     <ItemGroup>
         <PackageReference Include="Blazor.LocalStorage.WebAssembly" />
+        <PackageReference Include="Markdig" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly"/>
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all"/>
         <PackageReference Include="Microsoft.Authentication.WebAssembly.Msal"/>
@@ -18,6 +19,11 @@
 
     <ItemGroup>
       <AdditionalFiles Include="Components\Options\ShuttleOptionsContext.razor" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="BlogEntries\**\*.md" />
+      <EmbeddedResource Include="BlogEntries\**\*.md" />
     </ItemGroup>
 
     <ItemGroup>

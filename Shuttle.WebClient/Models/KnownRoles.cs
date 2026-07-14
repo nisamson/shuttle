@@ -5,6 +5,10 @@ public enum KnownRoles {
     Gm
 }
 
+public static class RoleNames {
+    public const string Admin = "Shuttle.Admin";
+}
+
 public static class KnownRolesExtensions {
     public static string ToDisplayString(this KnownRoles role) => role switch {
         KnownRoles.Admin => "Admin",

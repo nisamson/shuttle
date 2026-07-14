@@ -22,6 +22,32 @@ a, .btn-link {
 
 .content {
     padding-top: 1.1rem;
+    width: 100%;
+    max-width: 80rem;
+    margin-inline: auto;
+}
+
+/* Collapsible desktop navigation rail: icons only when collapsed. */
+.fluent-layout-item[area=nav] {
+    transition: width 0.2s ease-in-out;
+}
+
+.nav-rail .fluent-navitem,
+.nav-rail .fluent-navsubitem,
+.nav-rail .fluent-navcategoryitem {
+    font-size: 0;
+    justify-content: center;
+    padding-inline: 0;
+}
+
+.nav-rail .fluent-navcategoryitem > .expand-icon,
+.nav-rail .fluent-navsubitemgroup {
+    display: none;
+}
+
+/* The desktop nav toggle is redundant on mobile, where the hamburger is shown. */
+.fluent-layout[mobile] .nav-toggle-desktop {
+    display: none;
 }
 
 .valid.modified:not([type=checkbox]) {

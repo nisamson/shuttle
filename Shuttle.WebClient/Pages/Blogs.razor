@@ -1,0 +1,21 @@
+@page "/blogs"
+@using Shuttle.WebClient.Models
+@using Shuttle.WebClient.Services
+@inject IBlogService BlogService
+
+<PageTitle>All Blogs</PageTitle>
+
+<h1>All Blogs</h1>
+
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="12">
+    @foreach (var entry in BlogService.GetEntries()) {
+        <FluentCard Style="width: 100%;">
+            <FluentStack Orientation="Orientation.Vertical" VerticalGap="4">
+                <a href="@Routes.Articles.Blog(entry.Slug)">
+                    <FluentText Weight="TextWeight.Bold" Size="TextSize.Size400" Block="true">@entry.Title</FluentText>
+                </a>
+                <FluentText Size="TextSize.Size200" Block="true">@entry.Date.ToString("MMMM d, yyyy")</FluentText>
+            </FluentStack>
+        </FluentCard>
+    }
+</FluentStack>

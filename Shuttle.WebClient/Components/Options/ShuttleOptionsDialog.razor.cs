@@ -4,11 +4,7 @@ using Shuttle.WebClient.Models.Options;
 
 namespace Shuttle.WebClient.Components.Options;
 
-public partial class ShuttleOptionsDialog : ComponentBase, IDialogContentComponent<ShuttleOptions> {
-    private bool IsTouched => !IShuttleOptions.Equals(OptionsModel, Content);
-
-    [CascadingParameter]
-    public FluentDialog Dialog { get; set; } = null!;
+public partial class ShuttleOptionsDialog : FluentDialogInstance {
 
     [Parameter, EditorRequired]
     public required ShuttleOptions Content { get; set; }
@@ -18,7 +14,13 @@ public partial class ShuttleOptionsDialog : ComponentBase, IDialogContentCompone
     [Inject]
     public required ILogger<ShuttleOptionsDialog> Logger { private get; set; }
 
+    protected override void OnInitializeDialog(DialogOptionsHeader header, DialogOptionsFooter footer) {
+        header.Title = "Shuttle Options";
+        footer.SecondaryAction.Visible = true;
+    }
+
     protected override void OnParametersSet() {
+        base.OnParametersSet();
         Logger.LogTrace("Updating options from context");
 
         if (IShuttleOptions.Equals(OptionsModel, Content)) {
@@ -29,19 +31,21 @@ public partial class ShuttleOptionsDialog : ComponentBase, IDialogContentCompone
         StateHasChanged();
     }
 
-    private async Task OnOptionsEdited() {
-        if (IShuttleOptions.Equals(OptionsModel, Content)) {
-            Logger.LogDebug("Options edited, but options are the same as current options, ignoring");
-            await Dialog.CancelAsync();
+    protected override async Task OnActionClickedAsync(bool primary) {
+        if (!primary) {
+            Logger.LogDebug("Options edit cancelled");
+            await DialogInstance.CancelAsync();
             return;
         }
+
+        if (IShuttleOptions.Equals(OptionsModel, Content)) {
+            Logger.LogDebug("Options edited, but options are the same as current options, ignoring");
+            await DialogInstance.CancelAsync();
+            return;
+        }
+
         Logger.LogDebug("Options edited, closing dialog with new options {OptionsModel}", OptionsModel);
         var options = OptionsModel.ToOptions();
-        await Dialog.CloseAsync(options);
+        await DialogInstance.CloseAsync(options);
     }
-
-    private async Task OnCancelEdit() {
-        await Dialog.CancelAsync();
-    }
-
 }
