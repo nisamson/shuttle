@@ -10,4 +10,8 @@
       <ProjectReference Include="..\Shuttle.Shl.Api.Models\Shuttle.Shl.Api.Models.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <PackageReference Include="Facet" />
+    </ItemGroup>
+
 </Project>

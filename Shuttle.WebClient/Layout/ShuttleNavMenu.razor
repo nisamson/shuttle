@@ -3,6 +3,7 @@
 @inject IWebAssemblyHostEnvironment Env
 <FluentNav Style="height: 100%;">
     <FluentNavItem Href="@Routes.Home" Match="NavLinkMatch.All" IconRest="@(new Icons.Regular.Size20.Home())">Home</FluentNavItem>
+    <FluentNavItem Href="@Routes.Players.Root" Match="NavLinkMatch.All" IconRest="@(new Icons.Regular.Size20.Person())">Players</FluentNavItem>
     <FluentDivider/>
     <AuthorizeView>
         <Authorized>

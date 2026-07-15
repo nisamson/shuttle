@@ -1,0 +1,12 @@
+@page "/players"
+
+<PageTitle>Players</PageTitle>
+
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="12">
+    <FluentText Size="TextSize.Size700" Weight="TextWeight.Bold">Players</FluentText>
+    <FluentText>Enter a player id to view their profile.</FluentText>
+    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
+        <FluentTextInput TextInputType="TextInputType.Number" @bind-Value="playerIdText" Placeholder="Player id" @onkeydown="OnKeyDown"/>
+        <FluentButton Appearance="ButtonAppearance.Primary" OnClick="Go" Disabled="@(!CanGo)">View</FluentButton>
+    </FluentStack>
+</FluentStack>
