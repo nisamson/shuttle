@@ -25,4 +25,10 @@ public static class Routes {
 
         public static string Blog(string slug) => $"{Blogs}/{slug}";
     }
+
+    public static class Players {
+        public const string Root = "/players";
+
+        public static string Player(int playerId) => $"{Root}/{playerId}";
+    }
 }

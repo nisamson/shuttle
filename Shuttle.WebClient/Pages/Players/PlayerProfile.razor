@@ -1,0 +1,107 @@
+@page "/players/{PlayerId:int}"
+@using Plotly.Blazor
+
+<PageTitle>@(card?.Name ?? $"Player {PlayerId}")</PageTitle>
+
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="16">
+    @if (loading) {
+        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
+            <FluentSpinner/>
+            <FluentText>Loading player #@PlayerId…</FluentText>
+        </FluentStack>
+    } else if (notFound) {
+        <div class="not-found">
+            <div class="not-found-badge">?</div>
+            <FluentText Size="TextSize.Size800" Weight="TextWeight.Bold">Player not found</FluentText>
+            <FluentText Size="TextSize.Size400" Block="true">We couldn't find a player with id <strong>@PlayerId</strong>.</FluentText>
+            <FluentText Size="TextSize.Size200" Block="true">They may not exist yet, or the id might be mistyped. Double-check the id and try again.</FluentText>
+            <FluentButton Appearance="ButtonAppearance.Primary" OnClick="GoToSearch">Back to player search</FluentButton>
+        </div>
+    } else if (error is not null) {
+        <FluentMessageBar Intent="MessageBarIntent.Error" Title="Failed to load player">
+            @error
+        </FluentMessageBar>
+    } else if (card is not null) {
+        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="12" VerticalAlignment="VerticalAlignment.Center" Wrap="true">
+            <FluentText Size="TextSize.Size800" Weight="TextWeight.Bold">@card.Name</FluentText>
+            @if (card.JerseyNumber is int num) {
+                <FluentBadge Appearance="BadgeAppearance.Filled">#@num</FluentBadge>
+            }
+            <FluentBadge>@PositionText</FluentBadge>
+            <FluentBadge>@HandednessText</FluentBadge>
+            <FluentBadge Color="StatusColor" title="@StatusTooltip">@StatusText</FluentBadge>
+            @if (card.Inactive) {
+                <FluentBadge Appearance="BadgeAppearance.Filled" Color="BadgeColor.Severe" IconStart="@(new Icons.Regular.Size20.Pause())"
+                             title="Has not been actively participating on the site.">Inactive on-site</FluentBadge>
+            }
+            @if (card.IsSuspended) {
+                <FluentBadge Appearance="BadgeAppearance.Outline" IconStart="@(new Icons.Regular.Size20.Prohibited())"
+                             title="Currently serving a suspension.">Suspended</FluentBadge>
+            }
+            @if (jsonDataUrl is not null) {
+                <FluentSpacer/>
+                <a class="download-json" href="@jsonDataUrl" download="@jsonFileName">Download as JSON</a>
+            }
+        </FluentStack>
+        <FluentText Size="TextSize.Size200">@card.Username · Player #@card.PlayerId · User #@card.UserId</FluentText>
+
+        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" HorizontalGap="32" VerticalGap="16">
+            <div class="stat-group">
+                <FluentText Weight="TextWeight.Bold" Block="true">Progression</FluentText>
+                @foreach (var row in Progression) {
+                    <div class="kv">
+                        <span class="k">@row.Label</span>
+                        @if (row.Negative) {
+                            <span class="v negative" id="@row.AnchorId">@row.Value</span>
+                            @if (row.Tooltip is not null) {
+                                <FluentTooltip Anchor="@row.AnchorId">@row.Tooltip</FluentTooltip>
+                            }
+                        } else {
+                            <span class="v">@row.Value</span>
+                        }
+                    </div>
+                }
+            </div>
+            <div class="stat-group">
+                <FluentText Weight="TextWeight.Bold" Block="true">Team &amp; rights</FluentText>
+                @foreach (var (label, value) in TeamInfo) {
+                    <div class="kv"><span class="k">@label</span><span class="v">@value</span></div>
+                }
+            </div>
+            <div class="stat-group">
+                <FluentText Weight="TextWeight.Bold" Block="true">Details</FluentText>
+                @foreach (var (label, value) in Details) {
+                    <div class="kv"><span class="k">@label</span><span class="v">@value</span></div>
+                }
+            </div>
+        </FluentStack>
+
+        <FluentDivider/>
+
+        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="12" VerticalAlignment="VerticalAlignment.Center">
+            <FluentText Size="TextSize.Size500" Weight="TextWeight.Bold">Attributes</FluentText>
+            @if (card.Attributes is not null && combinedChart is not null) {
+                <FluentSpacer/>
+                <FluentSwitch @bind-Value="groupedView" @bind-Value:after="OnViewChanged">Break out by category</FluentSwitch>
+            }
+        </FluentStack>
+        @if (card.Attributes is null || combinedChart is null) {
+            <FluentText>No in-game attributes have been ingested for this player yet.</FluentText>
+        } else if (groupedView) {
+            <div class="attribute-charts">
+                @foreach (var group in attributeCharts) {
+                    <div class="attribute-chart">
+                        <FluentText Weight="TextWeight.Bold" Block="true" Class="chart-title">@group.Title</FluentText>
+                        <div class="chart-surface">
+                            <PlotlyChart Config="chartConfig" Layout="group.Layout" Data="group.Data" @ref="group.Chart"/>
+                        </div>
+                    </div>
+                }
+            </div>
+        } else {
+            <div class="attribute-chart-single">
+                <PlotlyChart Config="chartConfig" Layout="combinedChart.Layout" Data="combinedChart.Data" @ref="combinedChart.Chart"/>
+            </div>
+        }
+    }
+</FluentStack>

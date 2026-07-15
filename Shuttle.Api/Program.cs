@@ -70,6 +70,10 @@ LinqToDBForEFTools.Initialize();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment()) {
     app.MapOpenApi();
+    // Swagger UI served at /swagger, backed by the built-in OpenAPI document.
+    app.UseSwaggerUI(options => {
+        options.SwaggerEndpoint("/openapi/v1.json", "Shuttle API v1");
+    });
 }
 
 app.UseHttpsRedirection();
