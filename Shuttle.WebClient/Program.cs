@@ -4,6 +4,7 @@ using Microsoft.FluentUI.AspNetCore.Components;
 using Shuttle.Api.Client;
 using Shuttle.WebClient;
 using Shuttle.WebClient.Services;
+using Shuttle.WebClient.Testing;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
@@ -15,14 +16,23 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 var apiBaseAddress = builder.Configuration["Api:BaseUrl"] ?? builder.HostEnvironment.BaseAddress;
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new(apiBaseAddress) });
 
-// Typed Refit client for the Shuttle backend API (player endpoints, etc.).
-builder.Services.AddShuttleApiClient(new Uri(apiBaseAddress));
+// Fake-backend run mode: when Testing:FakeBackend is set (see appsettings.Testing.json + the
+// "TestServer" launch profile), swap the real Refit API client and MSAL auth for an in-memory
+// fake + a fake identity so the whole app runs with no Azure / network dependency. The flag is
+// absent from the production appsettings.json, so this path is inert in production.
+var useFakeBackend = builder.Configuration.GetValue<bool>("Testing:FakeBackend");
+if (useFakeBackend) {
+    builder.Services.AddShuttleFakeBackend();
+} else {
+    // Typed Refit client for the Shuttle backend API (player endpoints, etc.).
+    builder.Services.AddShuttleApiClient(new Uri(apiBaseAddress));
 
-builder.Services.AddMsalAuthentication(options => {
-        builder.Configuration.Bind("AzureAd", options.ProviderOptions.Authentication);
-        options.UserOptions.RoleClaim = "roles";
-    }
-).AddAccountClaimsPrincipalFactory<ArrayClaimsPrincipalFactory>();
+    builder.Services.AddMsalAuthentication(options => {
+            builder.Configuration.Bind("AzureAd", options.ProviderOptions.Authentication);
+            options.UserOptions.RoleClaim = "roles";
+        }
+    ).AddAccountClaimsPrincipalFactory<ArrayClaimsPrincipalFactory>();
+}
 
 builder.Services.AddFluentUIComponents();
 builder.Services.AddLocalStorageServices();

@@ -102,11 +102,13 @@ orchestration host.
   config section, registered as a non-default scheme so it does not affect JWT or anonymous
   access to the API endpoints).
 - **`Shuttle.WebClient`** — Blazor WebAssembly **Standalone** front end
-  (`Microsoft.NET.Sdk.BlazorWebAssembly`). Built with **MudBlazor**. Authenticates users
+  (`Microsoft.NET.Sdk.BlazorWebAssembly`). Built with **Fluent UI Blazor**
+  (`Microsoft.FluentUI.AspNetCore.Components`). Authenticates users
   with MSAL (`Microsoft.Authentication.WebAssembly.Msal`, `AzureAd` config) and calls
   `Shuttle.Api` over `HttpClient`. Pages are in `Shuttle.WebClient/Pages`, reusable UI in
   `Components`/`Layout`, client-side state (e.g. local-storage-backed options) in
-  `Services`.
+  `Services`. See the [Shuttle.WebClient structure](#shuttlewebclient-structure) section
+  below for a full breakdown.
 
   **Styling:** avoid adding custom CSS (e.g. new rules in `wwwroot/css/app.css` or
   scoped `.razor.css` files) — prefer Fluent UI component parameters and built-in
@@ -139,6 +141,52 @@ orchestration host.
 - Observability is via **OpenTelemetry**, configured centrally in `Shuttle.ServiceDefaults`
   and per-project `ActivitySources`.
 
+### Shuttle.WebClient structure
+
+The front end is a **standalone Blazor WebAssembly** app — there is no server-side host;
+everything runs in the browser and talks to `Shuttle.Api` over HTTP. Component code lives
+in `.razor` files, most with a matching `.razor.cs` code-behind and (where needed) a scoped
+`.razor.css`.
+
+- **`Program.cs`** — WebAssembly host bootstrap. Reads the API base URL from `Api:BaseUrl`
+  (supplied by `wwwroot/appsettings*.json`), registers a base-address `HttpClient`, the
+  typed Refit API client (`AddShuttleApiClient`), MSAL authentication
+  (`AddMsalAuthentication`, roles from the `roles` claim via `ArrayClaimsPrincipalFactory`),
+  Fluent UI (`AddFluentUIComponents`), local-storage services, and the singleton app
+  services (`IBlogService`, `IShuttleOptionsStorage`, `IPlayerDirectoryService`).
+- **`App.razor`** — root router wrapped in `CascadingAuthenticationState`. Uses
+  `AuthorizeRouteView` with `MainLayout`; unauthenticated users hit `RedirectToLogin`, and
+  authenticated-but-unauthorized users get an alert. `NotFoundPage` routes to `Pages/NotFound`.
+- **`Pages/`** — routable page components (each with an `@page` route). Top level:
+  `Home`, `Blogs`/`BlogPost`, `Privacy`, `Authentication` (MSAL callback handling),
+  `Claims`/`Roles` (auth debug), `NotFound`. Subfolders: `Pages/Players/`
+  (`PlayerProfile`, `PlayerSearch`) and `Pages/Admin/` (`HelloApi`).
+- **`Components/`** — reusable, non-routable UI. Top level: `RoleBadge`, `SeasonNumber`,
+  `ShuttleLogo`, `BackToTopButton` (with a collocated `.razor.js` interop module).
+  Subfolders: `Options/` (the `ShuttleOptions*` dialog/button/context for user preferences),
+  `Players/` (`PlayerCardTable`, `PlayerSearchFilters`), and `Dev/` (`AccountView`,
+  `HelloApiView`).
+- **`Layout/`** — app shell: `MainLayout`, `ShuttleNavMenu`, `LoginDisplay`, and
+  `RedirectToLogin`.
+- **`Services/`** — client-side services and state. `BlogService` renders the embedded
+  `BlogEntries` markdown; `PlayerDirectoryService` fetches the slim player suggestion
+  directory once and caches it in memory + `localStorage` for local autocomplete;
+  `ShuttleOptionsLocalStorage`/`IShuttleOptionsStorage` persist user options;
+  `ArrayClaimsPrincipalFactory` expands the array-valued `roles` claim.
+- **`Models/`** — client-side models and constants: `Routes` (typed route/URL constants —
+  prefer these over hard-coded paths), `KnownRoles`, `BlogEntry`, and `Options/`
+  (`IShuttleOptions`, `ShuttleOptions`, `ShuttleOptionsModel`).
+- **`Extensions/`** — `ClaimsPrincipalExtensions` and other small helpers.
+- **`BlogEntries/`** — markdown articles (named `yyyyMMdd-Title.md`) embedded as resources
+  and surfaced through `BlogService`.
+- **`wwwroot/`** — static web assets: `index.html`, `appsettings.json` +
+  `appsettings.Development.json` (the latter points `Api:BaseUrl` at the local dev API),
+  `css/`, `js/`, and icons.
+
+**Data access** goes exclusively through the shared `Shuttle.Api.Client` project's typed
+Refit `IShuttlePlayerClient` (registered in `Program.cs`); the WebClient does not build
+requests by hand. DTOs are the shared `Shuttle.Models` types.
+
 ## Build
 
 SDK-style .NET 10 solution (`SHLAnalytics.sln`) using Central Package Management.
@@ -156,6 +204,52 @@ Tests live in `Shuttle.Tests` (xunit.v3, run via the Microsoft Testing Platform 
 - `dotnet test` — run the full test suite.
 - `dotnet test Shuttle.Tests/Shuttle.Tests.csproj` — run just the test project.
 - `dotnet test --filter "FullyQualifiedName~<Namespace.Class>"` — run a targeted subset.
+
+### WebClient testing (no Azure auth)
+
+The Blazor WebClient can be exercised **without Entra ID / MSAL or a live `Shuttle.Api`** via a
+shared, deterministic in-memory backend. Three projects support this:
+
+- **`Shuttle.WebClient.Testing`** — the single source of offline truth, reused by the app's
+  run mode and both test projects:
+  - `SeedData` — a fixed set of `PlayerCard` / `PlayerSuggestion` records (stable IDs and
+    ordering, `PlayerId` starting at 1001, ordered by name).
+  - `InMemoryShuttlePlayerClient : IShuttlePlayerClient` — a hand-written fake that mirrors the
+    server's filter/sort/paging semantics (text `Contains` on name/username, position short
+    codes, page size clamped to 100, `PlayerId` tiebreak).
+  - `FakeAuthenticationStateProvider` + `FakeAuthOptions` — a configurable signed-in principal
+    (name/roles, defaults to the `Shuttle.Admin` role) with no token round trip.
+  - `AddShuttleFakeBackend(...)` — DI extension registering the fake client and fake auth.
+
+- **`Shuttle.WebClient.Tests`** — **bUnit** component/page tests (headless, offline, no browser).
+  `WebClientTestContext` wires FluentUI services, the in-memory client, and
+  `PlayerDirectoryService`; bUnit's `AddAuthorization()` drives auth-gated UI. Fast to run:
+  - `dotnet test Shuttle.WebClient.Tests/Shuttle.WebClient.Tests.csproj`
+
+- **`Shuttle.WebClient.E2E`** — **Playwright** browser smoke tests that drive the fully rendered
+  app in its offline **fake-backend run mode**. `WebAppFixture` boots the WebClient via
+  `dotnet run --launch-profile TestServer` (fixed at `http://localhost:5099`), waits for
+  readiness, and tears the process down. Set `SHUTTLE_E2E_BASEURL` to point the tests at an
+  already-running server instead of starting one.
+  - One-time browser install:
+    `pwsh Shuttle.WebClient.E2E/bin/Debug/net10.0/playwright.ps1 install chromium`
+  - `dotnet test Shuttle.WebClient.E2E/Shuttle.WebClient.E2E.csproj`
+
+**Fake-backend run mode.** `Program.cs` reads the `Testing:FakeBackend` flag; when `true` it calls
+`AddShuttleFakeBackend` and **skips** MSAL/Refit registration. The flag lives only in
+`wwwroot/appsettings.Testing.json` and is loaded when the app's environment is `Testing`. Because a
+standalone .NET 10 WASM app resolves its environment from the boot manifest baked at build time (the
+dev server does not emit a reliable `Blazor-Environment` header), the WebClient csproj bakes
+`WasmApplicationEnvironmentName=Testing` whenever `-p:ShuttleFakeBackend=true` is passed **or**
+`ASPNETCORE_ENVIRONMENT=Testing` is set (the `TestServer` launch profile). Run it locally with:
+
+```
+dotnet run --project Shuttle.WebClient/Shuttle.WebClient.csproj --launch-profile TestServer -p:ShuttleFakeBackend=true
+```
+
+The property is never set in normal Debug/Release builds, so the production app is unaffected even
+though the fake code ships in the bundle.
+
 
 ## Dependency management
 

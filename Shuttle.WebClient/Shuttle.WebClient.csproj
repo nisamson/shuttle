@@ -7,6 +7,20 @@
         <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
     </PropertyGroup>
 
+    <!--
+      Offline test run mode. In .NET 10 a standalone WASM app resolves its environment from the
+      boot manifest baked at build time (there is no reliable Blazor-Environment header from the
+      dev server), so we bake "Testing" into the app whenever the fake backend is requested. That
+      makes HostEnvironment.Environment == "Testing", which loads wwwroot/appsettings.Testing.json
+      (Testing:FakeBackend=true) and activates the fake client + fake auth in Program.cs. Triggered
+      either by the TestServer launch profile (ASPNETCORE_ENVIRONMENT=Testing, imported by MSBuild)
+      or explicitly via -p:ShuttleFakeBackend=true. Never set in normal Debug/Release builds, so the
+      production app is unaffected.
+    -->
+    <PropertyGroup Condition="'$(ShuttleFakeBackend)' == 'true' or '$(ASPNETCORE_ENVIRONMENT)' == 'Testing'">
+        <WasmApplicationEnvironmentName>Testing</WasmApplicationEnvironmentName>
+    </PropertyGroup>
+
     <ItemGroup>
         <PackageReference Include="Blazor.LocalStorage.WebAssembly" />
         <PackageReference Include="Markdig" />
@@ -21,6 +35,7 @@
     <ItemGroup>
         <ProjectReference Include="..\Shuttle.Api.Client\Shuttle.Api.Client.csproj" />
         <ProjectReference Include="..\Shuttle.Models\Shuttle.Models.csproj" />
+        <ProjectReference Include="..\Shuttle.WebClient.Testing\Shuttle.WebClient.Testing.csproj" />
     </ItemGroup>
 
     <ItemGroup>
