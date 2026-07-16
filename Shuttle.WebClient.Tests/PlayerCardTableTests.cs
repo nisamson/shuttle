@@ -47,4 +47,47 @@ public class PlayerCardTableTests : WebClientTestContext {
         var link = cut.Find("a.player-link");
         Assert.Equal($"/players/{player.PlayerId}", link.GetAttribute("href"));
     }
+
+    [Fact]
+    public void Links_username_to_the_user_profile() {
+        var player = SeedData.Players()[0];
+
+        var cut = Render<PlayerCardTable>(p => p.Add(c => c.Players, new List<PlayerCard> { player }));
+
+        var link = cut.Find("a.user-link");
+        Assert.Equal($"/users/{player.UserId}", link.GetAttribute("href"));
+        Assert.Equal(player.Username, link.TextContent);
+    }
+
+    [Fact]
+    public void Shows_first_gen_badge_for_a_members_first_player() {
+        var player = SeedData.Players().First(p => !p.Recreate);
+
+        var cut = Render<PlayerCardTable>(p => p.Add(c => c.Players, new List<PlayerCard> { player }));
+
+        Assert.Contains("First-gen", cut.Markup);
+        Assert.DoesNotContain("Recreate", cut.Markup);
+    }
+
+    [Fact]
+    public void Shows_recreate_badge_for_a_later_player() {
+        var player = SeedData.Players().First(p => p.Recreate);
+
+        var cut = Render<PlayerCardTable>(p => p.Add(c => c.Players, new List<PlayerCard> { player }));
+
+        Assert.Contains("Recreate", cut.Markup);
+        Assert.DoesNotContain("First-gen", cut.Markup);
+    }
+
+    [Fact]
+    public void Suppresses_username_link_for_the_configured_user() {
+        var player = SeedData.Players()[0];
+
+        var cut = Render<PlayerCardTable>(p => p
+            .Add(c => c.Players, new List<PlayerCard> { player })
+            .Add(c => c.SuppressUserLinkFor, player.UserId));
+
+        Assert.Empty(cut.FindAll("a.user-link"));
+        Assert.Contains(player.Username, cut.Markup);
+    }
 }

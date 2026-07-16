@@ -24,6 +24,16 @@ public static class Startup {
     public const string OptionsSectionName = "QuartzDashAuth";
     public const string OptionsAuthScheme = OpenIdConnectDefaults.AuthenticationScheme;
 
+    /// <summary>
+    /// App role granted (via Entra app-role assignment on the API's app registration) to users
+    /// allowed to call administrative API endpoints. Must match the app role <c>value</c> defined
+    /// on the backend app registration and the role string used by the WebClient.
+    /// </summary>
+    public const string AdminRole = "Shuttle.Admin";
+
+    /// <summary>Authorization policy requiring <see cref="AdminRole"/> on a validated JWT bearer token.</summary>
+    public const string AdminAuthorizationPolicy = "ShuttleAdmin";
+
     public static void AddQuartz(this WebApplicationBuilder builder) {
         builder.Services.Configure<QuartzOptions>(options => {
                 options.Scheduling.IgnoreDuplicates = true;
@@ -62,6 +72,15 @@ public static class Startup {
                         policy.RequireAuthenticatedUser();
                         policy.RequireRole("Shuttle.Jobs.Admin");
                         policy.AuthenticationSchemes.Add(OptionsAuthScheme);
+                    }
+                );
+                // Admin API endpoints authorize against the default (JWT bearer) scheme so a
+                // WebClient admin's access token satisfies the policy.
+                options.AddPolicy(
+                    AdminAuthorizationPolicy,
+                    policy => {
+                        policy.RequireAuthenticatedUser();
+                        policy.RequireRole(AdminRole);
                     }
                 );
             }

@@ -31,4 +31,12 @@ public static class Routes {
 
         public static string Player(int playerId) => $"{Root}/{playerId}";
     }
+
+    public static class Users {
+        public const string Root = "/users";
+
+        public static string User(int userId) => $"{Root}/{userId}";
+
+        public static string User(string userIdOrName) => $"{Root}/{userIdOrName}";
+    }
 }

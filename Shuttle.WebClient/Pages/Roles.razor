@@ -1,32 +1,82 @@
 @page "/debug/roles"
 @using System.Security.Claims
+@using System.Net
+@using Refit
+@using Shuttle.Api.Client
 @using Microsoft.AspNetCore.Components.WebAssembly.Hosting
 @inject IWebAssemblyHostEnvironment Env
+@inject IShuttleDebugClient DebugClient
 
 <PageTitle>Roles</PageTitle>
 
 @if (Env.IsDevelopment()) {
-    <FluentStack Orientation="Orientation.Vertical">
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="16">
         <h1>Roles</h1>
         <AuthorizeView>
             <Authorized>
-                @{
-                    var identity = context.User.Identity as ClaimsIdentity;
-                    var roleClaimType = identity?.RoleClaimType ?? ClaimTypes.Role;
-                    var roles = context.User.FindAll(roleClaimType)
-                        .Select(c => c.Value)
-                        .OrderBy(r => r, StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-                }
-                @if (roles.Count == 0) {
-                    <p>No site roles are assigned to the current user.</p>
-                } else {
-                    <ul>
-                        @foreach (var role in roles) {
-                            <li>@role</li>
-                        }
-                    </ul>
-                }
+                <div>
+                    <h2>Client roles</h2>
+                    <p>Roles parsed from the access token by the browser.</p>
+                    @{
+                        var identity = context.User.Identity as ClaimsIdentity;
+                        var roleClaimType = identity?.RoleClaimType ?? ClaimTypes.Role;
+                        var clientRoles = context.User.FindAll(roleClaimType)
+                            .Select(c => c.Value)
+                            .OrderBy(r => r, StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+                    }
+                    @if (clientRoles.Count == 0) {
+                        <p>No site roles are assigned to the current user.</p>
+                    } else {
+                        <ul>
+                            @foreach (var role in clientRoles) {
+                                <li>@role</li>
+                            }
+                        </ul>
+                    }
+                </div>
+
+                <div>
+                    <h2>Server roles</h2>
+                    <p>Roles the API reports for the same token via <code>GET /debug/roles</code>.</p>
+                    @if (serverRolesLoading) {
+                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
+                            <FluentSpinner/>
+                            <FluentText>Loading server roles…</FluentText>
+                        </FluentStack>
+                    } else if (serverRolesError is not null) {
+                        <FluentMessageBar Intent="MessageBarIntent.Error" Title="Failed to load server roles">
+                            @serverRolesError
+                        </FluentMessageBar>
+                    } else if (serverRoles is { Count: 0 }) {
+                        <p>The API reports no site roles for the current user.</p>
+                    } else if (serverRoles is not null) {
+                        <ul>
+                            @foreach (var role in serverRoles) {
+                                <li>@role</li>
+                            }
+                        </ul>
+                    }
+                </div>
+
+                <div>
+                    <h2>Admin API access</h2>
+                    <p>Calls the admin-gated <code>GET /admin/ping</code> with the same token.</p>
+                    @if (adminPingLoading) {
+                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
+                            <FluentSpinner/>
+                            <FluentText>Checking admin access…</FluentText>
+                        </FluentStack>
+                    } else if (adminPingError is not null) {
+                        <FluentMessageBar Intent="MessageBarIntent.Warning" Title="Admin access denied">
+                            @adminPingError
+                        </FluentMessageBar>
+                    } else if (adminPingMessage is not null) {
+                        <FluentMessageBar Intent="MessageBarIntent.Success" Title="Admin access granted">
+                            @adminPingMessage
+                        </FluentMessageBar>
+                    }
+                </div>
             </Authorized>
             <NotAuthorized>
                 <p>Not logged in.</p>
@@ -35,4 +85,55 @@
     </FluentStack>
 } else {
     <p>This page is only available in the development environment.</p>
+}
+
+@code {
+    private bool serverRolesLoading;
+    private IReadOnlyList<string>? serverRoles;
+    private string? serverRolesError;
+
+    private bool adminPingLoading;
+    private string? adminPingMessage;
+    private string? adminPingError;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    protected override async Task OnInitializedAsync() {
+        if (!Env.IsDevelopment()) {
+            return;
+        }
+
+        if (AuthenticationStateTask is not null) {
+            var state = await AuthenticationStateTask;
+            if (state.User.Identity?.IsAuthenticated != true) {
+                return;
+            }
+        }
+
+        serverRolesLoading = true;
+        try {
+            serverRoles = await DebugClient.GetServerRoles();
+        } catch (Exception ex) {
+            serverRolesError = $"The API did not return roles ({ex.Message}). " +
+                "The debug endpoint is only available when the API itself runs in Development.";
+        } finally {
+            serverRolesLoading = false;
+        }
+
+        adminPingLoading = true;
+        try {
+            var ping = await DebugClient.PingAdmin();
+            adminPingMessage = $"{ping.Message} — the API accepted the request as {ping.User ?? "an unnamed caller"}.";
+        } catch (ApiException apiEx) {
+            adminPingError = apiEx.StatusCode == HttpStatusCode.Forbidden
+                ? "Authenticated, but the token is missing the Shuttle.Admin role (HTTP 403). " +
+                    "Assign the Shuttle.Admin app role on the API app registration, then sign out and back in."
+                : $"The admin endpoint rejected the request (HTTP {(int)apiEx.StatusCode} {apiEx.StatusCode}).";
+        } catch (Exception ex) {
+            adminPingError = $"Could not reach the admin endpoint ({ex.Message}).";
+        } finally {
+            adminPingLoading = false;
+        }
+    }
 }

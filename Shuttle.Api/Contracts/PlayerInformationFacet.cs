@@ -16,6 +16,43 @@ namespace Shuttle.Api.Contracts;
     exclude: [nameof(PlayerInformation.User), nameof(PlayerInformation.IndexRecords)])]
 public partial class PlayerInformationFacet;
 
+/// <summary>
+/// A materialized <see cref="PlayerInformation"/> entity paired with its computed
+/// <see cref="Recreate"/> flag, produced by <see cref="PlayerCardQueryExtensions.SelectCardRows"/>
+/// so the (SQL-computed) recreate value travels with the row into the in-memory card mapping.
+/// </summary>
+public sealed class PlayerCardRow {
+    public required PlayerInformation Player { get; init; }
+    public required bool Recreate { get; init; }
+}
+
+public static class PlayerCardQueryExtensions {
+    /// <summary>
+    /// Projects each player alongside a computed "recreate" flag: <see langword="true"/> when the
+    /// same user created an earlier player. This is the mirror of the most-recent anti-join in
+    /// <c>UpdateMostRecentPlayers</c> (comparing "earlier" instead of "later"), evaluated as a
+    /// correlated <c>EXISTS</c> against <paramref name="allPlayers"/>.
+    /// </summary>
+    public static IQueryable<PlayerCardRow> SelectCardRows(
+        this IQueryable<PlayerInformation> source,
+        IQueryable<PlayerInformation> allPlayers) =>
+        source.Select(p => new PlayerCardRow {
+            Player = p,
+            Recreate = allPlayers.Any(o =>
+                o.UserId == p.UserId
+                && (o.CreationTime < p.CreationTime
+                    || (o.CreationTime == p.CreationTime && o.PlayerId < p.PlayerId))),
+        });
+
+    /// <summary>Maps a single <see cref="PlayerCardRow"/> onto a <see cref="PlayerCard"/>.</summary>
+    public static PlayerCard ToPlayerCard(this PlayerCardRow row) =>
+        new PlayerInformationFacet(row.Player).ToPlayerCard() with { Recreate = row.Recreate };
+
+    /// <summary>Maps a sequence of <see cref="PlayerCardRow"/>s onto a list of cards.</summary>
+    public static List<PlayerCard> ToPlayerCards(this IEnumerable<PlayerCardRow> rows) =>
+        rows.Select(row => row.ToPlayerCard()).ToList();
+}
+
 public static class PlayerInformationFacetExtensions {
     /// <summary>
     /// Maps the internal facet onto the lean, shared <see cref="PlayerCard"/> wire contract,

@@ -1,6 +1,7 @@
 @page "/players/{PlayerId:int}"
 @using Plotly.Blazor
 @using Shuttle.Shl.Api.Models.Common
+@using Shuttle.WebClient.Models
 
 <PageTitle>@(card?.Name ?? $"Player {PlayerId}")</PageTitle>
 
@@ -45,7 +46,7 @@
             }
         </FluentStack>
         <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="6" VerticalAlignment="VerticalAlignment.Center" Wrap="true">
-            <FluentText Size="TextSize.Size200">@card.Username · Player #@card.PlayerId</FluentText>
+            <FluentText Size="TextSize.Size200"><a class="user-link" href="@Routes.Users.User(card.UserId)">@card.Username</a> · Player #@card.PlayerId</FluentText>
             <a id="portal-player-link" class="portal-link" href="https://portal.simulationhockey.com/player/@card.PlayerId" target="_blank" rel="noopener noreferrer">
                 <FluentIcon Value="@(new Icons.Regular.Size16.Open())"/>
             </a>

@@ -56,6 +56,7 @@ public partial class PlayerSearchFilters : ComponentBase {
     private string? maxBankBalanceText;
     private TriState inactiveFilter = TriState.Any;
     private TriState suspendedFilter = TriState.Any;
+    private TriState recreateFilter = TriState.Any;
     private bool showAdvanced;
 
     private void ToggleLeague(KnownLeague league) => Toggle(leagues, league);
@@ -125,12 +126,14 @@ public partial class PlayerSearchFilters : ComponentBase {
 
         inactiveFilter = FromBool(source?.Inactive);
         suspendedFilter = FromBool(source?.Suspended);
+        recreateFilter = FromBool(source?.Recreate);
 
         // Reveal the advanced section when it holds any active filters.
         showAdvanced = showAdvanced
             || handedness.Count > 0
             || inactiveFilter != TriState.Any
             || suspendedFilter != TriState.Any
+            || recreateFilter != TriState.Any
             || !string.IsNullOrEmpty(iihfNation)
             || !string.IsNullOrEmpty(minBankBalanceText)
             || !string.IsNullOrEmpty(maxBankBalanceText);
@@ -164,6 +167,7 @@ public partial class PlayerSearchFilters : ComponentBase {
             IihfNation = Clean(iihfNation),
             Inactive = ToBool(inactiveFilter),
             Suspended = ToBool(suspendedFilter),
+            Recreate = ToBool(recreateFilter),
             MinBankBalance = ParseInt(minBankBalanceText),
             MaxBankBalance = ParseInt(maxBankBalanceText),
         };
@@ -183,6 +187,7 @@ public partial class PlayerSearchFilters : ComponentBase {
         maxBankBalanceText = null;
         inactiveFilter = TriState.Any;
         suspendedFilter = TriState.Any;
+        recreateFilter = TriState.Any;
 
         await OnReset.InvokeAsync();
     }

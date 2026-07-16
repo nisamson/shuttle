@@ -50,6 +50,13 @@ public record PlayerSearchQuery {
     /// <summary>Filter by suspension flag. <see langword="null"/> matches any.</summary>
     public bool? Suspended { get; init; }
 
+    /// <summary>
+    /// Filter by "recreate" status (a player that is not the user's earliest-created player).
+    /// <see langword="true"/> returns only recreates, <see langword="false"/> only first-gen
+    /// players, and <see langword="null"/> matches any.
+    /// </summary>
+    public bool? Recreate { get; init; }
+
     /// <summary>Inclusive lower bound on bank balance.</summary>
     public int? MinBankBalance { get; init; }
 

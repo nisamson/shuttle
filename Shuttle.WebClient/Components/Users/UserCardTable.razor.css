@@ -1,0 +1,70 @@
+.user-table-wrapper {
+    overflow-x: auto;
+    width: 100%;
+}
+
+.user-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: var(--type-ramp-base-font-size);
+}
+
+.user-table thead th {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 2px solid var(--neutral-stroke-divider-rest);
+    white-space: nowrap;
+    font-weight: 600;
+    user-select: none;
+}
+
+.user-table thead th.num {
+    text-align: right;
+}
+
+.user-table thead th.th-sort {
+    cursor: pointer;
+}
+
+.user-table thead th.th-sort:hover {
+    color: var(--accent-fill-rest);
+}
+
+.user-table thead th.active {
+    color: var(--accent-fill-rest);
+}
+
+.user-table thead th .sort-ind {
+    font-size: 0.85em;
+}
+
+.user-table tbody td {
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid var(--neutral-stroke-divider-rest);
+    white-space: nowrap;
+}
+
+.user-table tbody td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.user-table tbody tr:hover {
+    background: var(--neutral-fill-stealth-hover);
+}
+
+.user-table .user-link {
+    color: var(--accent-fill-rest);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.user-table .user-link:hover {
+    text-decoration: underline;
+}
+
+.user-table .user-table-msg {
+    text-align: center;
+    padding: 1.5rem;
+    color: var(--neutral-foreground-hint);
+}

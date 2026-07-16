@@ -1,0 +1,36 @@
+@using Shuttle.Models.Users
+
+<div class="user-table-wrapper">
+    <table class="user-table">
+        <thead>
+            <tr>
+                <th class="@ThClass(UserSortField.Username)" @onclick="() => ToggleSort(UserSortField.Username)">Username<span class="sort-ind">@SortIndicator(UserSortField.Username)</span></th>
+                <th class="num @ThClass(UserSortField.UserId)" @onclick="() => ToggleSort(UserSortField.UserId)">User ID<span class="sort-ind">@SortIndicator(UserSortField.UserId)</span></th>
+                @if (ShowDiscord) {
+                    <th class="@ThClass(UserSortField.DiscordName)" @onclick="() => ToggleSort(UserSortField.DiscordName)">Discord<span class="sort-ind">@SortIndicator(UserSortField.DiscordName)</span></th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @if (Loading) {
+                <tr>
+                    <td colspan="@ColumnCount" class="user-table-msg"><FluentSpinner/> Loading users…</td>
+                </tr>
+            } else if (Users is null || Users.Count == 0) {
+                <tr>
+                    <td colspan="@ColumnCount" class="user-table-msg">No users match your search.</td>
+                </tr>
+            } else {
+                @foreach (var u in Users) {
+                    <tr>
+                        <td><a class="user-link" href="@UserRoute(u.UserId)">@u.Username</a></td>
+                        <td class="num">@u.UserId</td>
+                        @if (ShowDiscord) {
+                            <td>@(string.IsNullOrWhiteSpace(u.DiscordName) ? "—" : u.DiscordName)</td>
+                        }
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>

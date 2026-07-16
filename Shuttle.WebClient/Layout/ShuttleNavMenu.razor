@@ -4,6 +4,8 @@
 <FluentNav Style="height: 100%;">
     <FluentNavItem Href="@Routes.Home" Match="NavLinkMatch.All" Tooltip="Home" IconRest="@(new Icons.Regular.Size20.Home())">Home</FluentNavItem>
     <FluentNavItem Href="@Routes.Players.Root" Match="NavLinkMatch.All" Tooltip="Players" IconRest="@(new Icons.Regular.Size20.Person())">Players</FluentNavItem>
+    <FluentNavItem Href="@Routes.Users.Root" Match="NavLinkMatch.All" Tooltip="Users" IconRest="@(new Icons.Regular.Size20.People())">Users</FluentNavItem>
+    <FluentNavItem Href="@Routes.Articles.Blogs" Match="NavLinkMatch.All" Tooltip="Blogs" IconRest="@(new Icons.Regular.Size20.News())">Blogs</FluentNavItem>
     <FluentDivider/>
     <AuthorizeView>
         <Authorized>
@@ -26,7 +28,6 @@
             <FluentNavItem Href="@Routes.Debug.Roles" Match="NavLinkMatch.All" Tooltip="Roles" IconRest="@(new Icons.Regular.Size20.PersonBoard())">Roles</FluentNavItem>
         </FluentNavCategory>
     }
-    <FluentNavItem Href="@Routes.Articles.Blogs" Match="NavLinkMatch.All" Tooltip="Blogs" IconRest="@(new Icons.Regular.Size20.News())">Blogs</FluentNavItem>
     <FluentNavCategory Title="Legal" Tooltip="Legal" IconRest="@(new Icons.Regular.Size20.Gavel())">
         <FluentNavItem Href="@Routes.Privacy" Match="NavLinkMatch.All" Tooltip="Privacy Policy" IconRest="@(new Icons.Regular.Size20.ShieldKeyhole())">Privacy Policy</FluentNavItem>
     </FluentNavCategory>
