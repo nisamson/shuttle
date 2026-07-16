@@ -1,9 +1,36 @@
 @page "/"
+@using Shuttle.WebClient.Components
 
 <PageTitle>Home</PageTitle>
 
-<FluentStack Orientation="Orientation.Vertical">
-    <h1>Hello, world!</h1>
+<FluentStack Orientation="Orientation.Vertical"
+             HorizontalAlignment="HorizontalAlignment.Center"
+             VerticalGap="12"
+             Style="text-align: center; padding-block: 2rem;">
+    <ShuttleLogo Size="128"/>
+    <h1 style="font-size: 3rem; font-weight: 700; margin: 0;">Shuttle</h1>
+    <FluentDivider Style="width: 100%;"/>
+    <p style="max-width: 40rem; font-size: 1.1rem;">
+        SHLAnalytics surfaces information and statistics about players and teams in the
+        Simulation Hockey League (SHL), a roleplaying simulation hockey league. It ingests
+        data from the league's public sites to help scouts and teams evaluate players'
+        stats, progression, and draft potential at a glance.
+    </p>
 
-    <p>Welcome to your new app.</p>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); grid-auto-rows: 1fr; gap: 1rem; width: 100%;">
+        @foreach (var feature in Features)
+        {
+            <a href="@feature.Href" style="text-decoration: none; color: inherit; display: flex;">
+                <FluentCard Style="height: 100%; text-align: start;">
+                    <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                        <FluentStack VerticalAlignment="VerticalAlignment.Center" HorizontalGap="8">
+                            <FluentIcon Value="feature.Icon"/>
+                            <h3 style="margin: 0; font-size: 1.25rem;">@feature.Title</h3>
+                        </FluentStack>
+                        <p style="margin: 0;">@feature.Description</p>
+                    </FluentStack>
+                </FluentCard>
+            </a>
+        }
+    </div>
 </FluentStack>

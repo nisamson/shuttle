@@ -108,6 +108,11 @@ orchestration host.
   `Components`/`Layout`, client-side state (e.g. local-storage-backed options) in
   `Services`.
 
+  **Styling:** avoid adding custom CSS (e.g. new rules in `wwwroot/css/app.css` or
+  scoped `.razor.css` files) — prefer Fluent UI component parameters and built-in
+  tokens/utilities. Small amounts of inline CSS (e.g. a `style="..."` for minor
+  spacing/alignment tweaks) are permissible when a component parameter doesn't cover it.
+
 ### Shared / supporting projects
 
 - **`Shuttle.EFCore`** — EF Core data layer: `ShlDbContext`, entities, migrations,
