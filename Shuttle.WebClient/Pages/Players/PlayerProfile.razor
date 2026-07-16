@@ -1,5 +1,6 @@
 @page "/players/{PlayerId:int}"
 @using Plotly.Blazor
+@using Shuttle.Shl.Api.Models.Common
 
 <PageTitle>@(card?.Name ?? $"Player {PlayerId}")</PageTitle>
 
@@ -43,7 +44,18 @@
                 <a class="download-json" href="@jsonDataUrl" download="@jsonFileName">Download as JSON</a>
             }
         </FluentStack>
-        <FluentText Size="TextSize.Size200">@card.Username · Player #@card.PlayerId · User #@card.UserId</FluentText>
+        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="6" VerticalAlignment="VerticalAlignment.Center" Wrap="true">
+            <FluentText Size="TextSize.Size200">@card.Username · Player #@card.PlayerId</FluentText>
+            <a id="portal-player-link" class="portal-link" href="https://portal.simulationhockey.com/player/@card.PlayerId" target="_blank" rel="noopener noreferrer">
+                <FluentIcon Value="@(new Icons.Regular.Size16.Open())"/>
+            </a>
+            <FluentTooltip Anchor="portal-player-link">View player #@card.PlayerId on the SHL portal</FluentTooltip>
+            <FluentText Size="TextSize.Size200">· User #@card.UserId</FluentText>
+            <a id="portal-user-link" class="portal-link" href="https://portal.simulationhockey.com/user/@card.UserId" target="_blank" rel="noopener noreferrer">
+                <FluentIcon Value="@(new Icons.Regular.Size16.Open())"/>
+            </a>
+            <FluentTooltip Anchor="portal-user-link">View user #@card.UserId on the SHL portal</FluentTooltip>
+        </FluentStack>
 
         <FluentStack Orientation="Orientation.Horizontal" Wrap="true" HorizontalGap="32" VerticalGap="16">
             <div class="stat-group">
@@ -78,8 +90,14 @@
 
         <FluentDivider/>
 
-        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="12" VerticalAlignment="VerticalAlignment.Center">
+        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
             <FluentText Size="TextSize.Size500" Weight="TextWeight.Bold">Attributes</FluentText>
+            @if (ExcludedAttributeLabels is not null) {
+                <FluentIcon Id="attributes-hint" Value="@(new Icons.Regular.Size16.Info())" Class="attributes-hint"/>
+                <FluentTooltip Anchor="attributes-hint">
+                    Attributes identical for every player (@ExcludedAttributeLabels) are not shown.
+                </FluentTooltip>
+            }
             @if (card.Attributes is not null && combinedChart is not null) {
                 <FluentSpacer/>
                 <FluentSwitch @bind-Value="groupedView" @bind-Value:after="OnViewChanged">Break out by category</FluentSwitch>
@@ -87,21 +105,23 @@
         </FluentStack>
         @if (card.Attributes is null || combinedChart is null) {
             <FluentText>No in-game attributes have been ingested for this player yet.</FluentText>
-        } else if (groupedView) {
-            <div class="attribute-charts">
-                @foreach (var group in attributeCharts) {
-                    <div class="attribute-chart">
-                        <FluentText Weight="TextWeight.Bold" Block="true" Class="chart-title">@group.Title</FluentText>
-                        <div class="chart-surface">
-                            <PlotlyChart Config="chartConfig" Layout="group.Layout" Data="group.Data" @ref="group.Chart"/>
-                        </div>
-                    </div>
-                }
-            </div>
         } else {
-            <div class="attribute-chart-single">
-                <PlotlyChart Config="chartConfig" Layout="combinedChart.Layout" Data="combinedChart.Data" @ref="combinedChart.Chart"/>
-            </div>
+            @if (groupedView) {
+                <div class="attribute-charts">
+                    @foreach (var group in attributeCharts) {
+                        <div class="attribute-chart">
+                            <FluentText Weight="TextWeight.Bold" Block="true" Class="chart-title">@group.Title</FluentText>
+                            <div class="chart-surface">
+                                <PlotlyChart Config="chartConfig" Layout="group.Layout" Data="group.Data" @ref="group.Chart"/>
+                            </div>
+                        </div>
+                    }
+                </div>
+            } else {
+                <div class="attribute-chart-single">
+                    <PlotlyChart Config="chartConfig" Layout="combinedChart.Layout" Data="combinedChart.Data" @ref="combinedChart.Chart"/>
+                </div>
+            }
         }
     }
 </FluentStack>

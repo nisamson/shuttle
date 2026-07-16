@@ -1,0 +1,53 @@
+@using Shuttle.Models.Players
+@using Shuttle.Shl.Api.Models.Common
+@using Shuttle.Shl.Api.Models.Portal.V1
+
+<div class="player-table-wrapper">
+    <table class="player-table">
+        <thead>
+            <tr>
+                <th class="@ThClass(PlayerSortField.Name)" @onclick="() => ToggleSort(PlayerSortField.Name)">Name<span class="sort-ind">@SortIndicator(PlayerSortField.Name)</span></th>
+                <th class="@ThClass(PlayerSortField.Username)" @onclick="() => ToggleSort(PlayerSortField.Username)">Username<span class="sort-ind">@SortIndicator(PlayerSortField.Username)</span></th>
+                <th class="@ThClass(PlayerSortField.Position)" @onclick="() => ToggleSort(PlayerSortField.Position)">Pos<span class="sort-ind">@SortIndicator(PlayerSortField.Position)</span></th>
+                <th class="@ThClass(PlayerSortField.Status)" @onclick="() => ToggleSort(PlayerSortField.Status)">Status<span class="sort-ind">@SortIndicator(PlayerSortField.Status)</span></th>
+                <th class="@ThClass(PlayerSortField.League)" @onclick="() => ToggleSort(PlayerSortField.League)">League<span class="sort-ind">@SortIndicator(PlayerSortField.League)</span></th>
+                <th class="@ThClass(PlayerSortField.DraftSeason)" @onclick="() => ToggleSort(PlayerSortField.DraftSeason)">Draft<span class="sort-ind">@SortIndicator(PlayerSortField.DraftSeason)</span></th>
+                <th class="@ThClass(PlayerSortField.Created)" @onclick="() => ToggleSort(PlayerSortField.Created)">Created<span class="sort-ind">@SortIndicator(PlayerSortField.Created)</span></th>
+                <th class="num @ThClass(PlayerSortField.TotalTpe)" @onclick="() => ToggleSort(PlayerSortField.TotalTpe)">Total TPE<span class="sort-ind">@SortIndicator(PlayerSortField.TotalTpe)</span></th>
+                <th>Flags</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Loading) {
+                <tr>
+                    <td colspan="9" class="player-table-msg"><FluentSpinner/> Loading players…</td>
+                </tr>
+            } else if (Players is null || Players.Count == 0) {
+                <tr>
+                    <td colspan="9" class="player-table-msg">No players match your filters.</td>
+                </tr>
+            } else {
+                @foreach (var p in Players) {
+                    <tr>
+                        <td><a class="player-link" href="@PlayerRoute(p.PlayerId)">@p.Name</a></td>
+                        <td>@p.Username</td>
+                        <td>@p.Position.ToShortString()</td>
+                        <td><FluentBadge Color="StatusColor(p.Status)">@StatusText(p.Status)</FluentBadge></td>
+                        <td>@(p.CurrentLeague?.Abbreviation ?? "—")</td>
+                        <td>@(p.DraftSeason?.ToString() ?? "—")</td>
+                        <td>@p.CreationDate.ToString("yyyy-MM-dd")</td>
+                        <td class="num">@p.TotalTpe.ToString("N0")</td>
+                        <td>
+                            @if (p.Inactive) {
+                                <FluentBadge Appearance="BadgeAppearance.Filled" Color="BadgeColor.Severe" title="Inactive on-site">Inactive</FluentBadge>
+                            }
+                            @if (p.IsSuspended) {
+                                <FluentBadge Appearance="BadgeAppearance.Outline" Color="BadgeColor.Danger" title="Suspended">Suspended</FluentBadge>
+                            }
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>

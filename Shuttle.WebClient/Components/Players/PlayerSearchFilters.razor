@@ -1,0 +1,133 @@
+@using Shuttle.Models.Players
+@using Shuttle.Shl.Api.Models.Common
+@using Shuttle.Shl.Api.Models.Portal.V1
+
+<div class="player-filters">
+    <div class="filter-row">
+        <div class="filter-field grow">
+            <label>Name or username</label>
+            <FluentAutocomplete TOption="PlayerSuggestion"
+                                TValue="string"
+                                Width="100%"
+                                Placeholder="Search by name or username"
+                                OnOptionsSearch="OnNameSearch"
+                                OptionText="@(p => $"{p.Name} ({p.Username})")"
+                                OptionValue="@(p => p.PlayerId.ToString())"
+                                SelectedItem="selectedNamePlayer"
+                                SelectedItemChanged="OnNameSelected"/>
+        </div>
+    </div>
+
+    <div class="filter-field">
+        <label>Position</label>
+        <FluentAutocomplete TOption="string"
+                            TValue="string"
+                            Multiple="true"
+                            Width="100%"
+                            Placeholder="Any position"
+                            OnOptionsSearch="OnPositionSearch"
+                            OptionText="@(p => p)"
+                            OptionValue="@(p => p)"
+                            MaximumSelectedOptions="6"
+                            @bind-SelectedItems="selectedPositions"/>
+    </div>
+
+    <div class="filter-field">
+        <label>Status</label>
+        <FluentAutocomplete TOption="PlayerStatus"
+                            TValue="string"
+                            Multiple="true"
+                            Width="100%"
+                            Placeholder="Any status"
+                            OnOptionsSearch="OnStatusSearch"
+                            OptionText="@(s => StatusLabel(s))"
+                            OptionValue="@(s => s.ToString())"
+                            MaximumSelectedOptions="4"
+                            @bind-SelectedItems="selectedStatuses"/>
+    </div>
+
+    <div class="filter-field">
+        <label>League</label>
+        <div class="chip-group">
+            @foreach (var league in LeagueOptions) {
+                <FluentButton Appearance="ChipAppearance(leagues.Contains(league))" OnClick="() => ToggleLeague(league)">@league.Abbreviation</FluentButton>
+            }
+        </div>
+    </div>
+
+    <div class="filter-row">
+        <div class="filter-field">
+            <label>Draft season</label>
+            <FluentTextInput TextInputType="TextInputType.Number" @bind-Value="draftSeasonText" Placeholder="e.g. 70" @onkeydown="OnKeyDown"/>
+        </div>
+        <div class="filter-field">
+            <label>Min total TPE</label>
+            <FluentTextInput TextInputType="TextInputType.Number" @bind-Value="minTotalTpeText" Placeholder="Min" @onkeydown="OnKeyDown"/>
+        </div>
+        <div class="filter-field">
+            <label>Max total TPE</label>
+            <FluentTextInput TextInputType="TextInputType.Number" @bind-Value="maxTotalTpeText" Placeholder="Max" @onkeydown="OnKeyDown"/>
+        </div>
+    </div>
+
+    <FluentSwitch @bind-Value="showAdvanced">Advanced filters</FluentSwitch>
+
+    @if (showAdvanced) {
+        <div class="advanced-filters">
+            <div class="filter-field">
+                <label>Handedness</label>
+                <div class="chip-group">
+                    @foreach (var hand in AllHandedness) {
+                        <FluentButton Appearance="ChipAppearance(handedness.Contains(hand))" OnClick="() => ToggleHandedness(hand)">@hand.ToString()</FluentButton>
+                    }
+                </div>
+            </div>
+
+            <div class="filter-field">
+                <label>On-site activity</label>
+                <div class="chip-group">
+                    <FluentButton Appearance="ChipAppearance(inactiveFilter == TriState.Any)" OnClick="() => inactiveFilter = TriState.Any">Any</FluentButton>
+                    <FluentButton Appearance="ChipAppearance(inactiveFilter == TriState.No)" OnClick="() => inactiveFilter = TriState.No">Active on-site</FluentButton>
+                    <FluentButton Appearance="ChipAppearance(inactiveFilter == TriState.Yes)" OnClick="() => inactiveFilter = TriState.Yes">Inactive on-site</FluentButton>
+                </div>
+            </div>
+
+            <div class="filter-field">
+                <label>Suspension</label>
+                <div class="chip-group">
+                    <FluentButton Appearance="ChipAppearance(suspendedFilter == TriState.Any)" OnClick="() => suspendedFilter = TriState.Any">Any</FluentButton>
+                    <FluentButton Appearance="ChipAppearance(suspendedFilter == TriState.No)" OnClick="() => suspendedFilter = TriState.No">Not suspended</FluentButton>
+                    <FluentButton Appearance="ChipAppearance(suspendedFilter == TriState.Yes)" OnClick="() => suspendedFilter = TriState.Yes">Suspended</FluentButton>
+                </div>
+            </div>
+
+            <div class="filter-row">
+                <div class="filter-field grow">
+                    <label>IIHF nation</label>
+                    <FluentTextInput @bind-Value="iihfNation" Placeholder="e.g. Canada" @onkeydown="OnKeyDown"/>
+                </div>
+                <div class="filter-field">
+                    <label>Min bank balance</label>
+                    <FluentTextInput TextInputType="TextInputType.Number" @bind-Value="minBankBalanceText" Placeholder="Min" @onkeydown="OnKeyDown"/>
+                </div>
+                <div class="filter-field">
+                    <label>Max bank balance</label>
+                    <FluentTextInput TextInputType="TextInputType.Number" @bind-Value="maxBankBalanceText" Placeholder="Max" @onkeydown="OnKeyDown"/>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="filter-actions">
+        <FluentButton Appearance="ButtonAppearance.Primary" OnClick="SearchAsync" Disabled="Busy">Search</FluentButton>
+        <FluentButton Appearance="ButtonAppearance.Outline" OnClick="ResetAsync" Disabled="Busy">Reset</FluentButton>
+    </div>
+</div>
+
+@code {
+    private async Task OnKeyDown(KeyboardEventArgs e) {
+        if (e.Key == "Enter") {
+            await SearchAsync();
+        }
+    }
+}

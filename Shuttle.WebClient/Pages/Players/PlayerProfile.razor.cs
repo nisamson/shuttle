@@ -201,11 +201,18 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
         };
     }
 
+    private string? ExcludedAttributeLabels => card?.Attributes switch {
+        SkaterAttributes => ExcludedSkaterAttributeLabels,
+        GoaltenderAttributes => ExcludedGoaltenderAttributeLabels,
+        _ => null,
+    };
+
     private static IReadOnlyList<(string Name, string Label, int Value)> GetAttributeValues(PlayerAttributes attributes) =>
         attributes.GetType()
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => p.PropertyType == typeof(int) && p.GetIndexParameters().Length == 0)
             .Where(p => attributes is not SkaterAttributes || !ExcludedSkaterAttributes.Contains(p.Name))
+            .Where(p => attributes is not GoaltenderAttributes || !ExcludedGoaltenderAttributes.Contains(p.Name))
             .Select(p => (Name: p.Name, Label: SplitPascalCase(p.Name), Value: (int)p.GetValue(attributes)!))
             .ToList();
 
@@ -229,12 +236,19 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
         }),
     };
 
-    // Skater mental attributes we deliberately exclude from the attribute charts.
-    private static readonly HashSet<string> ExcludedSkaterAttributes = new(StringComparer.Ordinal) {
+    // Skater mental attributes we deliberately exclude from the attribute charts because
+    // they are identical for every player and therefore carry no comparative signal.
+    private static readonly string[] ExcludedSkaterAttributeNames = {
         nameof(SkaterAttributes.Determination), nameof(SkaterAttributes.TeamPlayer),
         nameof(SkaterAttributes.Leadership), nameof(SkaterAttributes.Temperament),
         nameof(SkaterAttributes.Professionalism),
     };
+
+    private static readonly HashSet<string> ExcludedSkaterAttributes =
+        new(ExcludedSkaterAttributeNames, StringComparer.Ordinal);
+
+    private static readonly string ExcludedSkaterAttributeLabels =
+        string.Join(", ", ExcludedSkaterAttributeNames.Select(SplitPascalCase));
 
     private static readonly IReadOnlyList<(string Title, string[] Attributes)> GoaltenderCategories = new (string, string[])[] {
         ("Technique", new[] {
@@ -247,10 +261,23 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
             nameof(GoaltenderAttributes.Puckhandling),
         }),
         ("Mental", new[] {
-            nameof(GoaltenderAttributes.Aggression), nameof(GoaltenderAttributes.MentalToughness), nameof(GoaltenderAttributes.Determination),
-            nameof(GoaltenderAttributes.TeamPlayer), nameof(GoaltenderAttributes.Leadership), nameof(GoaltenderAttributes.Professionalism),
+            nameof(GoaltenderAttributes.MentalToughness),
         }),
     };
+
+    // Goaltender mental attributes we deliberately exclude from the attribute charts because
+    // they are identical for every player and therefore carry no comparative signal.
+    private static readonly string[] ExcludedGoaltenderAttributeNames = {
+        nameof(GoaltenderAttributes.Determination), nameof(GoaltenderAttributes.TeamPlayer),
+        nameof(GoaltenderAttributes.Leadership), nameof(GoaltenderAttributes.Professionalism),
+        nameof(GoaltenderAttributes.Aggression),
+    };
+
+    private static readonly HashSet<string> ExcludedGoaltenderAttributes =
+        new(ExcludedGoaltenderAttributeNames, StringComparer.Ordinal);
+
+    private static readonly string ExcludedGoaltenderAttributeLabels =
+        string.Join(", ", ExcludedGoaltenderAttributeNames.Select(SplitPascalCase));
 
     private sealed class AttributeChart {
         public required string Title { get; init; }
