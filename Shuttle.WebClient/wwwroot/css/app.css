@@ -27,27 +27,46 @@ a, .btn-link {
     margin-inline: auto;
 }
 
-/* Collapsible desktop navigation rail: icons only when collapsed. */
+/* Collapsible desktop navigation rail: icons only when collapsed.
+   Selectors are qualified with .fluent-layout-item so they outrank the
+   library's equally-specific rules (e.g. .fluent-nav .fluent-navcategoryitem
+   sets font-size:inherit), which load after app.css. */
 .fluent-layout-item[area=nav] {
     transition: width 0.2s ease-in-out;
 }
 
-.nav-rail .fluent-navitem,
-.nav-rail .fluent-navsubitem,
-.nav-rail .fluent-navcategoryitem {
+.fluent-layout-item.nav-rail .fluent-navitem,
+.fluent-layout-item.nav-rail .fluent-navsubitem,
+.fluent-layout-item.nav-rail .fluent-navcategoryitem {
     font-size: 0;
+    gap: 0;
     justify-content: center;
     padding-inline: 0;
 }
 
-.nav-rail .fluent-navcategoryitem > .expand-icon,
-.nav-rail .fluent-navsubitemgroup {
+.fluent-layout-item.nav-rail .fluent-navcategoryitem > .expand-icon,
+.fluent-layout-item.nav-rail .fluent-navsubitemgroup {
     display: none;
 }
 
 /* The desktop nav toggle is redundant on mobile, where the hamburger is shown. */
 .fluent-layout[mobile] .nav-toggle-desktop {
     display: none;
+}
+
+/* Make the header follow the light/dark theme. The library defaults the header
+   to var(--colorBrandBackground) / --colorNeutralForegroundOnBrand, which are
+   brand tokens that don't change between themes, leaving some icons hard to
+   see. Use neutral tokens (which flip with the theme) instead. The extra
+   .fluent-layout qualifier outranks the library's own header rules. */
+.fluent-layout .fluent-layout-item[area=header] {
+    background-color: var(--colorNeutralBackground3);
+    color: var(--colorNeutralForeground1);
+    border-bottom: 1px solid var(--colorNeutralStroke2);
+}
+
+.fluent-layout .fluent-layout-item[area=header] .fluent-layout-hamburger {
+    fill: var(--colorNeutralForeground1);
 }
 
 .valid.modified:not([type=checkbox]) {

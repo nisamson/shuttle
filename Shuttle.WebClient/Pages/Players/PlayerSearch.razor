@@ -1,12 +1,41 @@
 @page "/players"
+@using Shuttle.Models.Players
 
 <PageTitle>Players</PageTitle>
 
-<FluentStack Orientation="Orientation.Vertical" VerticalGap="12">
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="16">
     <FluentText Size="TextSize.Size700" Weight="TextWeight.Bold">Players</FluentText>
-    <FluentText>Enter a player id to view their profile.</FluentText>
+
     <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
-        <FluentTextInput TextInputType="TextInputType.Number" @bind-Value="playerIdText" Placeholder="Player id" @onkeydown="OnKeyDown"/>
-        <FluentButton Appearance="ButtonAppearance.Primary" OnClick="Go" Disabled="@(!CanGo)">View</FluentButton>
+        <FluentText>Jump to a player:</FluentText>
+        <FluentAutocomplete TOption="PlayerSuggestion"
+                            TValue="string"
+                            Width="320px"
+                            Placeholder="Search by name or username"
+                            OnOptionsSearch="OnJumpSearch"
+                            OptionText="@(p => $"{p.Name} ({p.Username})")"
+                            OptionValue="@(p => p.PlayerId.ToString())"
+                            SelectedItem="jumpSelection"
+                            SelectedItemChanged="OnJumpSelected"/>
     </FluentStack>
+
+    <PlayerSearchFilters OnSearch="OnSearch" OnReset="OnReset" Busy="loading" Initial="query"/>
+
+    @if (errorMessage is not null) {
+        <FluentText Color="Color.Error">@errorMessage</FluentText>
+    }
+
+    <div class="players-pager">
+        <FluentPaginator State="pagination" CurrentPageIndexChanged="OnPageChanged"/>
+    </div>
+
+    <PlayerCardTable Players="results"
+                     Loading="loading"
+                     SortField="query.SortBy"
+                     SortDescending="query.SortDescending"
+                     SortChanged="OnSortChanged"/>
+
+    <div class="players-pager">
+        <FluentPaginator State="pagination" CurrentPageIndexChanged="OnPageChanged"/>
+    </div>
 </FluentStack>

@@ -1,0 +1,70 @@
+.player-table-wrapper {
+    overflow-x: auto;
+    width: 100%;
+}
+
+.player-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: var(--type-ramp-base-font-size);
+}
+
+.player-table thead th {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 2px solid var(--neutral-stroke-divider-rest);
+    white-space: nowrap;
+    font-weight: 600;
+    user-select: none;
+}
+
+.player-table thead th.num {
+    text-align: right;
+}
+
+.player-table thead th.th-sort {
+    cursor: pointer;
+}
+
+.player-table thead th.th-sort:hover {
+    color: var(--accent-fill-rest);
+}
+
+.player-table thead th.active {
+    color: var(--accent-fill-rest);
+}
+
+.player-table thead th .sort-ind {
+    font-size: 0.85em;
+}
+
+.player-table tbody td {
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid var(--neutral-stroke-divider-rest);
+    white-space: nowrap;
+}
+
+.player-table tbody td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.player-table tbody tr:hover {
+    background: var(--neutral-fill-stealth-hover);
+}
+
+.player-table .player-link {
+    color: var(--accent-fill-rest);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.player-table .player-link:hover {
+    text-decoration: underline;
+}
+
+.player-table .player-table-msg {
+    text-align: center;
+    padding: 1.5rem;
+    color: var(--neutral-foreground-hint);
+}

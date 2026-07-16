@@ -28,6 +28,7 @@ builder.Services.AddFluentUIComponents();
 builder.Services.AddLocalStorageServices();
 builder.Services.AddSingleton<IBlogService, BlogService>();
 builder.Services.AddSingleton<IShuttleOptionsStorage, ShuttleOptionsLocalStorage>();
+builder.Services.AddSingleton<IPlayerDirectoryService, PlayerDirectoryService>();
 if (builder.HostEnvironment.IsDevelopment()) {
     builder.Logging.AddFilter("Microsoft.AspNetCore.Components.RenderTree.*", LogLevel.None);
     builder.Logging.SetMinimumLevel(LogLevel.Trace);

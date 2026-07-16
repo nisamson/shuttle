@@ -17,6 +17,23 @@ public interface IShuttlePlayerClient {
     Task<IReadOnlyList<PlayerCard>> GetPlayers(CancellationToken token = default);
 
     /// <summary>
+    /// Searches players with server-side filtering, sorting, and pagination. The multiselect
+    /// filters on <paramref name="query"/> are serialized as repeated query keys.
+    /// </summary>
+    /// <param name="query">The filter, sort, and paging options.</param>
+    /// <param name="token">A cancellation token.</param>
+    [Get("/players/search")]
+    Task<PagedResult<PlayerCard>> SearchPlayers([Query] PlayerSearchQuery query, CancellationToken token = default);
+
+    /// <summary>
+    /// Fetches the slim <see cref="PlayerSuggestion"/> directory for every player, ordered by name.
+    /// Intended to be fetched once and cached client-side to power local name/username autocomplete.
+    /// </summary>
+    /// <param name="token">A cancellation token.</param>
+    [Get("/players/suggestions")]
+    Task<IReadOnlyList<PlayerSuggestion>> GetPlayerSuggestions(CancellationToken token = default);
+
+    /// <summary>
     /// Fetches the "at a glance" <see cref="PlayerCard"/> for the given player id. Returns
     /// <see langword="null"/> when no player with that id exists (HTTP 404).
     /// </summary>

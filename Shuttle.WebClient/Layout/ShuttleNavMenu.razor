@@ -2,32 +2,32 @@
 @using Microsoft.AspNetCore.Components.WebAssembly.Hosting
 @inject IWebAssemblyHostEnvironment Env
 <FluentNav Style="height: 100%;">
-    <FluentNavItem Href="@Routes.Home" Match="NavLinkMatch.All" IconRest="@(new Icons.Regular.Size20.Home())">Home</FluentNavItem>
-    <FluentNavItem Href="@Routes.Players.Root" Match="NavLinkMatch.All" IconRest="@(new Icons.Regular.Size20.Person())">Players</FluentNavItem>
+    <FluentNavItem Href="@Routes.Home" Match="NavLinkMatch.All" Tooltip="Home" IconRest="@(new Icons.Regular.Size20.Home())">Home</FluentNavItem>
+    <FluentNavItem Href="@Routes.Players.Root" Match="NavLinkMatch.All" Tooltip="Players" IconRest="@(new Icons.Regular.Size20.Person())">Players</FluentNavItem>
     <FluentDivider/>
     <AuthorizeView>
         <Authorized>
-            <FluentNavItem OnClick="BeginLogout" IconRest="@(new Icons.Regular.Size20.SignOut())">Logout</FluentNavItem>
+            <FluentNavItem OnClick="BeginLogout" Tooltip="Logout" IconRest="@(new Icons.Regular.Size20.SignOut())">Logout</FluentNavItem>
         </Authorized>
         <NotAuthorized>
-            <FluentNavItem OnClick="BeginLogin" IconRest="@(new Icons.Regular.Size20.PersonArrowRight())">Login</FluentNavItem>
+            <FluentNavItem OnClick="BeginLogin" Tooltip="Login" IconRest="@(new Icons.Regular.Size20.PersonArrowRight())">Login</FluentNavItem>
         </NotAuthorized>
     </AuthorizeView>
     <AuthorizeView Roles="@RoleNames.Admin">
         <Authorized>
-            <FluentNavCategory Title="Admin" IconRest="@(new Icons.Regular.Size20.Shield())">
-                <FluentNavItem Href="@Routes.Admin.Hello" Match="NavLinkMatch.All" IconRest="@(new Icons.Regular.Size20.Cloud())">API Check</FluentNavItem>
+            <FluentNavCategory Title="Admin" Tooltip="Admin" IconRest="@(new Icons.Regular.Size20.Shield())">
+                <FluentNavItem Href="@Routes.Admin.Hello" Match="NavLinkMatch.All" Tooltip="API Check" IconRest="@(new Icons.Regular.Size20.Cloud())">API Check</FluentNavItem>
             </FluentNavCategory>
         </Authorized>
     </AuthorizeView>
     @if (Env.IsDevelopment()) {
-        <FluentNavCategory Title="Debug" IconRest="@(new Icons.Regular.Size20.Bug())">
-            <FluentNavItem Href="@Routes.Debug.Claims" Match="NavLinkMatch.All" IconRest="@(new Icons.Regular.Size20.Key())">Claims</FluentNavItem>
-            <FluentNavItem Href="@Routes.Debug.Roles" Match="NavLinkMatch.All" IconRest="@(new Icons.Regular.Size20.PersonBoard())">Roles</FluentNavItem>
+        <FluentNavCategory Title="Debug" Tooltip="Debug" IconRest="@(new Icons.Regular.Size20.Bug())">
+            <FluentNavItem Href="@Routes.Debug.Claims" Match="NavLinkMatch.All" Tooltip="Claims" IconRest="@(new Icons.Regular.Size20.Key())">Claims</FluentNavItem>
+            <FluentNavItem Href="@Routes.Debug.Roles" Match="NavLinkMatch.All" Tooltip="Roles" IconRest="@(new Icons.Regular.Size20.PersonBoard())">Roles</FluentNavItem>
         </FluentNavCategory>
     }
-    <FluentNavItem Href="@Routes.Articles.Blogs" Match="NavLinkMatch.All" IconRest="@(new Icons.Regular.Size20.News())">Blogs</FluentNavItem>
-    <FluentNavCategory Title="Legal" IconRest="@(new Icons.Regular.Size20.Gavel())">
-        <FluentNavItem Href="@Routes.Privacy" Match="NavLinkMatch.All" IconRest="@(new Icons.Regular.Size20.ShieldKeyhole())">Privacy Policy</FluentNavItem>
+    <FluentNavItem Href="@Routes.Articles.Blogs" Match="NavLinkMatch.All" Tooltip="Blogs" IconRest="@(new Icons.Regular.Size20.News())">Blogs</FluentNavItem>
+    <FluentNavCategory Title="Legal" Tooltip="Legal" IconRest="@(new Icons.Regular.Size20.Gavel())">
+        <FluentNavItem Href="@Routes.Privacy" Match="NavLinkMatch.All" Tooltip="Privacy Policy" IconRest="@(new Icons.Regular.Size20.ShieldKeyhole())">Privacy Policy</FluentNavItem>
     </FluentNavCategory>
 </FluentNav>

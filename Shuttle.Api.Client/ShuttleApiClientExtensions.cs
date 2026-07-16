@@ -25,7 +25,10 @@ public static class ShuttleApiClientExtensions {
 
     private static RefitSettings CreateRefitSettings() =>
         new() {
-            ContentSerializer = new SystemTextJsonContentSerializer(JsonSerializerOptions)
+            ContentSerializer = new SystemTextJsonContentSerializer(JsonSerializerOptions),
+            // Multiselect query collections (e.g. PlayerSearchQuery.Statuses) serialize as repeated
+            // keys: ?statuses=Active&statuses=Retired.
+            CollectionFormat = CollectionFormat.Multi,
         };
 
     /// <summary>
