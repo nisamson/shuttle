@@ -194,6 +194,7 @@ public class PlayerController : ControllerBase {
             PlayerSortField.Status => source.OrderByField(p => p.Status, desc).ThenBy(p => p.PlayerId),
             PlayerSortField.League => source.OrderByField(p => p.CurrentLeague, desc).ThenBy(p => p.PlayerId),
             PlayerSortField.Username => source.OrderByField(p => p.Username, desc).ThenBy(p => p.PlayerId),
+            PlayerSortField.Created => source.OrderByField(p => p.CreationTime, desc).ThenBy(p => p.PlayerId),
             _ => source.OrderByField(p => p.Name, desc).ThenBy(p => p.PlayerId),
         };
     }

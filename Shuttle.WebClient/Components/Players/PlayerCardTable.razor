@@ -12,7 +12,7 @@
                 <th class="@ThClass(PlayerSortField.Status)" @onclick="() => ToggleSort(PlayerSortField.Status)">Status<span class="sort-ind">@SortIndicator(PlayerSortField.Status)</span></th>
                 <th class="@ThClass(PlayerSortField.League)" @onclick="() => ToggleSort(PlayerSortField.League)">League<span class="sort-ind">@SortIndicator(PlayerSortField.League)</span></th>
                 <th class="@ThClass(PlayerSortField.DraftSeason)" @onclick="() => ToggleSort(PlayerSortField.DraftSeason)">Draft<span class="sort-ind">@SortIndicator(PlayerSortField.DraftSeason)</span></th>
-                <th>Created</th>
+                <th class="@ThClass(PlayerSortField.Created)" @onclick="() => ToggleSort(PlayerSortField.Created)">Created<span class="sort-ind">@SortIndicator(PlayerSortField.Created)</span></th>
                 <th class="num @ThClass(PlayerSortField.TotalTpe)" @onclick="() => ToggleSort(PlayerSortField.TotalTpe)">Total TPE<span class="sort-ind">@SortIndicator(PlayerSortField.TotalTpe)</span></th>
                 <th>Flags</th>
             </tr>
