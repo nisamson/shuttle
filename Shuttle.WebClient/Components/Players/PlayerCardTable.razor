@@ -34,7 +34,7 @@
                         <td>@p.Position.ToShortString()</td>
                         <td><FluentBadge Color="StatusColor(p.Status)">@StatusText(p.Status)</FluentBadge></td>
                         <td>@(p.CurrentLeague?.Abbreviation ?? "—")</td>
-                        <td>@(p.DraftSeason?.ToString() ?? "—")</td>
+                        <td><SeasonNumber Season="p.DraftSeason"/></td>
                         <td>@p.CreationDate.ToString("yyyy-MM-dd")</td>
                         <td class="num">@p.TotalTpe.ToString("N0")</td>
                         <td>

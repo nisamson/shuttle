@@ -13,6 +13,7 @@ using Shuttle.Api.Client;
 using Shuttle.Models.Players;
 using Shuttle.Shl.Api.Models.Common;
 using Shuttle.Shl.Api.Models.Portal.V1;
+using Shuttle.WebClient.Components;
 using Shuttle.WebClient.Models;
 using Shuttle.WebClient.Models.Options;
 using Shuttle.WebClient.Services;
@@ -415,7 +416,7 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
             yield return ("Current team", card.CurrentTeamId?.ToString() ?? "—");
             yield return ("SHL rights", card.ShlRightsTeamId?.ToString() ?? "—");
             yield return ("SMJHL rights", card.SmjhlRightsTeamId?.ToString() ?? "—");
-            yield return ("Draft season", card.DraftSeason?.ToString() ?? "—");
+            yield return ("Draft season", SeasonNumber.Format(card.DraftSeason));
         }
     }
 
