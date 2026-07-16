@@ -16,7 +16,8 @@ namespace Shuttle.Api.Controllers;
 /// </summary>
 [AllowAnonymous]
 [ApiController]
-[Route("[controller]")]
+[Route("players")]
+[Route("player")]
 public class PlayerController : ControllerBase {
     private readonly ShlDbContext db;
     private readonly ILogger<PlayerController> logger;
@@ -29,7 +30,7 @@ public class PlayerController : ControllerBase {
     /// <summary>
     /// Returns the "at a glance" <see cref="PlayerCard"/> for every player, ordered by name.
     /// </summary>
-    [HttpGet("~/players")]
+    [HttpGet]
     [ProducesResponseType<IReadOnlyList<PlayerCard>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<PlayerCard>>> GetPlayers(CancellationToken cancellationToken) {
         var entities = await db.PlayerInformation
@@ -50,7 +51,7 @@ public class PlayerController : ControllerBase {
     /// Backs client-side name/username autocomplete: the WebClient fetches this once and filters it
     /// locally. Marked cacheable since the directory only changes on the periodic DB update job.
     /// </summary>
-    [HttpGet("~/players/suggestions")]
+    [HttpGet("suggestions")]
     [ProducesResponseType<IReadOnlyList<PlayerSuggestion>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<PlayerSuggestion>>> GetPlayerSuggestions(
         CancellationToken cancellationToken) {
@@ -76,7 +77,7 @@ public class PlayerController : ControllerBase {
     }
     /// filtered, sorted, and paginated server-side.
     /// </summary>
-    [HttpGet("~/players/search")]
+    [HttpGet("search")]
     [ProducesResponseType<PagedResult<PlayerCard>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResult<PlayerCard>>> SearchPlayers(
         [FromQuery] PlayerSearchQuery query,
