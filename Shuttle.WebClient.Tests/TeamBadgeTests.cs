@@ -10,7 +10,7 @@ namespace Shuttle.WebClient.Tests;
 /// Render tests for <see cref="TeamBadge"/> covering the resolved, unresolved, and empty states.
 /// </summary>
 public class TeamBadgeTests : WebClientTestContext {
-    private static TeamCard SampleTeam() => new() {
+    private static TeamCard SampleTeam(string? textColor = "#FFFFFF") => new() {
         TeamId = 10,
         Season = 72,
         League = "SHL",
@@ -20,28 +20,43 @@ public class TeamBadgeTests : WebClientTestContext {
         Location = "Aurora",
         PrimaryColor = "#0B3D91",
         SecondaryColor = "#B0C4DE",
-        TextColor = "#FFFFFF",
+        TextColor = textColor,
     };
+
+    private string RenderBadge(TeamCard? team, int? teamId) =>
+        Render(builder => {
+            // TeamBadge renders a FluentTooltip, which needs a FluentTooltipProvider in the render
+            // tree (supplied app-wide by <FluentProviders/> in MainLayout).
+            builder.OpenComponent<FluentTooltipProvider>(0);
+            builder.CloseComponent();
+            builder.OpenComponent<TeamBadge>(1);
+            builder.AddAttribute(2, nameof(TeamBadge.Team), team);
+            builder.AddAttribute(3, nameof(TeamBadge.TeamId), teamId);
+            builder.CloseComponent();
+        }).Markup;
 
     [Fact]
     public void Renders_abbreviation_and_team_colors_when_resolved() {
         var team = SampleTeam();
 
-        // TeamBadge renders a FluentTooltip, which needs a FluentTooltipProvider in the render
-        // tree (supplied app-wide by <FluentProviders/> in MainLayout).
-        var cut = Render(builder => {
-            builder.OpenComponent<FluentTooltipProvider>(0);
-            builder.CloseComponent();
-            builder.OpenComponent<TeamBadge>(1);
-            builder.AddAttribute(2, nameof(TeamBadge.Team), team);
-            builder.AddAttribute(3, nameof(TeamBadge.TeamId), (int?)team.TeamId);
-            builder.CloseComponent();
-        });
+        var markup = RenderBadge(team, team.TeamId);
 
-        Assert.Contains("AUR", cut.Markup);
-        Assert.Contains("background-color:#0B3D91", cut.Markup);
+        Assert.Contains("AUR", markup);
+        Assert.Contains("background-color:#0B3D91", markup);
+        Assert.Contains("color:#FFFFFF", markup);
         // Full team name is surfaced via the tooltip.
-        Assert.Contains("Aurora Frost", cut.Markup);
+        Assert.Contains("Aurora Frost", markup);
+    }
+
+    [Fact]
+    public void Uses_secondary_color_for_text_and_outline_when_no_text_color() {
+        var team = SampleTeam(textColor: null);
+
+        var markup = RenderBadge(team, team.TeamId);
+
+        Assert.Contains("background-color:#0B3D91", markup);
+        Assert.Contains("color:#B0C4DE", markup);
+        Assert.Contains("border:1px solid #B0C4DE", markup);
     }
 
     [Fact]

@@ -1,4 +1,3 @@
-using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Shuttle.Models.Leagues;
 
@@ -32,31 +31,14 @@ public partial class TeamBadge : ComponentBase {
                 return string.Empty;
             }
 
+            // Prefer the team's explicit text color; otherwise fall back to the secondary color,
+            // which is also used for the outline.
             var text = string.IsNullOrWhiteSpace(Team.TextColor)
-                ? ContrastingText(Team.PrimaryColor)
+                ? Team.SecondaryColor
                 : Team.TextColor;
 
             return $"background-color:{Team.PrimaryColor};color:{text};" +
                    $"border:1px solid {Team.SecondaryColor};";
         }
-    }
-
-    // Picks black or white for legibility against the given background using the standard
-    // luminance heuristic; falls back to white if the color can't be parsed.
-    private static string ContrastingText(string hex) =>
-        TryParseHex(hex, out var r, out var g, out var b) && (0.299 * r + 0.587 * g + 0.114 * b) > 150
-            ? "#000000"
-            : "#FFFFFF";
-
-    private static bool TryParseHex(string hex, out int r, out int g, out int b) {
-        r = g = b = 0;
-        var value = hex.TrimStart('#');
-        if (value.Length != 6) {
-            return false;
-        }
-
-        return int.TryParse(value.AsSpan(0, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out r)
-               && int.TryParse(value.AsSpan(2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out g)
-               && int.TryParse(value.AsSpan(4, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out b);
     }
 }
