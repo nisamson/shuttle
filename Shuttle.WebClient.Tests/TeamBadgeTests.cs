@@ -76,6 +76,21 @@ public class TeamBadgeTests : WebClientTestContext {
     }
 
     [Fact]
+    public void Overrides_a_low_contrast_explicit_text_color() {
+        // An explicit but nearly-invisible text color against the primary background.
+        var team = SampleTeam() with {
+            PrimaryColor = "#0B3D91",
+            TextColor = "#0C3E92",
+        };
+
+        var markup = RenderBadge(team, team.TeamId);
+
+        Assert.Contains("background-color:#0B3D91", markup);
+        // WCAG compliance wins over the team's unreadable text color.
+        Assert.Contains("color:#FFFFFF", markup);
+    }
+
+    [Fact]
     public void Falls_back_to_the_raw_id_when_team_is_unresolved() {
         var cut = Render<TeamBadge>(p => p
             .Add(c => c.Team, (TeamCard?)null)
