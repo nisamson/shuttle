@@ -24,6 +24,15 @@
     color: var(--accent-foreground-hover);
 }
 
+.user-link {
+    color: var(--accent-foreground-rest);
+    text-decoration: none;
+}
+
+.user-link:hover {
+    text-decoration: underline;
+}
+
 .attributes-hint {
     color: var(--neutral-foreground-hint);
     cursor: help;

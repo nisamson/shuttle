@@ -30,6 +30,13 @@ public record PlayerCard {
     public bool IsSuspended { get; init; }
     public bool Inactive { get; init; }
 
+    /// <summary>
+    /// <see langword="true"/> when this is not the user's earliest-created player — i.e. the member
+    /// already had a player before this one (a "recreate"). <see langword="false"/> for a member's
+    /// first-ever (first-gen) player.
+    /// </summary>
+    public bool Recreate { get; init; }
+
     // TPE / bank
     public required int TotalTpe { get; init; }
     public required int AppliedTpe { get; init; }

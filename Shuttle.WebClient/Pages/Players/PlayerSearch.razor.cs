@@ -169,6 +169,7 @@ public partial class PlayerSearch : ComponentBase, IDisposable {
         Add("nation", target.IihfNation);
         Add("inactive", target.Inactive is { } inactive ? (inactive ? "true" : "false") : null);
         Add("suspended", target.Suspended is { } suspended ? (suspended ? "true" : "false") : null);
+        Add("recreate", target.Recreate is { } recreate ? (recreate ? "true" : "false") : null);
         Add("minBank", target.MinBankBalance?.ToString(CultureInfo.InvariantCulture));
         Add("maxBank", target.MaxBankBalance?.ToString(CultureInfo.InvariantCulture));
 
@@ -209,6 +210,7 @@ public partial class PlayerSearch : ComponentBase, IDisposable {
             IihfNation = First("nation"),
             Inactive = ParseBool(First("inactive")),
             Suspended = ParseBool(First("suspended")),
+            Recreate = ParseBool(First("recreate")),
             MinBankBalance = ParseInt(First("minBank")),
             MaxBankBalance = ParseInt(First("maxBank")),
             Page = ParseInt(First("page")) ?? 1,
@@ -282,6 +284,7 @@ public partial class PlayerSearch : ComponentBase, IDisposable {
         && a.IihfNation == b.IihfNation
         && a.Inactive == b.Inactive
         && a.Suspended == b.Suspended
+        && a.Recreate == b.Recreate
         && a.MinBankBalance == b.MinBankBalance
         && a.MaxBankBalance == b.MaxBankBalance
         && a.Page == b.Page

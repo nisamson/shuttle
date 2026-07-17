@@ -51,16 +51,16 @@ circumstances.
 
 ### Project goals / use cases
 
-A key goal of this project is to provide **statistical analysis of how likely a player is to
-succeed if drafted**, by analyzing their in-game stats together with collected information
+A key goal of this project is to provide \*\*statistical analysis of how likely a player is to
+succeed if drafted\*\*, by analyzing their in-game stats together with collected information
 about their income and site activity. Much of this underlying information is available
 programmatically through the SHL APIs (Index and Portal).
 
 Another goal is to provide **"at a glance" stat cards** for players that reflect their
 current impact and potential.
 
-A primary use case is providing information useful to teams **scouting players
-and planning their draft lists**. Scouting draftees draws on several sources of information:
+A primary use case is providing information useful to teams \*\*scouting players
+and planning their draft lists\*\*. Scouting draftees draws on several sources of information:
 
 - **Member interviews** — typically conducted over Discord.
 - **Player stats** — reviews of on-ice statistical performance.
@@ -72,8 +72,8 @@ reserves are typically viewed as more likely to succeed at the SHL level, making
 meaningful scouting signal.
 
 Determining which **player archetype** a player best fits also helps drafting teams judge
-whether a player suits their roster. For example, a team may be looking for a *two-way
-player* who is responsible both offensively and defensively, or a *playmaker* with
+whether a player suits their roster. For example, a team may be looking for a \*two-way
+player\* who is responsible both offensively and defensively, or a *playmaker* with
 excellent passing and speed.
 
 Teams also consider whether a player is a **first-gen** (a new member with their first-ever
@@ -212,28 +212,28 @@ shared, deterministic in-memory backend. Three projects support this:
 
 - **`Shuttle.WebClient.Testing`** — the single source of offline truth, reused by the app's
   run mode and both test projects:
-  - `SeedData` — a fixed set of `PlayerCard` / `PlayerSuggestion` records (stable IDs and
+    - `SeedData` — a fixed set of `PlayerCard` / `PlayerSuggestion` records (stable IDs and
     ordering, `PlayerId` starting at 1001, ordered by name).
-  - `InMemoryShuttlePlayerClient : IShuttlePlayerClient` — a hand-written fake that mirrors the
+    - `InMemoryShuttlePlayerClient : IShuttlePlayerClient` — a hand-written fake that mirrors the
     server's filter/sort/paging semantics (text `Contains` on name/username, position short
     codes, page size clamped to 100, `PlayerId` tiebreak).
-  - `FakeAuthenticationStateProvider` + `FakeAuthOptions` — a configurable signed-in principal
+    - `FakeAuthenticationStateProvider` + `FakeAuthOptions` — a configurable signed-in principal
     (name/roles, defaults to the `Shuttle.Admin` role) with no token round trip.
-  - `AddShuttleFakeBackend(...)` — DI extension registering the fake client and fake auth.
+    - `AddShuttleFakeBackend(...)` — DI extension registering the fake client and fake auth.
 
 - **`Shuttle.WebClient.Tests`** — **bUnit** component/page tests (headless, offline, no browser).
   `WebClientTestContext` wires FluentUI services, the in-memory client, and
   `PlayerDirectoryService`; bUnit's `AddAuthorization()` drives auth-gated UI. Fast to run:
-  - `dotnet test Shuttle.WebClient.Tests/Shuttle.WebClient.Tests.csproj`
+    - `dotnet test Shuttle.WebClient.Tests/Shuttle.WebClient.Tests.csproj`
 
 - **`Shuttle.WebClient.E2E`** — **Playwright** browser smoke tests that drive the fully rendered
   app in its offline **fake-backend run mode**. `WebAppFixture` boots the WebClient via
   `dotnet run --launch-profile TestServer` (fixed at `http://localhost:5099`), waits for
   readiness, and tears the process down. Set `SHUTTLE_E2E_BASEURL` to point the tests at an
   already-running server instead of starting one.
-  - One-time browser install:
+    - One-time browser install:
     `pwsh Shuttle.WebClient.E2E/bin/Debug/net10.0/playwright.ps1 install chromium`
-  - `dotnet test Shuttle.WebClient.E2E/Shuttle.WebClient.E2E.csproj`
+    - `dotnet test Shuttle.WebClient.E2E/Shuttle.WebClient.E2E.csproj`
 
 **Fake-backend run mode.** `Program.cs` reads the `Testing:FakeBackend` flag; when `true` it calls
 `AddShuttleFakeBackend` and **skips** MSAL/Refit registration. The flag lives only in
@@ -243,7 +243,7 @@ dev server does not emit a reliable `Blazor-Environment` header), the WebClient 
 `WasmApplicationEnvironmentName=Testing` whenever `-p:ShuttleFakeBackend=true` is passed **or**
 `ASPNETCORE_ENVIRONMENT=Testing` is set (the `TestServer` launch profile). Run it locally with:
 
-```
+````javascript
 dotnet run --project Shuttle.WebClient/Shuttle.WebClient.csproj --launch-profile TestServer -p:ShuttleFakeBackend=true
 ```
 
@@ -300,3 +300,4 @@ related packages so the relationship is explicit and updates stay consistent.
 When asked to create a skill, place it in the repository (e.g.
 `.github/skills/<skill-name>/SKILL.md`) so it is version-controlled and shared with
 collaborators, unless the request explicitly says otherwise.
+````

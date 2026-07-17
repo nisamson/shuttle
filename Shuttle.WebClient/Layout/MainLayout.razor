@@ -8,13 +8,6 @@
         <FluentLayoutItem Area="LayoutArea.Header">
             <FluentStack VerticalAlignment="VerticalAlignment.Center">
                 <FluentLayoutHamburger/>
-                <FluentButton Class="nav-toggle-desktop"
-                              Appearance="ButtonAppearance.Transparent"
-                              Title="Toggle navigation"
-                              aria-label="Toggle navigation"
-                              OnClick="ToggleNav">
-                    <FluentIcon Value="@(new Icons.Regular.Size24.Navigation())"/>
-                </FluentButton>
                 <FluentSpacer/>
                 <ShuttleLogo/>
                 <span class="app-title" style="font-weight: 600; font-size: 1.5rem; line-height: 1; margin-inline-start: 0.5rem;">Shuttle</span>
@@ -25,7 +18,20 @@
         <FluentLayoutItem Area="LayoutArea.Navigation"
                           Width="@(NavCollapsed ? "48px" : "250px")"
                           Class="@(NavCollapsed ? "nav-rail" : null)">
-            <ShuttleNavMenu/>
+            <div class="nav-shell">
+                <div class="nav-toggle-bar">
+                    <FluentButton Class="nav-toggle-desktop"
+                                  Appearance="ButtonAppearance.Transparent"
+                                  Title="Toggle navigation"
+                                  aria-label="Toggle navigation"
+                                  OnClick="ToggleNav">
+                        <FluentIcon Value="@(new Icons.Regular.Size24.Navigation())"/>
+                    </FluentButton>
+                </div>
+                <div class="nav-scroll">
+                    <ShuttleNavMenu/>
+                </div>
+            </div>
         </FluentLayoutItem>
         <FluentLayoutItem Area="LayoutArea.Content" Padding="@Padding.All3">
             <div class="content">

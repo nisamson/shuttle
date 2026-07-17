@@ -54,6 +54,30 @@ a, .btn-link {
     display: none;
 }
 
+/* Navigation rail: collapse control pinned to the top, menu scrolls below it. */
+.nav-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.nav-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.nav-toggle-bar {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0.25rem;
+}
+
+.fluent-layout-item.nav-rail .nav-toggle-bar {
+    justify-content: center;
+    padding-inline: 0;
+}
+
 /* Make the header follow the light/dark theme. The library defaults the header
    to var(--colorBrandBackground) / --colorNeutralForegroundOnBrand, which are
    brand tokens that don't change between themes, leaving some icons hard to

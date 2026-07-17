@@ -28,6 +28,12 @@ public partial class PlayerCardTable : ComponentBase {
     /// <summary>Raised when the user clicks a sortable header. When unset, sorting is disabled.</summary>
     [Parameter] public EventCallback<PlayerTableSort> SortChanged { get; set; }
 
+    /// <summary>
+    /// When set, usernames belonging to this user id render as plain text instead of a profile link.
+    /// Used on the user profile page so a user's own players don't link back to the same page.
+    /// </summary>
+    [Parameter] public int? SuppressUserLinkFor { get; set; }
+
     private bool Sortable => SortChanged.HasDelegate;
 
     private async Task ToggleSort(PlayerSortField field) {
@@ -52,6 +58,8 @@ public partial class PlayerCardTable : ComponentBase {
         SortField == field ? (SortDescending ? " \u25be" : " \u25b4") : string.Empty;
 
     private static string PlayerRoute(int playerId) => Routes.Players.Player(playerId);
+
+    private static string UserRoute(int userId) => Routes.Users.User(userId);
 
     private static BadgeColor StatusColor(PlayerStatus status) => status switch {
         PlayerStatus.Active => BadgeColor.Success,

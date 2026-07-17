@@ -1,0 +1,71 @@
+@page "/users/{Id}"
+@using Shuttle.WebClient.Components.Players
+
+<PageTitle>@(card?.Username ?? $"User {Id}")</PageTitle>
+
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="16">
+    @if (loading) {
+        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
+            <FluentSpinner/>
+            <FluentText>Loading user @Id…</FluentText>
+        </FluentStack>
+    } else if (notFound) {
+        <div class="not-found">
+            <div class="not-found-badge">?</div>
+            <FluentText Size="TextSize.Size800" Weight="TextWeight.Bold">User not found</FluentText>
+            <FluentText Size="TextSize.Size400" Block="true">We couldn't find a user matching <strong>@Id</strong>.</FluentText>
+            <FluentText Size="TextSize.Size200" Block="true">They may not exist, or the id/username might be mistyped.</FluentText>
+            <FluentButton Appearance="ButtonAppearance.Primary" OnClick="GoToSearch">Back to user search</FluentButton>
+        </div>
+    } else if (error is not null) {
+        <FluentMessageBar Intent="MessageBarIntent.Error" Title="Failed to load user">
+            @error
+        </FluentMessageBar>
+    } else if (card is not null) {
+        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="12" VerticalAlignment="VerticalAlignment.Center" Wrap="true">
+            <FluentText Size="TextSize.Size800" Weight="TextWeight.Bold">@card.Username</FluentText>
+            <FluentBadge>User #@card.UserId</FluentBadge>
+            <a id="portal-user-link" class="portal-link" href="https://portal.simulationhockey.com/user/@card.UserId" target="_blank" rel="noopener noreferrer">
+                <FluentIcon Value="@(new Icons.Regular.Size16.Open())"/>
+            </a>
+            <FluentTooltip Anchor="portal-user-link">View user #@card.UserId on the SHL portal</FluentTooltip>
+        </FluentStack>
+
+        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" HorizontalGap="32" VerticalGap="16">
+            <div class="stat-group">
+                <FluentText Weight="TextWeight.Bold" Block="true">Identity</FluentText>
+                <div class="kv"><span class="k">Username</span><span class="v">@card.Username</span></div>
+                <div class="kv"><span class="k">User ID</span><span class="v">@card.UserId</span></div>
+                <div class="kv">
+                    <span class="k">Discord</span>
+                    @if (!isAuthenticated) {
+                        <span class="v muted" title="Sign in to view Discord names.">Log in as a Shuttle user to view the Discord username.</span>
+                    } else if (string.IsNullOrWhiteSpace(card.DiscordName)) {
+                        <span class="v muted">Discord name not known.</span>
+                    } else {
+                        <span class="v">@card.DiscordName</span>
+                    }
+                </div>
+            </div>
+        </FluentStack>
+
+        <FluentDivider/>
+
+        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
+            <FluentText Size="TextSize.Size500" Weight="TextWeight.Bold">Players</FluentText>
+            @if (sortedPlayers is not null) {
+                <FluentBadge Appearance="BadgeAppearance.Filled">@sortedPlayers.Count</FluentBadge>
+            }
+        </FluentStack>
+
+        @if (sortedPlayers is null || sortedPlayers.Count == 0) {
+            <FluentText>This user has not created any players.</FluentText>
+        } else {
+            <PlayerCardTable Players="sortedPlayers"
+                             SortField="sortField"
+                             SortDescending="sortDescending"
+                             SuppressUserLinkFor="card.UserId"
+                             SortChanged="OnSortChanged"/>
+        }
+    }
+</FluentStack>

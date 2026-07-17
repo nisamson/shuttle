@@ -1,0 +1,38 @@
+.user-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--neutral-stroke-divider-rest);
+    border-radius: var(--control-corner-radius, 6px);
+    background: var(--neutral-layer-2);
+}
+
+.user-filters .filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.user-filters .filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 10rem;
+}
+
+.user-filters .filter-field.grow {
+    flex: 1 1 16rem;
+}
+
+.user-filters .filter-field label {
+    font-size: var(--type-ramp-minus-1-font-size);
+    font-weight: 600;
+    color: var(--neutral-foreground-hint);
+}
+
+.user-filters .filter-actions {
+    display: flex;
+    gap: 0.5rem;
+    padding-top: 0.25rem;
+}

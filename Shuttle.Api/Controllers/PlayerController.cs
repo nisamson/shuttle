@@ -33,17 +33,14 @@ public class PlayerController : ControllerBase {
     [HttpGet]
     [ProducesResponseType<IReadOnlyList<PlayerCard>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<PlayerCard>>> GetPlayers(CancellationToken cancellationToken) {
-        var entities = await db.PlayerInformation
+        var rows = await db.PlayerInformation
             .AsNoTracking()
             .IgnoreAutoIncludes()
             .OrderBy(p => p.Name)
+            .SelectCardRows(db.PlayerInformation)
             .ToListAsync(cancellationToken);
 
-        var cards = entities
-            .Select(e => new PlayerInformationFacet(e).ToPlayerCard())
-            .ToList();
-
-        return Ok(cards);
+        return Ok(rows.ToPlayerCards());
     }
 
     /// <summary>
@@ -84,6 +81,7 @@ public class PlayerController : ControllerBase {
         CancellationToken cancellationToken) {
         var filtered = ApplyFilters(
             db.PlayerInformation.AsNoTracking().IgnoreAutoIncludes(),
+            db.PlayerInformation,
             query);
 
         var totalCount = await filtered.CountAsync(cancellationToken);
@@ -91,14 +89,13 @@ public class PlayerController : ControllerBase {
         var page = Math.Max(1, query.Page);
         var pageSize = Math.Clamp(query.PageSize, 1, MaxPageSize);
 
-        var entities = await ApplySort(filtered, query)
+        var rows = await ApplySort(filtered, query)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .SelectCardRows(db.PlayerInformation)
             .ToListAsync(cancellationToken);
 
-        var cards = entities
-            .Select(e => new PlayerInformationFacet(e).ToPlayerCard())
-            .ToList();
+        var cards = rows.ToPlayerCards();
 
         return Ok(new PagedResult<PlayerCard> {
             Items = cards,
@@ -112,6 +109,7 @@ public class PlayerController : ControllerBase {
 
     private static IQueryable<PlayerInformation> ApplyFilters(
         IQueryable<PlayerInformation> source,
+        IQueryable<PlayerInformation> allPlayers,
         PlayerSearchQuery query) {
         if (!string.IsNullOrWhiteSpace(query.Text)) {
             var text = query.Text.Trim();
@@ -163,6 +161,15 @@ public class PlayerController : ControllerBase {
             source = source.Where(p => p.IsSuspended == suspended);
         }
 
+        if (query.Recreate is { } recreate) {
+            // Recreate == a same-user player exists with an earlier creation (mirror of the
+            // most-recent anti-join, comparing "earlier" instead of "later").
+            source = source.Where(p => allPlayers.Any(o =>
+                o.UserId == p.UserId
+                && (o.CreationTime < p.CreationTime
+                    || (o.CreationTime == p.CreationTime && o.PlayerId < p.PlayerId))) == recreate);
+        }
+
         if (query.MinTotalTpe is { } minTpe) {
             source = source.Where(p => p.TotalTpe >= minTpe);
         }
@@ -208,17 +215,19 @@ public class PlayerController : ControllerBase {
     [ProducesResponseType<PlayerCard>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PlayerCard>> GetPlayer(int playerId, CancellationToken cancellationToken) {
-        var entity = await db.PlayerInformation
+        var row = await db.PlayerInformation
             .AsNoTracking()
             .IgnoreAutoIncludes()
-            .FirstOrDefaultAsync(p => p.PlayerId == playerId, cancellationToken);
+            .Where(p => p.PlayerId == playerId)
+            .SelectCardRows(db.PlayerInformation)
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (entity is null) {
+        if (row is null) {
             logger.LogInformation("Player {PlayerId} not found", playerId);
             return NotFound();
         }
 
-        return Ok(new PlayerInformationFacet(entity).ToPlayerCard());
+        return Ok(row.ToPlayerCard());
     }
 }
 

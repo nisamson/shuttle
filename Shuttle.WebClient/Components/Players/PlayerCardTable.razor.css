@@ -63,6 +63,15 @@
     text-decoration: underline;
 }
 
+.player-table .user-link {
+    color: var(--accent-fill-rest);
+    text-decoration: none;
+}
+
+.player-table .user-link:hover {
+    text-decoration: underline;
+}
+
 .player-table .player-table-msg {
     text-align: center;
     padding: 1.5rem;

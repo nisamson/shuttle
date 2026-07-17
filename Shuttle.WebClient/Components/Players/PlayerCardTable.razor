@@ -30,7 +30,13 @@
                 @foreach (var p in Players) {
                     <tr>
                         <td><a class="player-link" href="@PlayerRoute(p.PlayerId)">@p.Name</a></td>
-                        <td>@p.Username</td>
+                        <td>
+                            @if (p.UserId == SuppressUserLinkFor) {
+                                @p.Username
+                            } else {
+                                <a class="user-link" href="@UserRoute(p.UserId)">@p.Username</a>
+                            }
+                        </td>
                         <td>@p.Position.ToShortString()</td>
                         <td><FluentBadge Color="StatusColor(p.Status)">@StatusText(p.Status)</FluentBadge></td>
                         <td>@(p.CurrentLeague?.Abbreviation ?? "—")</td>
@@ -38,6 +44,11 @@
                         <td>@p.CreationDate.ToString("yyyy-MM-dd")</td>
                         <td class="num">@p.TotalTpe.ToString("N0")</td>
                         <td>
+                            @if (p.Recreate) {
+                                <FluentBadge Appearance="BadgeAppearance.Outline" Color="BadgeColor.Informative" title="Recreate — not the member's first player">Recreate</FluentBadge>
+                            } else {
+                                <FluentBadge Appearance="BadgeAppearance.Filled" Color="BadgeColor.Success" title="First-gen — the member's first player">First-gen</FluentBadge>
+                            }
                             @if (p.Inactive) {
                                 <FluentBadge Appearance="BadgeAppearance.Filled" Color="BadgeColor.Severe" title="Inactive on-site">Inactive</FluentBadge>
                             }

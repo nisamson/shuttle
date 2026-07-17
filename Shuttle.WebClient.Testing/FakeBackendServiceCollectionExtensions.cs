@@ -33,6 +33,16 @@ public static class FakeBackendServiceCollectionExtensions {
         services.AddSingleton<AuthenticationStateProvider>(
             sp => sp.GetRequiredService<FakeAuthenticationStateProvider>());
 
+        // The user client is auth-aware (Discord gating), so hand it the fake auth state provider.
+        services.RemoveAll<IShuttleUserClient>();
+        services.AddSingleton<IShuttleUserClient>(
+            sp => new InMemoryShuttleUserClient(sp.GetRequiredService<AuthenticationStateProvider>()));
+
+        // The debug client reports the fake caller's roles as the server would.
+        services.RemoveAll<IShuttleDebugClient>();
+        services.AddSingleton<IShuttleDebugClient>(
+            sp => new InMemoryShuttleDebugClient(sp.GetRequiredService<AuthenticationStateProvider>()));
+
         return services;
     }
 }

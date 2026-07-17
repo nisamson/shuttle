@@ -40,4 +40,26 @@ public static class ShuttleApiClientExtensions {
         return services.AddRefitClient<IShuttlePlayerClient>(CreateRefitSettings())
             .ConfigureHttpClient(c => c.BaseAddress = baseAddress);
     }
+
+    /// <summary>
+    /// Registers the Shuttle backend API user Refit client (<see cref="IShuttleUserClient"/>) pointed
+    /// at <paramref name="baseAddress"/> (e.g. the value of <c>Api:BaseUrl</c>). Returns the
+    /// <see cref="IHttpClientBuilder"/> so callers can chain additional configuration such as an auth
+    /// message handler (needed for the backend to surface Discord names to authenticated callers).
+    /// </summary>
+    public static IHttpClientBuilder AddShuttleUserClient(this IServiceCollection services, Uri baseAddress) {
+        return services.AddRefitClient<IShuttleUserClient>(CreateRefitSettings())
+            .ConfigureHttpClient(c => c.BaseAddress = baseAddress);
+    }
+
+    /// <summary>
+    /// Registers the Shuttle backend API development-only debug Refit client
+    /// (<see cref="IShuttleDebugClient"/>) pointed at <paramref name="baseAddress"/> (e.g. the value
+    /// of <c>Api:BaseUrl</c>). Returns the <see cref="IHttpClientBuilder"/> so callers can chain an
+    /// auth message handler (the debug endpoints require an authenticated caller).
+    /// </summary>
+    public static IHttpClientBuilder AddShuttleDebugClient(this IServiceCollection services, Uri baseAddress) {
+        return services.AddRefitClient<IShuttleDebugClient>(CreateRefitSettings())
+            .ConfigureHttpClient(c => c.BaseAddress = baseAddress);
+    }
 }

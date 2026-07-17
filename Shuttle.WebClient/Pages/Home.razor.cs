@@ -17,6 +17,11 @@ public partial class Home
             Routes.Players.Root,
             new Icons.Regular.Size24.PersonSearch()),
         new FeatureCard(
+            "User Search",
+            "Search for members to see their profile, Discord name, and the players they've created.",
+            Routes.Users.Root,
+            new Icons.Regular.Size24.PeopleSearch()),
+        new FeatureCard(
             "Blogs",
             "Read the latest articles and analysis about the league and its players.",
             Routes.Articles.Blogs,

@@ -1,0 +1,137 @@
+using Microsoft.AspNetCore.Components.Authorization;
+using Shuttle.Api.Client;
+using Shuttle.Models.Players;
+using Shuttle.Models.Users;
+
+namespace Shuttle.WebClient.Testing;
+
+/// <summary>
+/// In-memory <see cref="IShuttleUserClient"/> that serves <see cref="SeedData"/> users without any
+/// HTTP, backend, or Azure dependency. Mirrors the server's <c>UserController</c> semantics closely
+/// enough that the WebClient behaves identically against it: Discord names are only surfaced when the
+/// (fake) caller is authenticated, and player cards follow the same null-vs-empty contract.
+/// </summary>
+public sealed class InMemoryShuttleUserClient : IShuttleUserClient {
+    private const int MaxPageSize = 100;
+
+    private readonly IReadOnlyList<PlayerCard> players;
+    private readonly IReadOnlyList<SeedUser> users;
+    private readonly AuthenticationStateProvider? authProvider;
+
+    /// <summary>Creates a client backed by the default <see cref="SeedData"/>.</summary>
+    public InMemoryShuttleUserClient(AuthenticationStateProvider? authProvider = null)
+        : this(SeedData.Players(), SeedData.Users(), authProvider) {
+    }
+
+    /// <summary>Creates a client backed by caller-supplied data (useful for focused tests).</summary>
+    public InMemoryShuttleUserClient(
+        IReadOnlyList<PlayerCard> players,
+        IReadOnlyList<SeedUser> users,
+        AuthenticationStateProvider? authProvider = null) {
+        this.players = players;
+        this.users = users;
+        this.authProvider = authProvider;
+    }
+
+    public async Task<UserCard?> GetUser(
+        string userIdOrName,
+        bool players = false,
+        CancellationToken token = default) {
+        var includeDiscord = await IsAuthenticatedAsync();
+
+        var user = int.TryParse(userIdOrName, out var id)
+            ? users.FirstOrDefault(u => u.UserId == id)
+            : users.FirstOrDefault(u => string.Equals(u.Username, userIdOrName, StringComparison.OrdinalIgnoreCase));
+
+        if (user is null) {
+            return null;
+        }
+
+        IReadOnlyList<PlayerCard>? playerCards = null;
+        if (players) {
+            playerCards = this.players
+                .Where(p => p.UserId == user.UserId)
+                .OrderByDescending(p => p.CreationDate)
+                .ThenByDescending(p => p.PlayerId)
+                .ToList();
+        }
+
+        return new UserCard {
+            UserId = user.UserId,
+            Username = user.Username,
+            DiscordName = includeDiscord ? user.DiscordName : null,
+            Players = playerCards,
+        };
+    }
+
+    public async Task<PagedResult<UserCard>> SearchUsers(
+        UserSearchQuery query,
+        CancellationToken token = default) {
+        var includeDiscord = await IsAuthenticatedAsync();
+        var searchDiscord = includeDiscord && query.SearchDiscord;
+
+        IEnumerable<SeedUser> filtered = users;
+        if (!string.IsNullOrWhiteSpace(query.Text)) {
+            var text = query.Text.Trim();
+            filtered = filtered.Where(u =>
+                u.Username.Contains(text, StringComparison.OrdinalIgnoreCase)
+                || (searchDiscord && u.DiscordName is not null
+                    && u.DiscordName.Contains(text, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        var matched = filtered.ToList();
+        var totalCount = matched.Count;
+
+        var page = Math.Max(1, query.Page);
+        var pageSize = Math.Clamp(query.PageSize, 1, MaxPageSize);
+
+        var items = ApplySort(matched, query)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(u => new UserCard {
+                UserId = u.UserId,
+                Username = u.Username,
+                DiscordName = includeDiscord ? u.DiscordName : null,
+                Players = null,
+            })
+            .ToList();
+
+        return new PagedResult<UserCard> {
+            Items = items,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount,
+        };
+    }
+
+    public Task<IReadOnlyList<UserSuggestion>> GetUserSuggestions(CancellationToken token = default) =>
+        Task.FromResult<IReadOnlyList<UserSuggestion>>(
+            users.Select(u => new UserSuggestion { UserId = u.UserId, Username = u.Username }).ToList());
+
+    // UserId is a stable tiebreaker so paging is deterministic, matching the server.
+    private static IEnumerable<SeedUser> ApplySort(IEnumerable<SeedUser> source, UserSearchQuery query) {
+        var desc = query.SortDescending;
+
+        return query.SortBy switch {
+            UserSortField.UserId => OrderBy(source, u => u.UserId, desc),
+            UserSortField.DiscordName => OrderBy(source, u => u.DiscordName ?? string.Empty, desc),
+            _ => OrderBy(source, u => u.Username, desc),
+        };
+    }
+
+    private static IEnumerable<SeedUser> OrderBy<TKey>(
+        IEnumerable<SeedUser> source,
+        Func<SeedUser, TKey> keySelector,
+        bool descending) =>
+        (descending ? source.OrderByDescending(keySelector) : source.OrderBy(keySelector))
+        .ThenBy(u => u.UserId);
+
+    private async Task<bool> IsAuthenticatedAsync() {
+        if (authProvider is null) {
+            return false;
+        }
+
+        var state = await authProvider.GetAuthenticationStateAsync();
+        return state.User.Identity?.IsAuthenticated == true;
+    }
+}

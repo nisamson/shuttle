@@ -101,6 +101,15 @@
                 </div>
             </div>
 
+            <div class="filter-field">
+                <label>Character type</label>
+                <div class="chip-group">
+                    <FluentButton Appearance="ChipAppearance(recreateFilter == TriState.Any)" OnClick="() => recreateFilter = TriState.Any">Any</FluentButton>
+                    <FluentButton Appearance="ChipAppearance(recreateFilter == TriState.No)" OnClick="() => recreateFilter = TriState.No">First-gen</FluentButton>
+                    <FluentButton Appearance="ChipAppearance(recreateFilter == TriState.Yes)" OnClick="() => recreateFilter = TriState.Yes">Recreate</FluentButton>
+                </div>
+            </div>
+
             <div class="filter-row">
                 <div class="filter-field grow">
                     <label>IIHF nation</label>
