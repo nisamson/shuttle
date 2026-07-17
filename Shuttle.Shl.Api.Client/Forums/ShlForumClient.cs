@@ -56,6 +56,7 @@ public partial class ShlForumClient : IShlForumClient {
             // Read the page into a pooled, fixed-size buffer and scan it as a stream so we never
             // hold the whole (potentially large) HTML document in a managed string.
             buffer = ArrayPool<byte>.Shared.Rent(MaxPageSize);
+            Array.Clear(buffer);
             using var streamBuffer = new MemoryStream(buffer, 0, MaxPageSize);
             await stream.CopyToAsync(streamBuffer, token);
             var match = await DiscordName()
