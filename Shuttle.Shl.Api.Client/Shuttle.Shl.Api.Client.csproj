@@ -15,6 +15,7 @@
         <PackageReference Include="Polly" />
         <PackageReference Include="Polly.RateLimiting" />
         <PackageReference Include="Polly.Extensions" />
+        <PackageReference Include="StreamRegex.Extensions" />
     </ItemGroup>
 
 
