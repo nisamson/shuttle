@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Drawing;
+using AccessibleColors;
 using Microsoft.AspNetCore.Components;
 using Shuttle.Models.Leagues;
 
@@ -31,14 +34,45 @@ public partial class TeamBadge : ComponentBase {
                 return string.Empty;
             }
 
-            // Prefer the team's explicit text color; otherwise fall back to the secondary color,
-            // which is also used for the outline.
-            var text = string.IsNullOrWhiteSpace(Team.TextColor)
-                ? Team.SecondaryColor
-                : Team.TextColor;
-
-            return $"background-color:{Team.PrimaryColor};color:{text};" +
+            return $"background-color:{Team.PrimaryColor};color:{ResolveTextColor(Team)};" +
                    $"border:1px solid {Team.SecondaryColor};";
         }
+    }
+
+    // Picks the badge's text color: an explicit team text color always wins. Otherwise the
+    // secondary color is used, but only when it is legible against the primary background —
+    // when the secondary color would be low-contrast we fall back to accessible black/white.
+    private static string ResolveTextColor(TeamCard team) {
+        if (!string.IsNullOrWhiteSpace(team.TextColor)) {
+            return team.TextColor;
+        }
+
+        if (TryParseHex(team.PrimaryColor, out var background)
+            && TryParseHex(team.SecondaryColor, out var secondary)) {
+            return WcagContrastColor.IsCompliant(background, secondary)
+                ? team.SecondaryColor
+                : ToHex(background.GetContrastColor());
+        }
+
+        return team.SecondaryColor;
+    }
+
+    private static string ToHex(Color color) => $"#{color.R:X2}{color.G:X2}{color.B:X2}";
+
+    private static bool TryParseHex(string hex, out Color color) {
+        color = Color.Black;
+        var value = hex.AsSpan().TrimStart('#');
+        if (value.Length != 6) {
+            return false;
+        }
+
+        if (int.TryParse(value[..2], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var r)
+            && int.TryParse(value[2..4], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var g)
+            && int.TryParse(value[4..6], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var b)) {
+            color = Color.FromArgb(r, g, b);
+            return true;
+        }
+
+        return false;
     }
 }

@@ -60,6 +60,22 @@ public class TeamBadgeTests : WebClientTestContext {
     }
 
     [Fact]
+    public void Falls_back_to_accessible_black_or_white_when_secondary_is_low_contrast() {
+        // Primary and secondary are both dark blues with far too little contrast to read.
+        var team = SampleTeam(textColor: null) with {
+            PrimaryColor = "#0B3D91",
+            SecondaryColor = "#123A80",
+        };
+
+        var markup = RenderBadge(team, team.TeamId);
+
+        Assert.Contains("background-color:#0B3D91", markup);
+        // White is the accessible choice against a dark background; the outline keeps the team color.
+        Assert.Contains("color:#FFFFFF", markup);
+        Assert.Contains("border:1px solid #123A80", markup);
+    }
+
+    [Fact]
     public void Falls_back_to_the_raw_id_when_team_is_unresolved() {
         var cut = Render<TeamBadge>(p => p
             .Add(c => c.Team, (TeamCard?)null)

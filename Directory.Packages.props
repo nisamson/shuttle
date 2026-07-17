@@ -6,6 +6,7 @@
     <FluentUIVersion>5.0.0-rc.4-26180.1</FluentUIVersion>
   </PropertyGroup>
   <ItemGroup>
+    <PackageVersion Include="AccessibleColors" Version="1.0.10" />
     <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.1.0" />
     <PackageVersion Include="Aspire.Hosting.Azure.AppConfiguration" Version="13.1.0" />
     <PackageVersion Include="Aspire.Hosting.Azure.AppContainers" Version="13.1.0" />
