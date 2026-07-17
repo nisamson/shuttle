@@ -50,7 +50,8 @@ public class UserController : ControllerBase {
             .FirstOrDefaultAsync(cancellationToken);
 
         if (user is null) {
-            logger.LogInformation("User {UserIdOrName} not found", userIdOrName);
+            var sanitizedIdOrName = userIdOrName.Replace("\r", string.Empty).Replace("\n", string.Empty);
+            logger.LogInformation("User {UserIdOrName} not found", sanitizedIdOrName);
             return NotFound();
         }
 
