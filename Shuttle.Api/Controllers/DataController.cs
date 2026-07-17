@@ -39,9 +39,9 @@ public class DataController : ControllerBase {
         var lastUpdated = ParseLastUpdated(jobDetail?.JobDataMap.GetString(DbUpdateJob.LastUpdatedKey));
 
         var trigger = await scheduler.GetTrigger(DbUpdateJob.TriggerKey, cancellationToken);
-        var nextUpdate = trigger?.GetNextFireTimeUtc();
+        var nextExpectedUpdate = trigger?.GetNextFireTimeUtc();
 
-        var result = new DataMetaInfo(lastUpdated, nextUpdate);
+        var result = new DataMetaInfo(lastUpdated, nextExpectedUpdate);
 
         SetCacheHeaders();
 
