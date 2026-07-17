@@ -40,22 +40,23 @@ public partial class TeamBadge : ComponentBase {
     }
 
     // Picks the badge's text color, treating WCAG contrast against the primary background as the
-    // top priority. The team's explicit text color is preferred, falling back to the secondary
-    // color; whichever is chosen, if it is not legible against the background we use accessible
-    // black/white instead.
+    // top priority. Candidates are tried in order — the team's explicit text color, then the
+    // secondary color — and the first that is legible against the background wins. When neither
+    // passes, an accessible black/white color is used instead.
     private static string ResolveTextColor(TeamCard team) {
-        var candidate = string.IsNullOrWhiteSpace(team.TextColor)
-            ? team.SecondaryColor
-            : team.TextColor;
-
-        if (TryParseHex(team.PrimaryColor, out var background)
-            && TryParseHex(candidate, out var foreground)) {
-            return WcagContrastColor.IsCompliant(background, foreground)
-                ? candidate
-                : ToHex(background.GetContrastColor());
+        if (!TryParseHex(team.PrimaryColor, out var background)) {
+            return string.IsNullOrWhiteSpace(team.TextColor) ? team.SecondaryColor : team.TextColor;
         }
 
-        return candidate;
+        foreach (var candidate in new[] { team.TextColor, team.SecondaryColor }) {
+            if (!string.IsNullOrWhiteSpace(candidate)
+                && TryParseHex(candidate, out var foreground)
+                && WcagContrastColor.IsCompliant(background, foreground)) {
+                return candidate;
+            }
+        }
+
+        return ToHex(background.GetContrastColor());
     }
 
     private static string ToHex(Color color) => $"#{color.R:X2}{color.G:X2}{color.B:X2}";
