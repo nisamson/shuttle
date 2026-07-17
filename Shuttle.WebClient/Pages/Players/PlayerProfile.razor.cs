@@ -10,6 +10,7 @@ using Plotly.Blazor.Traces;
 using Plotly.Blazor.Traces.ScatterPolarLib;
 using Refit;
 using Shuttle.Api.Client;
+using Shuttle.Models.Leagues;
 using Shuttle.Models.Players;
 using Shuttle.Shl.Api.Models.Common;
 using Shuttle.Shl.Api.Models.Portal.V1;
@@ -24,6 +25,7 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
     [Parameter] public int PlayerId { get; set; }
 
     [Inject] private IShuttlePlayerClient PlayerClient { get; set; } = null!;
+    [Inject] private IShuttleLeagueClient LeagueClient { get; set; } = null!;
     [Inject] private NavigationManager Navigation { get; set; } = null!;
     [Inject] private IShuttleOptionsStorage OptionsStorage { get; set; } = null!;
 
@@ -57,6 +59,9 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
     public void Dispose() => OptionsStorage.OptionsChanged -= OnOptionsChanged;
 
     private PlayerCard? card;
+    private TeamCard? currentTeam;
+    private TeamCard? shlRights;
+    private TeamCard? smjhlRights;
     private bool loading;
     private bool notFound;
     private string? error;
@@ -80,6 +85,9 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
         notFound = false;
         error = null;
         card = null;
+        currentTeam = null;
+        shlRights = null;
+        smjhlRights = null;
         attributeCharts.Clear();
         combinedChart = null;
         jsonDataUrl = null;
@@ -91,6 +99,7 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
                 notFound = true;
             } else {
                 BuildDownload(card);
+                await LoadTeamsAsync(card);
                 if (card.Attributes is not null) {
                     BuildCharts(card);
                     needsRedraw = true;
@@ -406,17 +415,38 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
 
     private sealed record StatRow(string Label, string Value, bool Negative = false, string? Tooltip = null, string? AnchorId = null);
 
-    private IEnumerable<(string Label, string Value)> TeamInfo {
-        get {
-            if (card is null) {
-                yield break;
-            }
+    // Resolves the team badges for the player's current team and SHL/SMJHL rights. Each lookup is
+    // independent and failure-tolerant: an unresolved team simply falls back to its raw id badge, so
+    // a team endpoint hiccup never blocks the rest of the profile from rendering.
+    private async Task LoadTeamsAsync(PlayerCard c) {
+        var tasks = new List<Task>();
 
-            yield return ("Current league", card.CurrentLeague?.Abbreviation ?? "—");
-            yield return ("Current team", card.CurrentTeamId?.ToString() ?? "—");
-            yield return ("SHL rights", card.ShlRightsTeamId?.ToString() ?? "—");
-            yield return ("SMJHL rights", card.SmjhlRightsTeamId?.ToString() ?? "—");
-            yield return ("Draft season", SeasonNumber.Format(card.DraftSeason));
+        if (c is { CurrentTeamId: { } currentTeamId, CurrentLeague: { } currentLeague }) {
+            tasks.Add(ResolveTeamAsync(currentLeague.Abbreviation, currentTeamId, team => currentTeam = team));
+        }
+
+        if (c.ShlRightsTeamId is { } shlTeamId) {
+            tasks.Add(ResolveTeamAsync(KnownLeague.Shl.Abbreviation, shlTeamId, team => shlRights = team));
+        }
+
+        if (c.SmjhlRightsTeamId is { } smjhlTeamId) {
+            tasks.Add(ResolveTeamAsync(KnownLeague.Smjhl.Abbreviation, smjhlTeamId, team => smjhlRights = team));
+        }
+
+        if (tasks.Count > 0) {
+            await Task.WhenAll(tasks);
+        }
+    }
+
+    private async Task ResolveTeamAsync(string league, int teamId, Action<TeamCard?> assign) {
+        try {
+            assign(await LeagueClient.GetTeam(league, teamId));
+        } catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound) {
+            assign(null);
+        } catch (Exception ex) {
+            // A failed team lookup is non-fatal; log and fall back to the raw id badge.
+            Console.Error.WriteLine($"Failed to resolve team {league}/{teamId}: {ex.Message}");
+            assign(null);
         }
     }
 

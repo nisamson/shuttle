@@ -53,6 +53,17 @@ public static class ShuttleApiClientExtensions {
     }
 
     /// <summary>
+    /// Registers the Shuttle backend API league/team Refit client (<see cref="IShuttleLeagueClient"/>)
+    /// pointed at <paramref name="baseAddress"/> (e.g. the value of <c>Api:BaseUrl</c>). The team
+    /// endpoints are public, so no auth message handler is required. Returns the
+    /// <see cref="IHttpClientBuilder"/> so callers can chain additional configuration.
+    /// </summary>
+    public static IHttpClientBuilder AddShuttleLeagueClient(this IServiceCollection services, Uri baseAddress) {
+        return services.AddRefitClient<IShuttleLeagueClient>(CreateRefitSettings())
+            .ConfigureHttpClient(c => c.BaseAddress = baseAddress);
+    }
+
+    /// <summary>
     /// Registers the Shuttle backend API development-only debug Refit client
     /// (<see cref="IShuttleDebugClient"/>) pointed at <paramref name="baseAddress"/> (e.g. the value
     /// of <c>Api:BaseUrl</c>). Returns the <see cref="IHttpClientBuilder"/> so callers can chain an

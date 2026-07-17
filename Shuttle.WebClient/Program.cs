@@ -27,6 +27,9 @@ if (useFakeBackend) {
     // Typed Refit clients for the Shuttle backend API (player endpoints, etc.).
     builder.Services.AddShuttleApiClient(new Uri(apiBaseAddress));
 
+    // The league/team endpoints are public (anonymous), so no access-token handler is attached.
+    builder.Services.AddShuttleLeagueClient(new Uri(apiBaseAddress));
+
     // The user client is attached to the access-token handler so authenticated callers receive the
     // richer (Discord-bearing) projection; anonymous callers fall through without a token.
     builder.Services.AddScoped<ApiAccessTokenHandler>();
