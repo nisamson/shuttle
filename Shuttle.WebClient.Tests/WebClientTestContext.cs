@@ -23,6 +23,7 @@ public abstract class WebClientTestContext : BunitContext {
         Services.AddLogging();
         Services.AddFluentUIComponents();
         Services.AddSingleton<IShuttlePlayerClient>(new InMemoryShuttlePlayerClient());
+        Services.AddSingleton<IShuttleLeagueClient>(new InMemoryShuttleLeagueClient());
         Services.AddSingleton<IShuttleUserClient>(new InMemoryShuttleUserClient());
         Services.AddSingleton<IShuttleDebugClient>(new InMemoryShuttleDebugClient());
         Services.AddSingleton<IPlayerDirectoryService, PlayerDirectoryService>();

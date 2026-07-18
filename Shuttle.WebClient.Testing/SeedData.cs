@@ -1,3 +1,4 @@
+using Shuttle.Models.Leagues;
 using Shuttle.Models.Players;
 using Shuttle.Models.Users;
 using Shuttle.Shl.Api.Models.Common;
@@ -58,6 +59,60 @@ public static class SeedData {
     public static IReadOnlyList<UserSuggestion> UserSuggestions() => Users()
         .Select(u => new UserSuggestion { UserId = u.UserId, Username = u.Username })
         .ToList();
+
+    // The (fixed) season all seeded teams belong to; the seed models a single current season.
+    private const int TeamSeason = 72;
+
+    // The seeded players reference current team ids in the 10..25 range (10 + playerId % 16), so the
+    // team directory covers that contiguous block for both the SHL and SMJHL.
+    private const int FirstTeamId = 10;
+    private const int TeamCount = 16;
+
+    /// <summary>
+    /// The canonical set of seeded teams — a contiguous block of ids for both the SHL and SMJHL —
+    /// used by the WebClient's fake-backend team lookups. Colors are deterministic so tests and
+    /// Playwright snapshots stay stable.
+    /// </summary>
+    public static IReadOnlyList<TeamCard> Teams() =>
+        BuildTeams(KnownLeague.Shl).Concat(BuildTeams(KnownLeague.Smjhl)).ToList();
+
+    private static IEnumerable<TeamCard> BuildTeams(KnownLeague league) {
+        // (location, nickname, abbreviation, primary, secondary, text) — 16 deterministic teams.
+        var specs = new (string Location, string Nickname, string Abbr, string Primary, string Secondary, string? Text)[] {
+            ("Aurora", "Frost", "AUR", "#0B3D91", "#B0C4DE", "#FFFFFF"),
+            ("Bayside", "Sharks", "BAY", "#005F73", "#94D2BD", "#FFFFFF"),
+            ("Cobalt", "Miners", "COB", "#264653", "#E9C46A", "#FFFFFF"),
+            ("Drayton", "Storm", "DRA", "#3D348B", "#7678ED", "#FFFFFF"),
+            ("Elmwood", "Elks", "ELM", "#1B4332", "#95D5B2", "#FFFFFF"),
+            ("Fairhaven", "Falcons", "FAI", "#7F1D1D", "#FCA5A5", "#FFFFFF"),
+            ("Granite", "Grizzlies", "GRA", "#3F3F46", "#A1A1AA", "#FFFFFF"),
+            ("Harbor", "Hawks", "HAR", "#0C4A6E", "#7DD3FC", "#FFFFFF"),
+            ("Ironwood", "Iron", "IRO", "#451A03", "#D97706", "#FFFFFF"),
+            ("Juniper", "Jays", "JUN", "#14532D", "#4ADE80", "#FFFFFF"),
+            ("Kingsport", "Kraken", "KIN", "#312E81", "#818CF8", "#FFFFFF"),
+            ("Lakeview", "Lynx", "LAK", "#134E4A", "#5EEAD4", "#FFFFFF"),
+            ("Meridian", "Monarchs", "MER", "#581C87", "#C084FC", "#FFFFFF"),
+            ("Northgate", "Norse", "NOR", "#0F172A", "#64748B", "#FFFFFF"),
+            ("Oakridge", "Otters", "OAK", "#78350F", "#FBBF24", "#000000"),
+            ("Pinecrest", "Pumas", "PIN", "#500724", "#F472B6", "#FFFFFF"),
+        };
+
+        for (var i = 0; i < TeamCount; i++) {
+            var spec = specs[i];
+            yield return new TeamCard {
+                TeamId = FirstTeamId + i,
+                Season = TeamSeason,
+                League = league.Abbreviation,
+                LeagueId = league.Id,
+                Name = $"{spec.Location} {spec.Nickname}",
+                Abbreviation = spec.Abbr,
+                Location = spec.Location,
+                PrimaryColor = spec.Primary,
+                SecondaryColor = spec.Secondary,
+                TextColor = spec.Text,
+            };
+        }
+    }
 
     // Discord names for a subset of users (keyed by user id), so authenticated-only Discord
     // behaviour has something to surface while other users deliberately have none.

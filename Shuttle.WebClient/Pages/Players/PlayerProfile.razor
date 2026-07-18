@@ -77,9 +77,11 @@
             </div>
             <div class="stat-group">
                 <FluentText Weight="TextWeight.Bold" Block="true">Team &amp; rights</FluentText>
-                @foreach (var (label, value) in TeamInfo) {
-                    <div class="kv"><span class="k">@label</span><span class="v">@value</span></div>
-                }
+                <div class="kv"><span class="k">Current league</span><span class="v">@(card.CurrentLeague?.Abbreviation ?? "—")</span></div>
+                <div class="kv"><span class="k">Current team</span><span class="v"><TeamBadge Team="currentTeam" TeamId="card.CurrentTeamId"/></span></div>
+                <div class="kv"><span class="k">SHL rights</span><span class="v"><TeamBadge Team="shlRights" TeamId="card.ShlRightsTeamId"/></span></div>
+                <div class="kv"><span class="k">SMJHL rights</span><span class="v"><TeamBadge Team="smjhlRights" TeamId="card.SmjhlRightsTeamId"/></span></div>
+                <div class="kv"><span class="k">Draft season</span><span class="v">@SeasonNumber.Format(card.DraftSeason)</span></div>
             </div>
             <div class="stat-group">
                 <FluentText Weight="TextWeight.Bold" Block="true">Details</FluentText>

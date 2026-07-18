@@ -22,6 +22,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="AccessibleColors" />
         <PackageReference Include="Blazor.LocalStorage.WebAssembly" />
         <PackageReference Include="Markdig" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />

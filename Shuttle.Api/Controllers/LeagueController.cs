@@ -1,3 +1,4 @@
+using System.Drawing;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -5,6 +6,7 @@ using Microsoft.Net.Http.Headers;
 using Shuttle.EFCore;
 using Shuttle.Models.Leagues;
 using Shuttle.Shl.Api.Models.Common;
+using TeamEntity = Shuttle.EFCore.Entities.Team;
 
 namespace Shuttle.Api.Controllers;
 
@@ -82,4 +84,66 @@ public class LeagueController : ControllerBase {
             MaxAge = TimeSpan.FromHours(1),
         };
     }
+
+    /// <summary>
+    /// Returns a single team's identity and branding within <paramref name="league"/>. When
+    /// <paramref name="season"/> is supplied the team is looked up for that exact season; otherwise
+    /// the most recent season on file is returned (the team's current branding). Responds
+    /// <c>404 Not Found</c> when the league abbreviation is unknown or no matching team exists.
+    /// </summary>
+    /// <param name="league">The league abbreviation from the route (e.g. "SHL", "SMJHL").</param>
+    /// <param name="teamId">The team id within that league.</param>
+    /// <param name="season">Optional season; defaults to the team's most recent season.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    [HttpGet("{league}/teams/{teamId:int}")]
+    [ProducesResponseType<TeamCard>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<TeamCard>> GetTeam(
+        string league,
+        int teamId,
+        [FromQuery] int? season,
+        CancellationToken cancellationToken) {
+        if (!KnownLeague.TryFromAbbreviation(league, out var knownLeague)) {
+            return NotFound();
+        }
+
+        var leagueId = knownLeague.Id;
+        var query = db.Teams
+            .AsNoTracking()
+            .IgnoreAutoIncludes()
+            .Where(t => t.LeagueId == leagueId && t.TeamId == teamId);
+
+        if (season is { } requestedSeason) {
+            query = query.Where(t => t.Season == requestedSeason);
+        }
+
+        var team = await query
+            .OrderByDescending(t => t.Season)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (team is null) {
+            return NotFound();
+        }
+
+        SetCacheHeaders();
+
+        return Ok(ToTeamCard(team, knownLeague));
+    }
+
+    private static TeamCard ToTeamCard(TeamEntity team, KnownLeague league) =>
+        new() {
+            TeamId = team.TeamId,
+            Season = team.Season,
+            League = league.Abbreviation,
+            LeagueId = team.LeagueId,
+            Name = team.Name,
+            Abbreviation = team.Abbreviation,
+            Location = team.Location,
+            PrimaryColor = ToHex(team.Colors.Primary),
+            SecondaryColor = ToHex(team.Colors.Secondary),
+            TextColor = team.Colors.Text is { } text ? ToHex(text) : null,
+        };
+
+    private static string ToHex(Color color) =>
+        $"#{color.R:X2}{color.G:X2}{color.B:X2}";
 }

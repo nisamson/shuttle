@@ -52,5 +52,25 @@ public static class KnownLeagueExtensions {
                     $"Not expected league abbreviation: {abbreviation}"
                 )
             };
+
+        public static bool TryFromAbbreviation(string? abbreviation, out KnownLeague result) {
+            switch (abbreviation?.ToUpperInvariant()) {
+                case "SHL":
+                    result = KnownLeague.Shl;
+                    return true;
+                case "SMJHL":
+                    result = KnownLeague.Smjhl;
+                    return true;
+                case "IIHF":
+                    result = KnownLeague.Iihf;
+                    return true;
+                case "WJC":
+                    result = KnownLeague.Wjc;
+                    return true;
+                default:
+                    result = default;
+                    return false;
+            }
+        }
     }
 }
