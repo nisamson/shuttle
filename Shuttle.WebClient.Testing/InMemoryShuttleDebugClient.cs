@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
 using Shuttle.Api.Client;
+using Shuttle.Models.Users;
 
 namespace Shuttle.WebClient.Testing;
 
@@ -41,5 +42,12 @@ public sealed class InMemoryShuttleDebugClient : IShuttleDebugClient {
 
         var state = authProvider is null ? null : await authProvider.GetAuthenticationStateAsync();
         return new AdminPingResponse("pong", state?.User.Identity?.Name);
+    }
+
+    public Task<DiscordUsernameResult> GetDiscordUsername(int userId, CancellationToken token = default) {
+        // Deterministic offline stand-in for the forum scrape: non-positive ids resolve to "not
+        // found" (null), everything else yields a stable fake username.
+        var username = userId > 0 ? $"discorduser{userId}" : null;
+        return Task.FromResult(new DiscordUsernameResult(userId, username));
     }
 }
