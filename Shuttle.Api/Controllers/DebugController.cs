@@ -2,8 +2,6 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Shuttle.Api.Filters;
-using Shuttle.Models.Users;
-using Shuttle.Shl.Api.Client;
 
 namespace Shuttle.Api.Controllers;
 
@@ -16,12 +14,6 @@ namespace Shuttle.Api.Controllers;
 [ApiController]
 [Route("[controller]")]
 public class DebugController : ControllerBase {
-    private readonly IShlForumClient forumClient;
-
-    public DebugController(IShlForumClient forumClient) {
-        this.forumClient = forumClient;
-    }
-
     /// <summary>
     /// Returns the roles the API sees for the currently authenticated caller, as resolved from the
     /// validated bearer token. Useful for verifying role mapping between the identity provider and
@@ -37,20 +29,5 @@ public class DebugController : ControllerBase {
             .ToList();
 
         return Ok(roles);
-    }
-
-    /// <summary>
-    /// Scrapes the given forum member's profile page (via <see cref="IShlForumClient"/>) and returns
-    /// the Discord username listed on it, if any. Intended for verifying the forum scraper against
-    /// live data; the result's <see cref="DiscordUsernameResult.DiscordUsername"/> is <c>null</c>
-    /// when the profile lists no Discord username.
-    /// </summary>
-    [HttpGet("users/{userId:int}/discord")]
-    [ProducesResponseType<DiscordUsernameResult>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<DiscordUsernameResult>> GetDiscordUsername(
-        int userId,
-        CancellationToken cancellationToken) {
-        var username = await forumClient.GetDiscordUsername(userId, cancellationToken);
-        return Ok(new DiscordUsernameResult(userId, username));
     }
 }

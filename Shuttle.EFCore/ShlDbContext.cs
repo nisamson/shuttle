@@ -22,6 +22,8 @@ public class ShlDbContext : DbContext {
     
     public DbSet<ShlUser> Users { get; set; }
 
+    public DbSet<ShuttleUser> ShuttleUsers { get; set; }
+
     public DbSet<League> Leagues { get; set; }
     
     public DbSet<LeagueSeason> Seasons { get; set; }

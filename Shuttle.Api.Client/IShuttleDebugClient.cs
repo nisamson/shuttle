@@ -1,5 +1,4 @@
 using Refit;
-using Shuttle.Models.Users;
 
 namespace Shuttle.Api.Client;
 
@@ -21,16 +20,6 @@ public interface IShuttleDebugClient {
     /// <param name="token">A cancellation token.</param>
     [Get("/debug/roles")]
     Task<IReadOnlyList<string>> GetServerRoles(CancellationToken token = default);
-
-    /// <summary>
-    /// Scrapes the given forum member's profile page on the server (via the forum client) and returns
-    /// the Discord username listed on it, if any. Development-only; the API returns 404 outside the
-    /// Development environment.
-    /// </summary>
-    /// <param name="userId">The forum member id to look up.</param>
-    /// <param name="token">A cancellation token.</param>
-    [Get("/debug/users/{userId}/discord")]
-    Task<DiscordUsernameResult> GetDiscordUsername(int userId, CancellationToken token = default);
 
     /// <summary>
     /// Calls the admin-gated <c>GET /admin/ping</c> endpoint. Unlike the other members this endpoint

@@ -10,10 +10,14 @@ public static class Routes {
         public const string Logout = $"{Root}/logout";
     }
 
+    public static class Account {
+        public const string Root = "/account";
+        public const string Settings = $"{Root}/settings";
+    }
+
     public static class Debug {
         public const string Claims = "/debug/claims";
         public const string Roles = "/debug/roles";
-        public const string Discord = "/debug/discord";
     }
 
     public static class Admin {

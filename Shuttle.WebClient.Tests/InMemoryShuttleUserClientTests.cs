@@ -1,3 +1,5 @@
+using System.Net;
+using Refit;
 using Shuttle.Models.Users;
 using Shuttle.WebClient.Testing;
 
@@ -144,5 +146,56 @@ public class InMemoryShuttleUserClientTests {
 
         Assert.NotEmpty(suggestions);
         Assert.All(suggestions, s => Assert.False(string.IsNullOrWhiteSpace(s.Username)));
+    }
+
+    [Fact]
+    public async Task GetCurrentUser_creates_account_keyed_to_the_callers_object_id() {
+        var oid = Guid.Parse("00000000-0000-0000-0000-0000000000aa");
+        var client = new InMemoryShuttleUserClient(
+            new FakeAuthenticationStateProvider(new FakeAuthOptions {
+                IsAuthenticated = true,
+                UserId = oid.ToString(),
+            }));
+
+        var me = await client.GetCurrentUser();
+
+        Assert.Equal(oid, me.Id);
+        // Default username mirrors the server: the id's "N" (dashless) form.
+        Assert.Equal(oid.ToString("N"), me.Username);
+    }
+
+    [Fact]
+    public async Task GetCurrentUser_throws_401_for_anonymous_callers() {
+        var ex = await Assert.ThrowsAsync<ApiException>(() => Anonymous().GetCurrentUser());
+
+        Assert.Equal(HttpStatusCode.Unauthorized, ex.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateCurrentUser_applies_a_valid_new_username() {
+        var client = Authenticated();
+
+        var updated = await client.UpdateCurrentUser(new UpdateCurrentUserRequest { Username = "new_name.01" });
+
+        Assert.Equal("new_name.01", updated.Username);
+        Assert.Equal(updated.Username, (await client.GetCurrentUser()).Username);
+    }
+
+    [Fact]
+    public async Task UpdateCurrentUser_rejects_an_invalid_username_with_400() {
+        var ex = await Assert.ThrowsAsync<ApiException>(
+            () => Authenticated().UpdateCurrentUser(new UpdateCurrentUserRequest { Username = "no spaces!" }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, ex.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateCurrentUser_rejects_a_taken_username_with_409() {
+        var taken = (await Anonymous().GetUserSuggestions())[0].Username;
+
+        var ex = await Assert.ThrowsAsync<ApiException>(
+            () => Authenticated().UpdateCurrentUser(new UpdateCurrentUserRequest { Username = taken }));
+
+        Assert.Equal(HttpStatusCode.Conflict, ex.StatusCode);
     }
 }

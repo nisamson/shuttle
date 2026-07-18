@@ -4,6 +4,7 @@ using Microsoft.Identity.Web;
 using Microsoft.Identity.Web.TokenCacheProviders.InMemory;
 using Microsoft.Identity.Web.UI;
 using Shuttle.Api;
+using Shuttle.Api.Services.Users;
 using Shuttle.EFCore;
 using Shuttle.ServiceDefaults;
 using Shuttle.Shl.Api.Client;
@@ -56,6 +57,8 @@ builder.Services.AddShlApiClients();
 
 builder.AddShuttleDatabase();
 builder.AddQuartz();
+
+builder.Services.AddUserService();
 
 builder.Services.AddControllersWithViews()
     .AddMicrosoftIdentityUI();

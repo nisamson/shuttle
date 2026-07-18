@@ -34,24 +34,4 @@ public class InMemoryShuttleDebugClientTests {
 
         Assert.Empty(await client.GetServerRoles());
     }
-
-    [Fact]
-    public async Task GetDiscordUsername_returns_a_deterministic_username_for_a_valid_id() {
-        var client = new InMemoryShuttleDebugClient();
-
-        var result = await client.GetDiscordUsername(42);
-
-        Assert.Equal(42, result.UserId);
-        Assert.Equal("discorduser42", result.DiscordUsername);
-    }
-
-    [Fact]
-    public async Task GetDiscordUsername_returns_null_username_for_a_non_positive_id() {
-        var client = new InMemoryShuttleDebugClient();
-
-        var result = await client.GetDiscordUsername(0);
-
-        Assert.Equal(0, result.UserId);
-        Assert.Null(result.DiscordUsername);
-    }
 }
