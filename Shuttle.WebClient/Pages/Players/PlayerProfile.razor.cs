@@ -53,6 +53,10 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
             BuildCharts(card);
         }
 
+        if (timelinePoints is not null) {
+            BuildTimeline(timelinePoints);
+        }
+
         needsRedraw = true;
     }
 
@@ -78,6 +82,16 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
     private bool groupedView = true;
     private bool needsRedraw;
 
+    private const string AttributesTabId = "attributes";
+    private const string TimelineTabId = "tpe-timeline";
+    private string activeTabId = AttributesTabId;
+
+    private AttributeChart? timelineChart;
+    private IReadOnlyList<TpeTimelinePoint>? timelinePoints;
+    private bool timelineLoading;
+    private bool timelineLoaded;
+    private string? timelineError;
+
     protected override async Task OnParametersSetAsync() => await LoadAsync();
 
     private async Task LoadAsync() {
@@ -92,6 +106,11 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
         combinedChart = null;
         jsonDataUrl = null;
         jsonFileName = null;
+        activeTabId = AttributesTabId;
+        timelineChart = null;
+        timelineLoading = false;
+        timelineLoaded = false;
+        timelineError = null;
 
         try {
             card = await PlayerClient.GetPlayer(PlayerId);
@@ -116,6 +135,36 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
 
     private void OnViewChanged() => needsRedraw = true;
 
+    // The TPE timeline is loaded lazily the first time its tab is opened so profiles that are never
+    // inspected for progression don't incur the extra backend call. Every tab change also flags a
+    // redraw so the now-visible chart resizes to its container (hidden charts render at zero size).
+    private async Task OnTabChangedAsync() {
+        if (activeTabId == TimelineTabId && !timelineLoaded && !timelineLoading) {
+            await LoadTimelineAsync();
+        }
+
+        needsRedraw = true;
+    }
+
+    private async Task LoadTimelineAsync() {
+        timelineLoading = true;
+        timelineError = null;
+        StateHasChanged();
+
+        try {
+            var timeline = await PlayerClient.GetPlayerTpeTimeline(PlayerId);
+            BuildTimeline(timeline);
+        } catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound) {
+            timelineChart = null;
+        } catch (Exception ex) {
+            timelineError = ex.Message;
+        } finally {
+            timelineLoading = false;
+            timelineLoaded = true;
+            needsRedraw = true;
+        }
+    }
+
     private void BuildDownload(PlayerCard c) {
         var json = JsonSerializer.Serialize(c, JsonOptions);
         jsonDataUrl = "data:application/json;charset=utf-8," + Uri.EscapeDataString(json);
@@ -129,11 +178,13 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
 
         needsRedraw = false;
 
-        // Only redraw the charts for the currently visible view; the hidden view's
-        // components have been disposed, so their captured refs must not be touched.
-        var visible = groupedView
-            ? (IEnumerable<AttributeChart>)attributeCharts
-            : combinedChart is null ? Array.Empty<AttributeChart>() : new[] { combinedChart };
+        // Only redraw the charts for the currently visible tab/view; the hidden ones may have been
+        // disposed, so their captured refs must not be touched.
+        var visible = activeTabId == TimelineTabId
+            ? timelineChart is null ? Array.Empty<AttributeChart>() : new[] { timelineChart }
+            : groupedView
+                ? (IEnumerable<AttributeChart>)attributeCharts
+                : combinedChart is null ? Array.Empty<AttributeChart>() : new[] { combinedChart };
         foreach (var group in visible) {
             if (group.Chart is null) {
                 continue;
@@ -145,6 +196,32 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
                 // The chart was disposed mid-toggle; the new view will redraw itself.
             }
         }
+    }
+
+    private void BuildTimeline(IReadOnlyList<TpeTimelinePoint>? timeline) {
+        timelinePoints = timeline;
+        timelineChart = null;
+
+        if (timeline is null || timeline.Count == 0) {
+            return;
+        }
+
+        timelineChart = new AttributeChart {
+            Title = "Total TPE",
+            Layout = BuildTimelineLayout(darkMode),
+            Data = new List<ITrace> {
+                new Plotly.Blazor.Traces.Scatter {
+                    X = timeline.Select(p => (object)p.TaskDate).ToList(),
+                    Y = timeline.Select(p => (object)p.TotalTpe).ToList(),
+                    Mode = Plotly.Blazor.Traces.ScatterLib.ModeFlag.Lines | Plotly.Blazor.Traces.ScatterLib.ModeFlag.Markers,
+                    // A step ("hv") line reflects that the cumulative total holds until the next event.
+                    Line = new Plotly.Blazor.Traces.ScatterLib.Line {
+                        Shape = Plotly.Blazor.Traces.ScatterLib.LineLib.ShapeEnum.Hv,
+                    },
+                    Name = "Total TPE",
+                },
+            },
+        };
     }
 
     private void BuildCharts(PlayerCard c) {
@@ -347,6 +424,30 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
                     Color = foreground,
                     GridColor = grid,
                 },
+            },
+        };
+    }
+
+    // Themed cartesian layout for the TPE timeline: a date x-axis with an auto-ranged TPE y-axis.
+    private static Plotly.Blazor.Layout BuildTimelineLayout(bool dark) {
+        const string transparent = "rgba(0,0,0,0)";
+        var foreground = dark ? "#e6e6e6" : "#242424";
+        var grid = dark ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.16)";
+
+        return new Plotly.Blazor.Layout {
+            AutoSize = true,
+            PaperBgColor = transparent,
+            PlotBgColor = transparent,
+            Font = new Plotly.Blazor.LayoutLib.Font { Color = foreground },
+            XAxis = new List<Plotly.Blazor.LayoutLib.XAxis> {
+                new() {
+                    Type = Plotly.Blazor.LayoutLib.XAxisLib.TypeEnum.Date,
+                    Color = foreground,
+                    GridColor = grid,
+                },
+            },
+            YAxis = new List<Plotly.Blazor.LayoutLib.YAxis> {
+                new() { Color = foreground, GridColor = grid },
             },
         };
     }

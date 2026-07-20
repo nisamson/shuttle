@@ -1,4 +1,5 @@
-﻿using LinqToDB;
+﻿using System.Threading.Tasks.Dataflow;
+using LinqToDB;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Shuttle.EFCore.Entities;
@@ -55,6 +56,9 @@ public class PortalUpdater {
         dbContext.ChangeTracker.Clear();
         
         await UpdatePlayerIndexEntries(players, token);
+        dbContext.ChangeTracker.Clear();
+
+        await UpdatePlayerTpeEvents(players, token);
         dbContext.ChangeTracker.Clear();
     }
 
@@ -125,5 +129,89 @@ public class PortalUpdater {
             .UpdateWhenMatched()
             .MergeAsync(token);
         logger.LogInformation("Changed {Count} player index entries", changed);
+    }
+
+    // Maximum number of concurrent TPE-timeline requests to the portal. The timeline endpoint is
+    // per-player, so this bounds the fan-out while keeping the whole ingest from running serially.
+    private const int TpeTimelineConcurrency = 8;
+
+    // Only ingest TPE timelines for players who are still progressing: active players, plus players
+    // who retired recently enough that late-arriving TPE could still land. Long-retired, pending, and
+    // denied players have static (or non-existent) timelines, so skipping them avoids wasted calls.
+    private static readonly TimeSpan RetiredTpeGracePeriod = TimeSpan.FromDays(90);
+
+    private static bool ShouldIngestTpeEvents(PlayerInfo player, DateTime nowUtc) => player.Status switch {
+        PlayerStatus.Active => true,
+        PlayerStatus.Retired => player.RetirementDate is { } retired && retired >= nowUtc - RetiredTpeGracePeriod,
+        _ => false,
+    };
+
+    private async Task UpdatePlayerTpeEvents(IList<PlayerInfo> playerInfo, CancellationToken token = default) {
+        using var activity = ActivitySources.ShuttleEfCore.StartActivity();
+        var nowUtc = DateTime.UtcNow;
+        var eligible = playerInfo.Where(p => ShouldIngestTpeEvents(p, nowUtc)).ToList();
+        logger.LogInformation(
+            "Updating player TPE events for {Eligible}/{Total} eligible players",
+            eligible.Count,
+            playerInfo.Count);
+
+        var totalChanged = 0;
+        var processed = 0;
+
+        // Fetch timelines concurrently but merge them one player at a time: a single merge over every
+        // player's events is large enough to time out, and the shared DbContext isn't thread-safe.
+        var fetchBlock = new TransformBlock<PlayerInfo, (int PlayerId, IList<TpeTimelineEntry> Timeline)>(
+            async player => (player.PlayerId, await portalClient.GetTpeTimeline(player.PlayerId, token)),
+            new ExecutionDataflowBlockOptions {
+                MaxDegreeOfParallelism = TpeTimelineConcurrency,
+                BoundedCapacity = TpeTimelineConcurrency * 2,
+                CancellationToken = token,
+            });
+
+        var mergeBlock = new ActionBlock<(int PlayerId, IList<TpeTimelineEntry> Timeline)>(
+            async item => {
+                totalChanged += await MergePlayerTpeEvents(item.PlayerId, item.Timeline, token);
+                if (++processed % 100 == 0) {
+                    logger.LogInformation("Ingested TPE timelines for {Processed}/{Total} players", processed, eligible.Count);
+                }
+            },
+            new ExecutionDataflowBlockOptions {
+                // A single merge worker keeps DbContext access serialized.
+                MaxDegreeOfParallelism = 1,
+                BoundedCapacity = TpeTimelineConcurrency * 2,
+                CancellationToken = token,
+            });
+
+        fetchBlock.LinkTo(mergeBlock, new DataflowLinkOptions { PropagateCompletion = true });
+
+        foreach (var player in eligible) {
+            await fetchBlock.SendAsync(player, token);
+        }
+
+        fetchBlock.Complete();
+        await mergeBlock.Completion;
+
+        logger.LogInformation("Changed {Count} player TPE events", totalChanged);
+    }
+
+    private async Task<int> MergePlayerTpeEvents(int playerId, IList<TpeTimelineEntry> timeline, CancellationToken token) {
+        if (timeline.Count == 0) {
+            return 0;
+        }
+
+        // The portal can, in principle, return more than one entry for the same timestamp; collapse
+        // on TaskDate (playerId is fixed here) so this player's merge source stays key-unique.
+        var events = timeline
+            .Select(entry => TpeEvent.FromShlApi(playerId, entry))
+            .GroupBy(e => e.TaskDate)
+            .Select(g => g.Last())
+            .ToList();
+
+        return await dbContext.TpeEvents.Merge()
+            .Using(events)
+            .OnTargetKey()
+            .InsertWhenNotMatched()
+            .UpdateWhenMatchedAnd((t, s) => t.TotalTpe != s.TotalTpe)
+            .MergeAsync(token);
     }
 }

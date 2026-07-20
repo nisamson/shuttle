@@ -41,4 +41,14 @@ public interface IShuttlePlayerClient {
     /// <param name="token">A cancellation token.</param>
     [Get("/player/{playerId}")]
     Task<PlayerCard?> GetPlayer(int playerId, CancellationToken token = default);
+
+    /// <summary>
+    /// Fetches the player's TPE timeline (cumulative total TPE over time), ordered chronologically.
+    /// Returns <see langword="null"/> when no player with that id exists (HTTP 404); an existing
+    /// player with no recorded events yields an empty list.
+    /// </summary>
+    /// <param name="playerId">The SHL player id.</param>
+    /// <param name="token">A cancellation token.</param>
+    [Get("/player/{playerId}/tpe-timeline")]
+    Task<IReadOnlyList<TpeTimelinePoint>?> GetPlayerTpeTimeline(int playerId, CancellationToken token = default);
 }

@@ -46,6 +46,31 @@ public sealed class InMemoryShuttlePlayerClient : IShuttlePlayerClient {
     public Task<PlayerCard?> GetPlayer(int playerId, CancellationToken token = default) =>
         Task.FromResult(players.FirstOrDefault(p => p.PlayerId == playerId));
 
+    public Task<IReadOnlyList<TpeTimelinePoint>?> GetPlayerTpeTimeline(int playerId, CancellationToken token = default) {
+        var player = players.FirstOrDefault(p => p.PlayerId == playerId);
+        return Task.FromResult(player is null ? null : BuildTimeline(player));
+    }
+
+    // Synthesizes a deterministic, monotonically increasing TPE ramp from the player's creation date
+    // up to their current TotalTpe, so the offline profile renders a real timeline chart. Players
+    // with no TPE (e.g. pending/denied) yield an empty timeline, exercising the "no data" state.
+    private static IReadOnlyList<TpeTimelinePoint> BuildTimeline(PlayerCard player) {
+        const int steps = 6;
+        if (player.TotalTpe <= 0) {
+            return Array.Empty<TpeTimelinePoint>();
+        }
+
+        var points = new List<TpeTimelinePoint>(steps);
+        for (var i = 1; i <= steps; i++) {
+            points.Add(new TpeTimelinePoint {
+                TaskDate = player.CreationDate.AddDays(30 * (i - 1)),
+                TotalTpe = (int)Math.Round(player.TotalTpe * ((double)i / steps)),
+            });
+        }
+
+        return points;
+    }
+
     public Task<PagedResult<PlayerCard>> SearchPlayers(PlayerSearchQuery query, CancellationToken token = default) {
         var filtered = ApplyFilters(players, query).ToList();
         var totalCount = filtered.Count;

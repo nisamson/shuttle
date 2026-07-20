@@ -93,38 +93,64 @@
 
         <FluentDivider/>
 
-        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
-            <FluentText Size="TextSize.Size500" Weight="TextWeight.Bold">Attributes</FluentText>
-            @if (ExcludedAttributeLabels is not null) {
-                <FluentIcon Id="attributes-hint" Value="@(new Icons.Regular.Size16.Info())" Class="attributes-hint"/>
-                <FluentTooltip Anchor="attributes-hint">
-                    Attributes identical for every player (@ExcludedAttributeLabels) are not shown.
-                </FluentTooltip>
-            }
-            @if (card.Attributes is not null && combinedChart is not null) {
-                <FluentSpacer/>
-                <FluentSwitch @bind-Value="groupedView" @bind-Value:after="OnViewChanged">Break out by category</FluentSwitch>
-            }
-        </FluentStack>
-        @if (card.Attributes is null || combinedChart is null) {
-            <FluentText>No in-game attributes have been ingested for this player yet.</FluentText>
-        } else {
-            @if (groupedView) {
-                <div class="attribute-charts">
-                    @foreach (var group in attributeCharts) {
-                        <div class="attribute-chart">
-                            <FluentText Weight="TextWeight.Bold" Block="true" Class="chart-title">@group.Title</FluentText>
-                            <div class="chart-surface">
-                                <PlotlyChart Config="chartConfig" Layout="group.Layout" Data="group.Data" @ref="group.Chart"/>
+        <FluentTabs @bind-ActiveTabId="activeTabId" @bind-ActiveTabId:after="OnTabChangedAsync" Width="100%">
+            <FluentTab Header="Attributes" Id="@AttributesTabId">
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="16">
+                    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
+                        <FluentText Size="TextSize.Size500" Weight="TextWeight.Bold">Attributes</FluentText>
+                        @if (ExcludedAttributeLabels is not null) {
+                            <FluentIcon Id="attributes-hint" Value="@(new Icons.Regular.Size16.Info())" Class="attributes-hint"/>
+                            <FluentTooltip Anchor="attributes-hint">
+                                Attributes identical for every player (@ExcludedAttributeLabels) are not shown.
+                            </FluentTooltip>
+                        }
+                        @if (card.Attributes is not null && combinedChart is not null) {
+                            <FluentSpacer/>
+                            <FluentSwitch @bind-Value="groupedView" @bind-Value:after="OnViewChanged">Break out by category</FluentSwitch>
+                        }
+                    </FluentStack>
+                    @if (card.Attributes is null || combinedChart is null) {
+                        <FluentText>No in-game attributes have been ingested for this player yet.</FluentText>
+                    } else {
+                        @if (groupedView) {
+                            <div class="attribute-charts">
+                                @foreach (var group in attributeCharts) {
+                                    <div class="attribute-chart">
+                                        <FluentText Weight="TextWeight.Bold" Block="true" Class="chart-title">@group.Title</FluentText>
+                                        <div class="chart-surface">
+                                            <PlotlyChart Config="chartConfig" Layout="group.Layout" Data="group.Data" @ref="group.Chart"/>
+                                        </div>
+                                    </div>
+                                }
                             </div>
+                        } else {
+                            <div class="attribute-chart-single">
+                                <PlotlyChart Config="chartConfig" Layout="combinedChart.Layout" Data="combinedChart.Data" @ref="combinedChart.Chart"/>
+                            </div>
+                        }
+                    }
+                </FluentStack>
+            </FluentTab>
+            <FluentTab Header="TPE timeline" Id="@TimelineTabId">
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="16">
+                    @if (!timelineLoaded || timelineLoading) {
+                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
+                            <FluentSpinner/>
+                            <FluentText>Loading TPE timeline…</FluentText>
+                        </FluentStack>
+                    } else if (timelineError is not null) {
+                        <FluentMessageBar Intent="MessageBarIntent.Error" Title="Failed to load TPE timeline">
+                            @timelineError
+                        </FluentMessageBar>
+                    } else if (timelineChart is null) {
+                        <FluentText>No TPE timeline has been recorded for this player yet.</FluentText>
+                    } else {
+                        <div class="attribute-chart-single">
+                            <PlotlyChart Config="chartConfig" Layout="timelineChart.Layout" Data="timelineChart.Data" @ref="timelineChart.Chart"/>
                         </div>
                     }
-                </div>
-            } else {
-                <div class="attribute-chart-single">
-                    <PlotlyChart Config="chartConfig" Layout="combinedChart.Layout" Data="combinedChart.Data" @ref="combinedChart.Chart"/>
-                </div>
-            }
-        }
+                </FluentStack>
+            </FluentTab>
+        </FluentTabs>
     }
 </FluentStack>
