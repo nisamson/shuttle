@@ -15,6 +15,7 @@
     <PackageVersion Include="Aspire.Hosting.Azure.Sql" Version="13.1.2" />
     <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.1.0" />
     <PackageVersion Include="Aspire.Microsoft.Data.SqlClient" Version="13.1.2" />
+    <PackageVersion Include="AngleSharp" Version="1.5.0" />
     <PackageVersion Include="Azure.Identity" Version="1.17.2" />
     <PackageVersion Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.4.0" />
     <PackageVersion Include="Blazor.LocalStorage.WebAssembly" Version="9.0.1" />
@@ -38,7 +39,6 @@
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.3" />
     <PackageVersion Include="Microsoft.Authentication.WebAssembly.Msal" Version="10.0.3" />
     <PackageVersion Include="Microsoft.Azure.Functions.Worker" Version="2.51.0" />
-    <PackageVersion Include="StreamRegex.Extensions" Version="1.2.7" />
     <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.2.3" />
     <PackageVersion Include="Microsoft.Azure.Functions.Worker.ApplicationInsights" Version="2.50.0" />
     <PackageVersion Include="Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore" Version="2.1.0" />

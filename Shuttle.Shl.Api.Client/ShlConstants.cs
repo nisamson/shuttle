@@ -1,10 +1,9 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Threading.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Polly;
 using Polly.Retry;
 using Refit;
-using Shuttle.Shl.Api.Client.Forums;
 
 namespace Shuttle.Shl.Api.Client;
 
@@ -72,12 +71,6 @@ public static class ShlConstants {
                     c.DefaultRequestHeaders.Add("User-Agent", UserAgent);
                 }
             );
-
-        var forumPolicy = CreatePolicy();
-        services.AddHttpClient<IShlForumClient, ShlForumClient>(c => {
-                c.DefaultRequestHeaders.Add("User-Agent", UserAgent);
-            })
-            .AddPolicyHandler(forumPolicy);
 
         return services;
     }

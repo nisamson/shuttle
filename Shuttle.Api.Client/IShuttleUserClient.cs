@@ -44,4 +44,23 @@ public interface IShuttleUserClient {
     /// <param name="token">A cancellation token.</param>
     [Get("/users/suggestions")]
     Task<IReadOnlyList<UserSuggestion>> GetUserSuggestions(CancellationToken token = default);
+
+    /// <summary>
+    /// Fetches the authenticated caller's own account (<c>GET /users/me</c>), creating it lazily on
+    /// first access. Requires an authenticated caller; the backend responds 401 otherwise.
+    /// </summary>
+    /// <param name="token">A cancellation token.</param>
+    [Get("/users/me")]
+    Task<CurrentUser> GetCurrentUser(CancellationToken token = default);
+
+    /// <summary>
+    /// Updates the mutable fields of the caller's own account (<c>PUT /users/me</c>). Refit surfaces a
+    /// <see cref="ValidationApiException"/> when the username fails validation (400) and an
+    /// <see cref="ApiException"/> with <see cref="System.Net.HttpStatusCode.Conflict"/> when the
+    /// username is already taken (409).
+    /// </summary>
+    /// <param name="request">The account fields to update.</param>
+    /// <param name="token">A cancellation token.</param>
+    [Put("/users/me")]
+    Task<CurrentUser> UpdateCurrentUser([Body] UpdateCurrentUserRequest request, CancellationToken token = default);
 }

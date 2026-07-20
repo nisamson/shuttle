@@ -9,7 +9,10 @@
     <FluentDivider/>
     <AuthorizeView>
         <Authorized>
-            <FluentNavItem OnClick="BeginLogout" Tooltip="Logout" IconRest="@(new Icons.Regular.Size20.SignOut())">Logout</FluentNavItem>
+            <FluentNavCategory Title="Account" Tooltip="Account" IconRest="@(new Icons.Regular.Size20.PersonCircle())">
+                <FluentNavItem Href="@Routes.Account.Settings" Match="NavLinkMatch.All" Tooltip="Settings" IconRest="@(new Icons.Regular.Size20.Settings())">Settings</FluentNavItem>
+                <FluentNavItem OnClick="BeginLogout" Tooltip="Logout" IconRest="@(new Icons.Regular.Size20.SignOut())">Logout</FluentNavItem>
+            </FluentNavCategory>
         </Authorized>
         <NotAuthorized>
             <FluentNavItem OnClick="BeginLogin" Tooltip="Login" IconRest="@(new Icons.Regular.Size20.PersonArrowRight())">Login</FluentNavItem>
@@ -26,7 +29,6 @@
         <FluentNavCategory Title="Debug" Tooltip="Debug" IconRest="@(new Icons.Regular.Size20.Bug())">
             <FluentNavItem Href="@Routes.Debug.Claims" Match="NavLinkMatch.All" Tooltip="Claims" IconRest="@(new Icons.Regular.Size20.Key())">Claims</FluentNavItem>
             <FluentNavItem Href="@Routes.Debug.Roles" Match="NavLinkMatch.All" Tooltip="Roles" IconRest="@(new Icons.Regular.Size20.PersonBoard())">Roles</FluentNavItem>
-            <FluentNavItem Href="@Routes.Debug.Discord" Match="NavLinkMatch.All" Tooltip="Discord Lookup" IconRest="@(new Icons.Regular.Size20.Chat())">Discord Lookup</FluentNavItem>
         </FluentNavCategory>
     }
     <FluentNavCategory Title="Legal" Tooltip="Legal" IconRest="@(new Icons.Regular.Size20.Gavel())">

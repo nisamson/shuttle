@@ -1,4 +1,7 @@
+using System.Net;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Components.Authorization;
+using Refit;
 using Shuttle.Api.Client;
 using Shuttle.Models.Players;
 using Shuttle.Models.Users;
@@ -11,12 +14,13 @@ namespace Shuttle.WebClient.Testing;
 /// enough that the WebClient behaves identically against it: Discord names are only surfaced when the
 /// (fake) caller is authenticated, and player cards follow the same null-vs-empty contract.
 /// </summary>
-public sealed class InMemoryShuttleUserClient : IShuttleUserClient {
+public sealed partial class InMemoryShuttleUserClient : IShuttleUserClient {
     private const int MaxPageSize = 100;
 
     private readonly IReadOnlyList<PlayerCard> players;
     private readonly IReadOnlyList<SeedUser> users;
     private readonly AuthenticationStateProvider? authProvider;
+    private CurrentUser? currentUser;
 
     /// <summary>Creates a client backed by the default <see cref="SeedData"/>.</summary>
     public InMemoryShuttleUserClient(AuthenticationStateProvider? authProvider = null)
@@ -107,6 +111,61 @@ public sealed class InMemoryShuttleUserClient : IShuttleUserClient {
     public Task<IReadOnlyList<UserSuggestion>> GetUserSuggestions(CancellationToken token = default) =>
         Task.FromResult<IReadOnlyList<UserSuggestion>>(
             users.Select(u => new UserSuggestion { UserId = u.UserId, Username = u.Username }).ToList());
+
+    public async Task<CurrentUser> GetCurrentUser(CancellationToken token = default) {
+        await EnsureAuthenticatedAsync();
+        return currentUser ??= await BuildDefaultCurrentUserAsync();
+    }
+
+    public async Task<CurrentUser> UpdateCurrentUser(
+        UpdateCurrentUserRequest request,
+        CancellationToken token = default) {
+        await EnsureAuthenticatedAsync();
+        var existing = currentUser ??= await BuildDefaultCurrentUserAsync();
+
+        var username = request.Username;
+        if (!UsernameRegex().IsMatch(username)) {
+            throw await ApiError(HttpMethod.Put, HttpStatusCode.BadRequest);
+        }
+
+        // Mirror the server's unique-username contract: reject a name already used by a seeded user.
+        if (users.Any(u => string.Equals(u.Username, username, StringComparison.OrdinalIgnoreCase))) {
+            throw await ApiError(HttpMethod.Put, HttpStatusCode.Conflict);
+        }
+
+        currentUser = existing with { Username = username };
+        return currentUser;
+    }
+
+    // Derives the caller's account from the (fake) identity: a stable id from the oid claim and a
+    // default username of the id's "N" form, matching the server's get-or-create behaviour.
+    private async Task<CurrentUser> BuildDefaultCurrentUserAsync() {
+        var id = Guid.NewGuid();
+        if (authProvider is not null) {
+            var state = await authProvider.GetAuthenticationStateAsync();
+            var oid = state.User.FindFirst("oid")?.Value;
+            if (Guid.TryParse(oid, out var parsed)) {
+                id = parsed;
+            }
+        }
+
+        return new CurrentUser { Id = id, Username = id.ToString("N") };
+    }
+
+    private async Task EnsureAuthenticatedAsync() {
+        if (!await IsAuthenticatedAsync()) {
+            throw await ApiError(HttpMethod.Get, HttpStatusCode.Unauthorized);
+        }
+    }
+
+    private static async Task<ApiException> ApiError(HttpMethod method, HttpStatusCode status) {
+        using var request = new HttpRequestMessage(method, "/users/me");
+        using var response = new HttpResponseMessage(status);
+        return await ApiException.Create(request, method, response, new RefitSettings());
+    }
+
+    [GeneratedRegex("^[A-Za-z0-9._]{2,32}$")]
+    private static partial Regex UsernameRegex();
 
     // UserId is a stable tiebreaker so paging is deterministic, matching the server.
     private static IEnumerable<SeedUser> ApplySort(IEnumerable<SeedUser> source, UserSearchQuery query) {
