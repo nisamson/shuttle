@@ -1,4 +1,5 @@
-﻿using LinqToDB;
+﻿using System.Threading.Tasks.Dataflow;
+using LinqToDB;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Shuttle.EFCore.Entities;
@@ -154,40 +155,63 @@ public class PortalUpdater {
             eligible.Count,
             playerInfo.Count);
 
-        var events = new List<TpeEvent>();
+        var totalChanged = 0;
         var processed = 0;
-        for (var i = 0; i < eligible.Count; i += TpeTimelineConcurrency) {
-            var chunk = eligible.Skip(i).Take(TpeTimelineConcurrency).ToList();
-            var timelines = await Task.WhenAll(chunk.Select(async player => (
-                player.PlayerId,
-                Timeline: await portalClient.GetTpeTimeline(player.PlayerId, token)
-            )));
 
-            foreach (var (playerId, timeline) in timelines) {
-                foreach (var entry in timeline) {
-                    events.Add(TpeEvent.FromShlApi(playerId, entry));
+        // Fetch timelines concurrently but merge them one player at a time: a single merge over every
+        // player's events is large enough to time out, and the shared DbContext isn't thread-safe.
+        var fetchBlock = new TransformBlock<PlayerInfo, (int PlayerId, IList<TpeTimelineEntry> Timeline)>(
+            async player => (player.PlayerId, await portalClient.GetTpeTimeline(player.PlayerId, token)),
+            new ExecutionDataflowBlockOptions {
+                MaxDegreeOfParallelism = TpeTimelineConcurrency,
+                BoundedCapacity = TpeTimelineConcurrency * 2,
+                CancellationToken = token,
+            });
+
+        var mergeBlock = new ActionBlock<(int PlayerId, IList<TpeTimelineEntry> Timeline)>(
+            async item => {
+                totalChanged += await MergePlayerTpeEvents(item.PlayerId, item.Timeline, token);
+                if (++processed % 100 == 0) {
+                    logger.LogInformation("Ingested TPE timelines for {Processed}/{Total} players", processed, eligible.Count);
                 }
-            }
+            },
+            new ExecutionDataflowBlockOptions {
+                // A single merge worker keeps DbContext access serialized.
+                MaxDegreeOfParallelism = 1,
+                BoundedCapacity = TpeTimelineConcurrency * 2,
+                CancellationToken = token,
+            });
 
-            processed += chunk.Count;
-            logger.LogInformation("Fetched TPE timelines for {Processed}/{Total} players", processed, eligible.Count);
+        fetchBlock.LinkTo(mergeBlock, new DataflowLinkOptions { PropagateCompletion = true });
+
+        foreach (var player in eligible) {
+            await fetchBlock.SendAsync(player, token);
         }
 
-        activity?.SetTag("tpeEventCount", events.Count);
+        fetchBlock.Complete();
+        await mergeBlock.Completion;
 
-        // The portal can, in principle, return more than one entry for the same (player, timestamp);
-        // collapse to the composite key so the merge source stays unique.
-        var deduped = events
-            .GroupBy(e => (e.PlayerId, e.TaskDate))
+        logger.LogInformation("Changed {Count} player TPE events", totalChanged);
+    }
+
+    private async Task<int> MergePlayerTpeEvents(int playerId, IList<TpeTimelineEntry> timeline, CancellationToken token) {
+        if (timeline.Count == 0) {
+            return 0;
+        }
+
+        // The portal can, in principle, return more than one entry for the same timestamp; collapse
+        // on TaskDate (playerId is fixed here) so this player's merge source stays key-unique.
+        var events = timeline
+            .Select(entry => TpeEvent.FromShlApi(playerId, entry))
+            .GroupBy(e => e.TaskDate)
             .Select(g => g.Last())
             .ToList();
 
-        var changed = await dbContext.TpeEvents.Merge()
-            .Using(deduped)
+        return await dbContext.TpeEvents.Merge()
+            .Using(events)
             .OnTargetKey()
             .InsertWhenNotMatched()
             .UpdateWhenMatchedAnd((t, s) => t.TotalTpe != s.TotalTpe)
             .MergeAsync(token);
-        logger.LogInformation("Changed {Count} player TPE events", changed);
     }
 }
