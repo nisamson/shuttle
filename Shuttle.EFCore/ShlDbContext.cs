@@ -40,6 +40,8 @@ public class ShlDbContext : DbContext {
     
     public DbSet<IndexRecord> IndexRecords { get; set; }
     
+    public DbSet<TpeEvent> TpeEvents { get; set; }
+    
     public DbSet<Team> Teams { get; set; }
 
 }
