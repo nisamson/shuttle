@@ -56,6 +56,9 @@ public class PortalUpdater {
         
         await UpdatePlayerIndexEntries(players, token);
         dbContext.ChangeTracker.Clear();
+
+        await UpdatePlayerTpeEvents(players, token);
+        dbContext.ChangeTracker.Clear();
     }
 
     private async Task UpdateUsers(IList<PlayerInfo> playerInfo, CancellationToken token = default) {
@@ -125,5 +128,50 @@ public class PortalUpdater {
             .UpdateWhenMatched()
             .MergeAsync(token);
         logger.LogInformation("Changed {Count} player index entries", changed);
+    }
+
+    // Maximum number of concurrent TPE-timeline requests to the portal. The timeline endpoint is
+    // per-player, so this bounds the fan-out while keeping the whole ingest from running serially.
+    private const int TpeTimelineConcurrency = 8;
+
+    private async Task UpdatePlayerTpeEvents(IList<PlayerInfo> playerInfo, CancellationToken token = default) {
+        using var activity = ActivitySources.ShuttleEfCore.StartActivity();
+        logger.LogInformation("Updating player TPE events for {Count} players", playerInfo.Count);
+
+        var events = new List<TpeEvent>();
+        var processed = 0;
+        for (var i = 0; i < playerInfo.Count; i += TpeTimelineConcurrency) {
+            var chunk = playerInfo.Skip(i).Take(TpeTimelineConcurrency).ToList();
+            var timelines = await Task.WhenAll(chunk.Select(async player => (
+                player.PlayerId,
+                Timeline: await portalClient.GetTpeTimeline(player.PlayerId, token)
+            )));
+
+            foreach (var (playerId, timeline) in timelines) {
+                foreach (var entry in timeline) {
+                    events.Add(TpeEvent.FromShlApi(playerId, entry));
+                }
+            }
+
+            processed += chunk.Count;
+            logger.LogInformation("Fetched TPE timelines for {Processed}/{Total} players", processed, playerInfo.Count);
+        }
+
+        activity?.SetTag("tpeEventCount", events.Count);
+
+        // The portal can, in principle, return more than one entry for the same (player, timestamp);
+        // collapse to the composite key so the merge source stays unique.
+        var deduped = events
+            .GroupBy(e => (e.PlayerId, e.TaskDate))
+            .Select(g => g.Last())
+            .ToList();
+
+        var changed = await dbContext.TpeEvents.Merge()
+            .Using(deduped)
+            .OnTargetKey()
+            .InsertWhenNotMatched()
+            .UpdateWhenMatchedAnd((t, s) => t.TotalTpe != s.TotalTpe)
+            .MergeAsync(token);
+        logger.LogInformation("Changed {Count} player TPE events", changed);
     }
 }
