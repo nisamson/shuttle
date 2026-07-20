@@ -134,14 +134,30 @@ public class PortalUpdater {
     // per-player, so this bounds the fan-out while keeping the whole ingest from running serially.
     private const int TpeTimelineConcurrency = 8;
 
+    // Only ingest TPE timelines for players who are still progressing: active players, plus players
+    // who retired recently enough that late-arriving TPE could still land. Long-retired, pending, and
+    // denied players have static (or non-existent) timelines, so skipping them avoids wasted calls.
+    private static readonly TimeSpan RetiredTpeGracePeriod = TimeSpan.FromDays(90);
+
+    private static bool ShouldIngestTpeEvents(PlayerInfo player, DateTime nowUtc) => player.Status switch {
+        PlayerStatus.Active => true,
+        PlayerStatus.Retired => player.RetirementDate is { } retired && retired >= nowUtc - RetiredTpeGracePeriod,
+        _ => false,
+    };
+
     private async Task UpdatePlayerTpeEvents(IList<PlayerInfo> playerInfo, CancellationToken token = default) {
         using var activity = ActivitySources.ShuttleEfCore.StartActivity();
-        logger.LogInformation("Updating player TPE events for {Count} players", playerInfo.Count);
+        var nowUtc = DateTime.UtcNow;
+        var eligible = playerInfo.Where(p => ShouldIngestTpeEvents(p, nowUtc)).ToList();
+        logger.LogInformation(
+            "Updating player TPE events for {Eligible}/{Total} eligible players",
+            eligible.Count,
+            playerInfo.Count);
 
         var events = new List<TpeEvent>();
         var processed = 0;
-        for (var i = 0; i < playerInfo.Count; i += TpeTimelineConcurrency) {
-            var chunk = playerInfo.Skip(i).Take(TpeTimelineConcurrency).ToList();
+        for (var i = 0; i < eligible.Count; i += TpeTimelineConcurrency) {
+            var chunk = eligible.Skip(i).Take(TpeTimelineConcurrency).ToList();
             var timelines = await Task.WhenAll(chunk.Select(async player => (
                 player.PlayerId,
                 Timeline: await portalClient.GetTpeTimeline(player.PlayerId, token)
@@ -154,7 +170,7 @@ public class PortalUpdater {
             }
 
             processed += chunk.Count;
-            logger.LogInformation("Fetched TPE timelines for {Processed}/{Total} players", processed, playerInfo.Count);
+            logger.LogInformation("Fetched TPE timelines for {Processed}/{Total} players", processed, eligible.Count);
         }
 
         activity?.SetTag("tpeEventCount", events.Count);
