@@ -229,6 +229,39 @@ public class PlayerController : ControllerBase {
 
         return Ok(row.ToPlayerCard());
     }
+
+    /// <summary>
+    /// Returns the player's TPE timeline (cumulative total TPE over time), ordered chronologically.
+    /// Responds 404 when no player with the given id exists; an existing player with no recorded
+    /// events yields an empty list.
+    /// </summary>
+    [HttpGet("{playerId:int}/tpe-timeline")]
+    [ProducesResponseType<IReadOnlyList<TpeTimelinePoint>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<TpeTimelinePoint>>> GetPlayerTpeTimeline(
+        int playerId,
+        CancellationToken cancellationToken) {
+        var playerExists = await db.PlayerInformation
+            .AsNoTracking()
+            .AnyAsync(p => p.PlayerId == playerId, cancellationToken);
+
+        if (!playerExists) {
+            logger.LogInformation("Player {PlayerId} not found", playerId);
+            return NotFound();
+        }
+
+        var timeline = await db.TpeEvents
+            .AsNoTracking()
+            .Where(e => e.PlayerId == playerId)
+            .OrderBy(e => e.TaskDate)
+            .Select(e => new TpeTimelinePoint {
+                TaskDate = e.TaskDate,
+                TotalTpe = e.TotalTpe,
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(timeline);
+    }
 }
 
 internal static class PlayerQueryableExtensions {

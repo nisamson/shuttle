@@ -46,6 +46,11 @@ public sealed class InMemoryShuttlePlayerClient : IShuttlePlayerClient {
     public Task<PlayerCard?> GetPlayer(int playerId, CancellationToken token = default) =>
         Task.FromResult(players.FirstOrDefault(p => p.PlayerId == playerId));
 
+    public Task<IReadOnlyList<TpeTimelinePoint>?> GetPlayerTpeTimeline(int playerId, CancellationToken token = default) =>
+        Task.FromResult(players.Any(p => p.PlayerId == playerId)
+            ? (IReadOnlyList<TpeTimelinePoint>?)Array.Empty<TpeTimelinePoint>()
+            : null);
+
     public Task<PagedResult<PlayerCard>> SearchPlayers(PlayerSearchQuery query, CancellationToken token = default) {
         var filtered = ApplyFilters(players, query).ToList();
         var totalCount = filtered.Count;
