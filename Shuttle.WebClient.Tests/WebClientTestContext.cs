@@ -26,7 +26,11 @@ public abstract class WebClientTestContext : BunitContext {
         Services.AddSingleton<IShuttleLeagueClient>(new InMemoryShuttleLeagueClient());
         Services.AddSingleton<IShuttleUserClient>(new InMemoryShuttleUserClient());
         Services.AddSingleton<IShuttleDebugClient>(new InMemoryShuttleDebugClient());
+        Services.AddSingleton<IShuttleScoutingClient>(
+            sp => new InMemoryShuttleScoutingClient(
+                sp.GetService<Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider>()));
         Services.AddSingleton<IPlayerDirectoryService, PlayerDirectoryService>();
         Services.AddSingleton<IUserDirectoryService, UserDirectoryService>();
+        Services.AddSingleton<ICurrentUserService, CurrentUserService>();
     }
 }

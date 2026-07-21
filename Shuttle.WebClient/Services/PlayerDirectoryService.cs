@@ -24,6 +24,13 @@ public interface IPlayerDirectoryService {
     /// <paramref name="limit"/> players by name.
     /// </summary>
     Task<IReadOnlyList<PlayerSuggestion>> Search(string? term, int limit = 10, CancellationToken token = default);
+
+    /// <summary>
+    /// Returns the directory entry for <paramref name="playerId"/>, or <c>null</c> if the player is
+    /// not in the cached directory. Used to render a player's name/username from a stored id (e.g. a
+    /// board entry) without an extra round trip.
+    /// </summary>
+    Task<PlayerSuggestion?> Find(int playerId, CancellationToken token = default);
 }
 
 /// <inheritdoc cref="IPlayerDirectoryService"/>
@@ -90,9 +97,13 @@ public sealed class PlayerDirectoryService : IPlayerDirectoryService, IDisposabl
             .ToList();
     }
 
+    public async Task<PlayerSuggestion?> Find(int playerId, CancellationToken token = default) {
+        await EnsureLoadedAsync(token);
+        return cache?.FirstOrDefault(p => p.PlayerId == playerId);
+    }
+
     // Lower rank = better match. 0/1 = name/username prefix; 2/3 = name/username substring; -1 = none.
-    private static int MatchRank(PlayerSuggestion p, string term) {
-        var nameIdx = p.Name.IndexOf(term, StringComparison.OrdinalIgnoreCase);
+    private static int MatchRank(PlayerSuggestion p, string term) {        var nameIdx = p.Name.IndexOf(term, StringComparison.OrdinalIgnoreCase);
         var userIdx = p.Username.IndexOf(term, StringComparison.OrdinalIgnoreCase);
 
         if (nameIdx == 0) {

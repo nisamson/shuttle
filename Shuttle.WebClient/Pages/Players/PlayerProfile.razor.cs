@@ -48,16 +48,26 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
         InvokeAsync(StateHasChanged);
     }
 
+    // Re-theme the existing chart objects in place: swap each chart's Layout for a freshly themed one
+    // while preserving its captured PlotlyChart ref and Data. Rebuilding the AttributeChart objects
+    // instead would orphan the @ref captures (Blazor reuses the PlotlyChart instances and does not
+    // reassign the refs onto the new objects), leaving group.Chart null so React() — and the new
+    // colors — never apply until a full page reload.
     private void RethemeCharts() {
-        if (card?.Attributes is not null) {
-            BuildCharts(card);
+        foreach (var chart in attributeCharts) {
+            ApplyTheme(chart);
         }
 
-        if (timelinePoints is not null) {
-            BuildTimeline(timelinePoints);
-        }
+        ApplyTheme(combinedChart);
+        ApplyTheme(timelineChart);
 
         needsRedraw = true;
+    }
+
+    private void ApplyTheme(AttributeChart? chart) {
+        if (chart?.LayoutFactory is not null) {
+            chart.Layout = chart.LayoutFactory(darkMode);
+        }
     }
 
     public void Dispose() => OptionsStorage.OptionsChanged -= OnOptionsChanged;
@@ -87,7 +97,6 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
     private string activeTabId = AttributesTabId;
 
     private AttributeChart? timelineChart;
-    private IReadOnlyList<TpeTimelinePoint>? timelinePoints;
     private bool timelineLoading;
     private bool timelineLoaded;
     private string? timelineError;
@@ -199,7 +208,6 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
     }
 
     private void BuildTimeline(IReadOnlyList<TpeTimelinePoint>? timeline) {
-        timelinePoints = timeline;
         timelineChart = null;
 
         if (timeline is null || timeline.Count == 0) {
@@ -209,6 +217,7 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
         timelineChart = new AttributeChart {
             Title = "Total TPE",
             Layout = BuildTimelineLayout(darkMode),
+            LayoutFactory = BuildTimelineLayout,
             Data = new List<ITrace> {
                 new Plotly.Blazor.Traces.Scatter {
                     X = timeline.Select(p => (object)p.TaskDate).ToList(),
@@ -256,6 +265,7 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
             return new AttributeChart {
                 Title = title,
                 Layout = BuildBarLayout(dark),
+                LayoutFactory = BuildBarLayout,
                 Data = new List<ITrace> {
                     new Bar {
                         X = points.Select(p => (object)p.Label).ToList(),
@@ -276,6 +286,7 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
         return new AttributeChart {
             Title = title,
             Layout = BuildLayout(dark),
+            LayoutFactory = BuildLayout,
             Data = new List<ITrace> {
                 new ScatterPolar {
                     R = magnitudes,
@@ -369,6 +380,13 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
     private sealed class AttributeChart {
         public required string Title { get; init; }
         public Plotly.Blazor.Layout Layout { get; set; } = BuildLayout(false);
+
+        /// <summary>
+        /// Builds a fresh, themed layout for this chart. Used to re-theme in place (preserving the
+        /// captured <see cref="Chart"/> ref and <see cref="Data"/>) when the light/dark option changes.
+        /// </summary>
+        public Func<bool, Plotly.Blazor.Layout>? LayoutFactory { get; init; }
+
         public IList<ITrace> Data { get; init; } = new List<ITrace>();
         public PlotlyChart? Chart { get; set; }
     }

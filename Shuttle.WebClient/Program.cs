@@ -40,6 +40,10 @@ if (useFakeBackend) {
     builder.Services.AddShuttleDebugClient(new Uri(apiBaseAddress))
         .AddHttpMessageHandler<ApiAccessTokenHandler>();
 
+    // The scouting endpoints all require an authenticated caller, so attach the token handler.
+    builder.Services.AddShuttleScoutingClient(new Uri(apiBaseAddress))
+        .AddHttpMessageHandler<ApiAccessTokenHandler>();
+
     builder.Services.AddMsalAuthentication(options => {
             builder.Configuration.Bind("AzureAd", options.ProviderOptions.Authentication);
             options.UserOptions.RoleClaim = "roles";
@@ -62,6 +66,7 @@ builder.Services.AddSingleton<IBlogService, BlogService>();
 builder.Services.AddSingleton<IShuttleOptionsStorage, ShuttleOptionsLocalStorage>();
 builder.Services.AddSingleton<IPlayerDirectoryService, PlayerDirectoryService>();
 builder.Services.AddSingleton<IUserDirectoryService, UserDirectoryService>();
+builder.Services.AddSingleton<ICurrentUserService, CurrentUserService>();
 if (builder.HostEnvironment.IsDevelopment()) {
     builder.Logging.AddFilter("Microsoft.AspNetCore.Components.RenderTree.*", LogLevel.None);
     builder.Logging.SetMinimumLevel(LogLevel.Trace);

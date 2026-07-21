@@ -1,0 +1,121 @@
+@page "/scouting/boards/{BoardId:guid}"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using Shuttle.Models.Players
+@using Shuttle.Models.Scouting
+@using Shuttle.WebClient.Components.Scouting
+@using Shuttle.WebClient.Models
+
+<PageTitle>@PageTitleText</PageTitle>
+
+@if (loading) {
+    <div><FluentSpinner/> Loading board…</div>
+} else if (loadError is not null) {
+    <FluentText Color="Color.Error">@loadError</FluentText>
+    <a href="@Routes.Scouting.Root">Back to scouting</a>
+} else if (board is not null) {
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="20">
+        <FluentStack Orientation="Orientation.Vertical" VerticalGap="4">
+            <a href="@Routes.Scouting.Team(board.ScoutingTeamId)">← Back to team</a>
+            <FluentText Size="TextSize.Size700" Weight="TextWeight.Bold">@board.Name</FluentText>
+            @if (board.DraftSeason is not null) {
+                <FluentText Style="color: var(--colorNeutralForeground2);">Draft season @board.DraftSeason</FluentText>
+            }
+        </FluentStack>
+
+        @if (actionError is not null) {
+            <FluentText Color="Color.Error">@actionError</FluentText>
+        }
+
+        @if (CanEditBoards) {
+            <FluentCard>
+                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Bottom">
+                    <FluentAutocomplete TOption="PlayerSuggestion"
+                                        TValue="string"
+                                        Width="320px"
+                                        Label="Add a player"
+                                        Placeholder="Search by name or username"
+                                        OnOptionsSearch="OnPlayerSearch"
+                                        OptionText="@(p => $"{p.Name} ({p.Username})")"
+                                        OptionValue="@(p => p.PlayerId.ToString())"
+                                        SelectedItem="pendingPlayer"
+                                        SelectedItemChanged="OnPlayerSelected"/>
+                    <FluentButton Appearance="ButtonAppearance.Primary"
+                                  Loading="busy"
+                                  Disabled="@(busy || pendingPlayer is null)"
+                                  OnClick="AddEntryAsync">Add player</FluentButton>
+                </FluentStack>
+            </FluentCard>
+        }
+
+        @if (board.Entries.Count == 0) {
+            <FluentText Style="color: var(--colorNeutralForeground2);">No players on this board yet.</FluentText>
+        } else {
+            <FluentDragContainer TItem="ScoutingBoardEntry" OnDropEnd="OnEntryDropEnd"
+                                 Style="display: flex; flex-direction: column; gap: 8px;">
+                @foreach (var entry in board.Entries) {
+                    <FluentDropZone Item="entry" Draggable="@CanEditBoards" Droppable="@CanEditBoards" Style="width: 100%;">
+                        <FluentCard>
+                            <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="12" VerticalAlignment="VerticalAlignment.Center">
+                                    @if (CanEditBoards) {
+                                        <FluentIcon Value="@(new Icons.Regular.Size20.ReOrderDotsVertical())"
+                                                    Color="Color.Default" Title="Drag to reorder"
+                                                    Style="cursor: grab;"/>
+                                    }
+                                    <FluentText Weight="TextWeight.Bold" Style="min-width: 2.5rem;">#@entry.Rank</FluentText>
+                                    <a href="@Routes.Players.Player(entry.PlayerId)">@PlayerName(entry.PlayerId)</a>
+                                    @if (PlayerCardFor(entry.PlayerId) is { } card) {
+                                        <FluentBadge Appearance="BadgeAppearance.Outline">@PositionShort(card)</FluentBadge>
+                                        <FluentText Style="color: var(--colorNeutralForeground2);">
+                                            @FormatTpe(card) TPE &middot; @FormatBank(card)
+                                        </FluentText>
+                                    }
+                                    <FluentSpacer/>
+                                    <FluentButton Appearance="ButtonAppearance.Subtle" Title="Comments"
+                                                  IconStart="@(new Icons.Regular.Size16.Comment())"
+                                                  OnClick="() => ToggleEntryCommentsAsync(entry)">@entry.CommentCount</FluentButton>
+                                    @if (CanEditBoards) {
+                                        <FluentButton Appearance="ButtonAppearance.Subtle" Title="Move up" IconOnly="true"
+                                                      Disabled="@(busy || entry.Rank <= 1)"
+                                                      IconStart="@(new Icons.Regular.Size16.ArrowUp())"
+                                                      OnClick="() => MoveAsync(entry, entry.Rank - 1)"/>
+                                        <FluentButton Appearance="ButtonAppearance.Subtle" Title="Move down" IconOnly="true"
+                                                      Disabled="@(busy || entry.Rank >= board.Entries.Count)"
+                                                      IconStart="@(new Icons.Regular.Size16.ArrowDown())"
+                                                      OnClick="() => MoveAsync(entry, entry.Rank + 1)"/>
+                                        <FluentButton Appearance="ButtonAppearance.Subtle" Title="Remove player" IconOnly="true"
+                                                      Disabled="busy"
+                                                      IconStart="@(new Icons.Regular.Size16.Delete())"
+                                                      OnClick="() => RemoveAsync(entry)"/>
+                                    }
+                                </FluentStack>
+
+                                @if (expandedEntries.Contains(entry.PlayerId)) {
+                                    <FluentDivider Style="width: 100%;"/>
+                                    <ScoutingCommentThread Title="Notes"
+                                                           Comments="@EntryComments(entry.PlayerId)"
+                                                           CanComment="CanComment"
+                                                           CanModerate="CanModerate"
+                                                           CurrentUserId="currentUserId"
+                                                           OnAdd="body => AddEntryCommentAsync(entry, body)"
+                                                           OnChanged="() => ReloadEntryCommentsAsync(entry.PlayerId)"/>
+                                }
+                            </FluentStack>
+                        </FluentCard>
+                    </FluentDropZone>
+                }
+            </FluentDragContainer>
+        }
+
+        <FluentDivider Style="width: 100%;"/>
+
+        <ScoutingCommentThread Title="Board discussion"
+                               Comments="boardComments"
+                               CanComment="CanComment"
+                               CanModerate="CanModerate"
+                               CurrentUserId="currentUserId"
+                               OnAdd="AddBoardCommentAsync"
+                               OnChanged="ReloadBoardCommentsAsync"/>
+    </FluentStack>
+}

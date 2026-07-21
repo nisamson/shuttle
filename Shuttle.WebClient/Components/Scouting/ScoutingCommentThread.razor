@@ -1,0 +1,68 @@
+@using Shuttle.Models.Scouting
+@using Shuttle.WebClient.Models
+
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="12">
+    <FluentText Size="TextSize.Size500" Weight="TextWeight.Bold">@Title</FluentText>
+
+    @if (Comments.Count == 0) {
+        <FluentText Style="color: var(--colorNeutralForeground2);">No comments yet.</FluentText>
+    }
+
+    @foreach (var comment in Comments) {
+        <FluentCard>
+            <FluentStack Orientation="Orientation.Vertical" VerticalGap="6">
+                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8"
+                             VerticalAlignment="VerticalAlignment.Center">
+                    <FluentText Weight="TextWeight.Bold">@comment.AuthorUsername</FluentText>
+                    <FluentText Style="color: var(--colorNeutralForeground2);" Size="TextSize.Size200">
+                        @comment.CreatedAt.LocalDateTime.ToString("g")@(comment.EditedAt is not null ? " (edited)" : "")
+                    </FluentText>
+                    <FluentSpacer/>
+                    @if (CanEdit(comment)) {
+                        <FluentButton Appearance="ButtonAppearance.Subtle" Title="Edit" IconOnly="true"
+                                      IconStart="@(new Icons.Regular.Size16.Edit())"
+                                      OnClick="() => BeginEdit(comment)"/>
+                    }
+                    @if (CanDelete(comment)) {
+                        <FluentButton Appearance="ButtonAppearance.Subtle" Title="Delete" IconOnly="true"
+                                      IconStart="@(new Icons.Regular.Size16.Delete())"
+                                      OnClick="() => DeleteAsync(comment)"/>
+                    }
+                </FluentStack>
+
+                @if (editingId == comment.Id) {
+                    <FluentTextArea @bind-Value="editBody" Style="width: 100%;"
+                                    Resize="TextAreaResize.Vertical"
+                                    MaxLength="ScoutingLimits.CommentBodyMaxLength"/>
+                    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
+                        <FluentButton Appearance="ButtonAppearance.Primary" Loading="busy" Disabled="busy"
+                                      OnClick="() => SaveEditAsync(comment)">Save</FluentButton>
+                        <FluentButton Appearance="ButtonAppearance.Default" Disabled="busy"
+                                      OnClick="CancelEdit">Cancel</FluentButton>
+                    </FluentStack>
+                } else {
+                    <FluentText Style="white-space: pre-wrap;">@comment.Body</FluentText>
+                }
+            </FluentStack>
+        </FluentCard>
+    }
+
+    @if (CanComment) {
+        <FluentStack Orientation="Orientation.Vertical" VerticalGap="6">
+            <FluentTextArea @bind-Value="newBody" Style="width: 100%;"
+                            Resize="TextAreaResize.Vertical"
+                            Placeholder="Add a comment..."
+                            MaxLength="ScoutingLimits.CommentBodyMaxLength"/>
+            <div>
+                <FluentButton Appearance="ButtonAppearance.Primary"
+                              Loading="busy"
+                              Disabled="@(busy || string.IsNullOrWhiteSpace(newBody))"
+                              OnClick="AddAsync">Post comment</FluentButton>
+            </div>
+        </FluentStack>
+    }
+
+    @if (errorMessage is not null) {
+        <FluentText Color="Color.Error">@errorMessage</FluentText>
+    }
+</FluentStack>
