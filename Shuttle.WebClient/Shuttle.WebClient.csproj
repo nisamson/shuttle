@@ -40,6 +40,10 @@
     </ItemGroup>
 
     <ItemGroup>
+        <InternalsVisibleTo Include="Shuttle.WebClient.Tests" />
+    </ItemGroup>
+
+    <ItemGroup>
       <AdditionalFiles Include="Components\Options\ShuttleOptionsContext.razor" />
     </ItemGroup>
 

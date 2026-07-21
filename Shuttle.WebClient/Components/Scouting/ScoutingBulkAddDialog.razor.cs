@@ -5,6 +5,7 @@ using Microsoft.FluentUI.AspNetCore.Components;
 using Refit;
 using Shuttle.Api.Client;
 using Shuttle.Models.Players;
+using Shuttle.WebClient.Services;
 
 namespace Shuttle.WebClient.Components.Scouting;
 
@@ -16,6 +17,7 @@ namespace Shuttle.WebClient.Components.Scouting;
 /// </summary>
 public partial class ScoutingBulkAddDialog : FluentDialogInstance {
     [Inject] private IShuttlePlayerClient PlayerClient { get; set; } = null!;
+    [Inject] private IPlayerDirectoryService Directory { get; set; } = null!;
 
     [Parameter, EditorRequired]
     public required Args Content { get; set; }
@@ -24,6 +26,7 @@ public partial class ScoutingBulkAddDialog : FluentDialogInstance {
     private bool resolving;
     private string? resolveError;
     private ResolvePlayersResult? result;
+    private PlayerSuggestion? picked;
 
     private IQueryable<ResolvedPlayer> ResolvedRows => (result?.Resolved ?? []).AsQueryable();
 
@@ -63,6 +66,33 @@ public partial class ScoutingBulkAddDialog : FluentDialogInstance {
         } finally {
             resolving = false;
         }
+    }
+
+    private async Task OnPlayerSearch(OptionsSearchEventArgs<PlayerSuggestion> e) {
+        e.Items = await Directory.Search(e.Text);
+    }
+
+    // Appends the picked player's id (unambiguous) to the paste box as a new line, then clears the
+    // picker so the field is ready for the next search.
+    private void OnPlayerPicked(PlayerSuggestion? player) {
+        picked = null;
+        if (player is not null) {
+            rawText = AppendPlayerId(rawText, player.PlayerId);
+        }
+    }
+
+    // Appends a player id on its own line, skipping ids already present so repeated picks don't
+    // duplicate a line. Kept static/internal so the append+dedup behaviour is unit-testable without
+    // rendering the dialog (which requires a live FluentUI dialog host).
+    internal static string AppendPlayerId(string rawText, int playerId) {
+        var existing = ParseInput(rawText).PlayerIds;
+        if (existing is not null && existing.Contains(playerId)) {
+            return rawText;
+        }
+
+        var id = playerId.ToString(CultureInfo.InvariantCulture);
+        var trimmed = rawText.TrimEnd('\r', '\n');
+        return trimmed.Length == 0 ? id : $"{trimmed}\n{id}";
     }
 
     private async Task AddAsync() {

@@ -10,6 +10,17 @@
             Resolve to preview the matched players before adding them to the board.
         </FluentText>
 
+        <FluentAutocomplete TOption="PlayerSuggestion"
+                            TValue="string"
+                            Width="100%"
+                            Label="Search and add a player"
+                            Placeholder="Search by name or username"
+                            OnOptionsSearch="OnPlayerSearch"
+                            OptionText="@(p => $"{p.Name} ({p.Username})")"
+                            OptionValue="@(p => p.PlayerId.ToString())"
+                            SelectedItem="picked"
+                            SelectedItemChanged="OnPlayerPicked"/>
+
         <FluentTextArea @bind-Value="rawText" Style="width: 100%;"
                         Rows="8"
                         Resize="TextAreaResize.Vertical"
