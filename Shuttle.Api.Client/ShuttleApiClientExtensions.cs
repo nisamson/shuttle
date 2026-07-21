@@ -73,4 +73,15 @@ public static class ShuttleApiClientExtensions {
         return services.AddRefitClient<IShuttleDebugClient>(CreateRefitSettings())
             .ConfigureHttpClient(c => c.BaseAddress = baseAddress);
     }
+
+    /// <summary>
+    /// Registers the Shuttle backend API scouting Refit client (<see cref="IShuttleScoutingClient"/>)
+    /// pointed at <paramref name="baseAddress"/> (e.g. the value of <c>Api:BaseUrl</c>). Every scouting
+    /// endpoint requires an authenticated caller, so callers must chain an access-token message
+    /// handler. Returns the <see cref="IHttpClientBuilder"/> for that chaining.
+    /// </summary>
+    public static IHttpClientBuilder AddShuttleScoutingClient(this IServiceCollection services, Uri baseAddress) {
+        return services.AddRefitClient<IShuttleScoutingClient>(CreateRefitSettings())
+            .ConfigureHttpClient(c => c.BaseAddress = baseAddress);
+    }
 }

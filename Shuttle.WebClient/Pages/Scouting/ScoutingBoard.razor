@@ -1,0 +1,149 @@
+@page "/scouting/boards/{BoardId:guid}"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using Shuttle.Models.Players
+@using Shuttle.Models.Scouting
+@using Shuttle.Shl.Api.Models.Common
+@using Shuttle.WebClient.Components.Scouting
+@using Shuttle.WebClient.Models
+
+<PageTitle>@PageTitleText</PageTitle>
+
+@if (loading) {
+    <div><FluentSpinner/> Loading board…</div>
+} else if (loadError is not null) {
+    <FluentText Color="Color.Error">@loadError</FluentText>
+    <a href="@Routes.Scouting.Root">Back to scouting</a>
+} else if (board is not null) {
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="20">
+        <FluentStack Orientation="Orientation.Vertical" VerticalGap="4">
+            <a href="@Routes.Scouting.Team(board.ScoutingTeamId)">← Back to team</a>
+            <FluentText Size="TextSize.Size700" Weight="TextWeight.Bold">@board.Name</FluentText>
+            @if (board.DraftSeason is not null) {
+                <FluentText Style="color: var(--colorNeutralForeground2);">Draft season @board.DraftSeason</FluentText>
+            }
+        </FluentStack>
+
+        @if (actionError is not null) {
+            <FluentText Color="Color.Error">@actionError</FluentText>
+        }
+
+        @if (CanEditBoards) {
+            <FluentCard>
+                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Bottom">
+                    <FluentAutocomplete TOption="PlayerSuggestion"
+                                        TValue="string"
+                                        Width="320px"
+                                        Label="Add a player"
+                                        Placeholder="Search by name or username"
+                                        OnOptionsSearch="OnPlayerSearch"
+                                        OptionText="@(p => $"{p.Name} ({p.Username})")"
+                                        OptionValue="@(p => p.PlayerId.ToString())"
+                                        SelectedItem="pendingPlayer"
+                                        SelectedItemChanged="OnPlayerSelected"/>
+                    <FluentButton Appearance="ButtonAppearance.Primary"
+                                  Loading="busy"
+                                  Disabled="@(busy || pendingPlayer is null)"
+                                  OnClick="AddEntryAsync">Add player</FluentButton>
+                </FluentStack>
+            </FluentCard>
+        }
+
+        @if (board.Entries.Count == 0) {
+            <FluentText Style="color: var(--colorNeutralForeground2);">No players on this board yet.</FluentText>
+        } else {
+            @if (CanEditBoards && SelectedCount > 0) {
+                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="12" VerticalAlignment="VerticalAlignment.Center">
+                    <FluentText>@SelectedCount selected</FluentText>
+                    <FluentButton Appearance="ButtonAppearance.Primary" Loading="busy" Disabled="busy"
+                                  IconStart="@(new Icons.Regular.Size16.Delete())"
+                                  OnClick="BulkDeleteAsync">Delete selected</FluentButton>
+                    <FluentButton Appearance="ButtonAppearance.Default" Disabled="busy" OnClick="ClearSelection">Clear</FluentButton>
+                </FluentStack>
+            }
+
+            <FluentDataGrid Items="@FilteredRows" TGridItem="BoardRow" ResizableColumns="true">
+                @if (CanEditBoards) {
+                    <SelectColumn TGridItem="BoardRow"
+                                  SelectMode="DataGridSelectMode.Multiple"
+                                  SelectFromEntireRow="false"
+                                  @bind-SelectedItems="selectedRows"/>
+                }
+                <TemplateColumn Title="Rank" Sortable="true" SortBy="@RankSort" IsDefaultSortColumn="true"
+                                InitialSortDirection="DataGridSortDirection.Ascending" Align="DataGridCellAlignment.Center">
+                    <span>@context.Rank</span>
+                </TemplateColumn>
+                <TemplateColumn Title="Player" Sortable="true" SortBy="@NameSort">
+                    <ColumnOptions>
+                        <FluentTextInput @bind-Value="nameFilter" @bind-Value:after="StateHasChanged"
+                                         Immediate="true" Placeholder="Filter by name" Autofocus="true"/>
+                    </ColumnOptions>
+                    <ChildContent>
+                        <a href="@Routes.Players.Player(context.PlayerId)" target="_blank" rel="noopener noreferrer">@context.Name</a>
+                    </ChildContent>
+                </TemplateColumn>
+                <TemplateColumn Title="Position" Sortable="true" SortBy="@PositionSort" Align="DataGridCellAlignment.Center">
+                    <ColumnOptions>
+                        <FluentStack Orientation="Orientation.Vertical" VerticalGap="4">
+                            @foreach (var pos in AvailablePositions) {
+                                <FluentCheckbox Margin="0" Label="@pos.ToShortString()"
+                                                Value="@selectedPositions.Contains(pos)"
+                                                ValueChanged="v => TogglePosition(pos, v)"/>
+                            }
+                        </FluentStack>
+                    </ColumnOptions>
+                    <ChildContent>
+                        @if (context.Position is not null) {
+                            <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+                                <FluentBadge Appearance="BadgeAppearance.Outline">@PositionText(context)</FluentBadge>
+                            </div>
+                        } else {
+                            <span>—</span>
+                        }
+                    </ChildContent>
+                </TemplateColumn>
+                <TemplateColumn Title="TPE" Sortable="true" SortBy="@TpeSort" Align="DataGridCellAlignment.End">
+                    @TpeText(context)
+                </TemplateColumn>
+                <TemplateColumn Title="Bank" Sortable="true" SortBy="@BankSort" Align="DataGridCellAlignment.End">
+                    @BankText(context)
+                </TemplateColumn>
+                <TemplateColumn Title="Comments" Align="DataGridCellAlignment.Center">
+                    <FluentButton Appearance="ButtonAppearance.Subtle" Title="View notes"
+                                  IconStart="@(new Icons.Regular.Size16.Comment())"
+                                  OnClick="() => OpenEntryCommentsAsync(context)">@context.CommentCount</FluentButton>
+                </TemplateColumn>
+                @if (CanEditBoards) {
+                    <TemplateColumn Title="Actions" Align="DataGridCellAlignment.End">
+                        <FluentButton Appearance="ButtonAppearance.Subtle" Title="Edit" IconOnly="true"
+                                      Disabled="busy"
+                                      IconStart="@(new Icons.Regular.Size16.Edit())"
+                                      OnClick="() => EditEntryAsync(context)"/>
+                        <FluentButton Appearance="ButtonAppearance.Subtle" Title="Move up" IconOnly="true"
+                                      Disabled="@(busy || context.Rank <= 1)"
+                                      IconStart="@(new Icons.Regular.Size16.ArrowUp())"
+                                      OnClick="() => MoveAsync(context.PlayerId, context.Rank, context.Rank - 1)"/>
+                        <FluentButton Appearance="ButtonAppearance.Subtle" Title="Move down" IconOnly="true"
+                                      Disabled="@(busy || context.Rank >= rows.Count)"
+                                      IconStart="@(new Icons.Regular.Size16.ArrowDown())"
+                                      OnClick="() => MoveAsync(context.PlayerId, context.Rank, context.Rank + 1)"/>
+                        <FluentButton Appearance="ButtonAppearance.Subtle" Title="Remove player" IconOnly="true"
+                                      Disabled="busy"
+                                      IconStart="@(new Icons.Regular.Size16.Delete())"
+                                      OnClick="() => RemoveAsync(context)"/>
+                    </TemplateColumn>
+                }
+            </FluentDataGrid>
+        }
+
+        <FluentDivider Style="width: 100%;"/>
+
+        <ScoutingCommentThread Title="Board discussion"
+                               Comments="boardComments"
+                               CanComment="CanComment"
+                               CanModerate="CanModerate"
+                               CurrentUserId="currentUserId"
+                               OnAdd="AddBoardCommentAsync"
+                               OnChanged="ReloadBoardCommentsAsync"/>
+    </FluentStack>
+}

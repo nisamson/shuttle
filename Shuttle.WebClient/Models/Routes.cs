@@ -44,4 +44,12 @@ public static class Routes {
 
         public static string User(string userIdOrName) => $"{Root}/{userIdOrName}";
     }
+
+    public static class Scouting {
+        public const string Root = "/scouting";
+
+        public static string Team(Guid teamId) => $"{Root}/teams/{teamId}";
+
+        public static string Board(Guid boardId) => $"{Root}/boards/{boardId}";
+    }
 }

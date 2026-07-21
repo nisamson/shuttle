@@ -6,6 +6,11 @@
     <FluentNavItem Href="@Routes.Players.Root" Match="NavLinkMatch.All" Tooltip="Players" IconRest="@(new Icons.Regular.Size20.Person())">Players</FluentNavItem>
     <FluentNavItem Href="@Routes.Users.Root" Match="NavLinkMatch.All" Tooltip="Users" IconRest="@(new Icons.Regular.Size20.People())">Users</FluentNavItem>
     <FluentNavItem Href="@Routes.Articles.Blogs" Match="NavLinkMatch.All" Tooltip="Blogs" IconRest="@(new Icons.Regular.Size20.News())">Blogs</FluentNavItem>
+    <AuthorizeView>
+        <Authorized>
+            <FluentNavItem Href="@Routes.Scouting.Root" Match="NavLinkMatch.Prefix" Tooltip="Scouting" IconRest="@(new Icons.Regular.Size20.ClipboardTextEdit())">Scouting</FluentNavItem>
+        </Authorized>
+    </AuthorizeView>
     <FluentDivider/>
     <AuthorizeView>
         <Authorized>

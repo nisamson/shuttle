@@ -1,0 +1,10 @@
+@inherits Microsoft.FluentUI.AspNetCore.Components.FluentDialogInstance
+
+<FluentDialogBody>
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="12">
+        <FluentNumberInput TValue="int" @bind-Value="rank"
+                           Label="@($"Rank (1–{Content.MaxRank})")"
+                           Min="1" Max="@Content.MaxRank"
+                           Style="width: 8rem;"/>
+    </FluentStack>
+</FluentDialogBody>

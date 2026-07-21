@@ -1,0 +1,77 @@
+@page "/scouting"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using Shuttle.Models.Scouting
+@using Shuttle.WebClient.Models
+
+<PageTitle>Scouting</PageTitle>
+
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="16">
+    <FluentStack Orientation="Orientation.Horizontal"
+                 HorizontalAlignment="HorizontalAlignment.SpaceBetween"
+                 VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Size="TextSize.Size700" Weight="TextWeight.Bold">Scouting Teams</FluentText>
+        <FluentButton Appearance="ButtonAppearance.Primary"
+                      IconStart="@(new Icons.Regular.Size16.Add())"
+                      OnClick="ToggleCreate">New team</FluentButton>
+    </FluentStack>
+
+    <FluentText Style="color: var(--colorNeutralForeground2);">
+        Scouting teams let you and your collaborators build and rank shared draft boards.
+    </FluentText>
+
+    @if (showCreate) {
+        <FluentCard>
+            <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                <FluentTextInput @bind-Value="newTeamName" Label="Team name"
+                                 MaxLength="ScoutingLimits.TeamNameMaxLength" Style="width: 100%;"/>
+                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
+                    <FluentButton Appearance="ButtonAppearance.Primary" Loading="busy" Disabled="@(busy || string.IsNullOrWhiteSpace(newTeamName))"
+                                  OnClick="CreateTeamAsync">Create</FluentButton>
+                    <FluentButton Appearance="ButtonAppearance.Default" Disabled="busy" OnClick="ToggleCreate">Cancel</FluentButton>
+                </FluentStack>
+            </FluentStack>
+        </FluentCard>
+    }
+
+    @if (errorMessage is not null) {
+        <FluentText Color="Color.Error">@errorMessage</FluentText>
+    }
+
+    @if (loading) {
+        <div><FluentSpinner/> Loading your teams…</div>
+    } else if (myTeams.Count == 0) {
+        <FluentText Style="color: var(--colorNeutralForeground2);">You're not on any scouting teams yet. Create one to get started.</FluentText>
+    } else {
+        <FluentDataGrid Items="@myTeams.AsQueryable()" TGridItem="ScoutingTeamSummary" GridTemplateColumns="2fr 1fr 1fr 1fr 1.5fr">
+            <TemplateColumn Title="Name" Sortable="true" SortBy="@nameSort">
+                <a href="@Routes.Scouting.Team(context.Id)">@context.Name</a>
+            </TemplateColumn>
+            <TemplateColumn Title="My role">@RoleLabel(context.MyRole)</TemplateColumn>
+            <PropertyColumn Property="@(t => t.MemberCount)" Title="Members" Sortable="true"/>
+            <PropertyColumn Property="@(t => t.BoardCount)" Title="Boards" Sortable="true"/>
+            <TemplateColumn Title="Updated">@context.UpdatedAt.LocalDateTime.ToString("g")</TemplateColumn>
+        </FluentDataGrid>
+    }
+
+    <AuthorizeView Roles="@RoleNames.Admin" Context="adminAuth">
+        <Authorized>
+            <FluentDivider Style="width: 100%;"/>
+            <FluentText Size="TextSize.Size600" Weight="TextWeight.Bold">All teams (admin)</FluentText>
+            @if (loadingAllTeams) {
+                <div><FluentSpinner/> Loading all teams…</div>
+            } else if (allTeams.Count == 0) {
+                <FluentText Style="color: var(--colorNeutralForeground2);">No teams exist yet.</FluentText>
+            } else {
+                <FluentDataGrid Items="@allTeams.AsQueryable()" TGridItem="ScoutingTeamSummary" GridTemplateColumns="2fr 1fr 1fr 1.5fr">
+                    <TemplateColumn Title="Name" Sortable="true" SortBy="@nameSort">
+                        <a href="@Routes.Scouting.Team(context.Id)">@context.Name</a>
+                    </TemplateColumn>
+                    <PropertyColumn Property="@(t => t.MemberCount)" Title="Members" Sortable="true"/>
+                    <PropertyColumn Property="@(t => t.BoardCount)" Title="Boards" Sortable="true"/>
+                    <TemplateColumn Title="Updated">@context.UpdatedAt.LocalDateTime.ToString("g")</TemplateColumn>
+                </FluentDataGrid>
+            }
+        </Authorized>
+    </AuthorizeView>
+</FluentStack>

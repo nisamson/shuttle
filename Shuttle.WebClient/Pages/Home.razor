@@ -1,5 +1,6 @@
 @page "/"
 @using Shuttle.WebClient.Components
+@using Shuttle.WebClient.Models
 
 <PageTitle>Home</PageTitle>
 
@@ -18,6 +19,21 @@
     </p>
 
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); grid-auto-rows: 1fr; gap: 1rem; width: 100%;">
+        <AuthorizeView>
+            <Authorized>
+                <a href="@Routes.Scouting.Root" style="text-decoration: none; color: inherit; display: flex;">
+                    <FluentCard Style="height: 100%; text-align: start;">
+                        <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                            <FluentStack VerticalAlignment="VerticalAlignment.Center" HorizontalGap="8">
+                                <FluentIcon Value="@(new Icons.Regular.Size24.ClipboardTextEdit())"/>
+                                <h3 style="margin: 0; font-size: 1.25rem;">Scouting Teams</h3>
+                            </FluentStack>
+                            <p style="margin: 0;">Build and rank shared draft boards with your scouting team. Jump to your dashboard.</p>
+                        </FluentStack>
+                    </FluentCard>
+                </a>
+            </Authorized>
+        </AuthorizeView>
         @foreach (var feature in Features)
         {
             <a href="@feature.Href" style="text-decoration: none; color: inherit; display: flex;">

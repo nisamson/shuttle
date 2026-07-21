@@ -1,0 +1,173 @@
+@page "/scouting/teams/{TeamId:guid}"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using Shuttle.Models.Scouting
+@using Shuttle.WebClient.Models
+
+<PageTitle>Scouting team</PageTitle>
+
+@if (loading) {
+    <div><FluentSpinner/> Loading team…</div>
+} else if (loadError is not null) {
+    <FluentText Color="Color.Error">@loadError</FluentText>
+    <a href="@Routes.Scouting.Root">Back to scouting</a>
+} else if (team is not null) {
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="20">
+        <FluentStack Orientation="Orientation.Horizontal"
+                     HorizontalGap="12"
+                     HorizontalAlignment="HorizontalAlignment.SpaceBetween"
+                     VerticalAlignment="VerticalAlignment.Center">
+            @if (renaming) {
+                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
+                    <FluentTextInput @bind-Value="renameValue" MaxLength="ScoutingLimits.TeamNameMaxLength"/>
+                    <FluentButton Appearance="ButtonAppearance.Primary" Loading="busy" Disabled="busy" OnClick="SaveRenameAsync">Save</FluentButton>
+                    <FluentButton Appearance="ButtonAppearance.Default" Disabled="busy" OnClick="() => renaming = false">Cancel</FluentButton>
+                </FluentStack>
+            } else {
+                <FluentText Size="TextSize.Size700" Weight="TextWeight.Bold"
+                            Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@team.Name</FluentText>
+            }
+            <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" Width="auto"
+                         HorizontalAlignment="HorizontalAlignment.End" Style="flex: 0 0 auto;">
+                @if (CanManage && !renaming) {
+                    <FluentButton Appearance="ButtonAppearance.Default" IconStart="@(new Icons.Regular.Size16.Edit())"
+                                  OnClick="BeginRename">Rename</FluentButton>
+                }
+                @if (IsMember) {
+                    <FluentButton Appearance="ButtonAppearance.Default" Loading="busy" Disabled="@(busy || !CanLeave)"
+                                  Title="@(CanLeave ? null : "The only owner cannot leave; assign another owner first.")"
+                                  OnClick="LeaveAsync">Leave</FluentButton>
+                }
+                @if (CanDelete) {
+                    <FluentButton Appearance="ButtonAppearance.Default" Loading="busy" Disabled="busy"
+                                  IconStart="@(new Icons.Regular.Size16.Delete())"
+                                  OnClick="DeleteTeamAsync">Delete</FluentButton>
+                }
+            </FluentStack>
+        </FluentStack>
+
+        @if (actionError is not null) {
+            <FluentText Color="Color.Error">@actionError</FluentText>
+        }
+
+        <FluentText Size="TextSize.Size600" Weight="TextWeight.Bold">Members</FluentText>
+        <FluentDataGrid Items="@team.Members.AsQueryable()" TGridItem="ScoutingMember" GridTemplateColumns="2fr 1.5fr 1.5fr 1fr"
+                        RowSize="DataGridRowSize.Large">
+            <TemplateColumn Title="Member">
+                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8"
+                             VerticalAlignment="VerticalAlignment.Center" Width="auto"
+                             Style="height: 100%;">
+                    <span>@context.Username</span>
+                    @if (context.UserId == currentUserId) {
+                        <FluentBadge Appearance="BadgeAppearance.Outline">You</FluentBadge>
+                    }
+                </FluentStack>
+            </TemplateColumn>
+            <TemplateColumn Title="Role">
+                <div style="display: flex; align-items: center; height: 100%;">
+                    @if (CanManage) {
+                        <FluentSelect TOption="ScoutingTeamRole"
+                                      TValue="ScoutingTeamRole"
+                                      Items="RoleOptions"
+                                      OptionText="@(r => RoleLabel(r))"
+                                      OptionValue="@(r => r)"
+                                      Value="context.Role"
+                                      ValueChanged="r => ChangeRoleAsync(context, r)"
+                                      Disabled="@(busy || IsSoleOwner(context))"/>
+                    } else {
+                        @RoleLabel(context.Role)
+                    }
+                </div>
+            </TemplateColumn>
+            <TemplateColumn Title="Joined">@context.CreatedAt.LocalDateTime.ToString("g")</TemplateColumn>
+            <TemplateColumn Title="">
+                @if (CanManage && context.UserId != currentUserId) {
+                    <FluentButton Appearance="ButtonAppearance.Subtle" Title="Remove member" IconOnly="true"
+                                  Disabled="@(busy || IsSoleOwner(context))"
+                                  IconStart="@(new Icons.Regular.Size16.PersonDelete())"
+                                  OnClick="() => RemoveMemberAsync(context)"/>
+                }
+            </TemplateColumn>
+        </FluentDataGrid>
+
+        @if (CanManage) {
+            <FluentCard>
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                    <FluentText Weight="TextWeight.Bold">Add a member</FluentText>
+                    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Bottom">
+                        <div style="display: flex; flex-direction: column; gap: 4px; width: 260px;">
+                            <FluentText>Username</FluentText>
+                            <FluentTextInput @bind-Value="addUsername"
+                                             Placeholder="Existing member's username" Style="width: 100%;"/>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 4px; width: 160px;">
+                            <FluentText>Role</FluentText>
+                            <FluentSelect TOption="ScoutingTeamRole"
+                                          TValue="ScoutingTeamRole"
+                                          Items="RoleOptions"
+                                          OptionText="@(r => RoleLabel(r))"
+                                          OptionValue="@(r => r)"
+                                          Style="width: 100%;"
+                                          @bind-Value="addRole"/>
+                        </div>
+                        <FluentButton Appearance="ButtonAppearance.Primary"
+                                      Loading="busy"
+                                      Disabled="@(busy || string.IsNullOrWhiteSpace(addUsername))"
+                                      OnClick="AddMemberAsync">Add</FluentButton>
+                    </FluentStack>
+                </FluentStack>
+            </FluentCard>
+        }
+
+        <FluentDivider Style="width: 100%;"/>
+
+        <FluentStack Orientation="Orientation.Horizontal"
+                     HorizontalAlignment="HorizontalAlignment.SpaceBetween"
+                     VerticalAlignment="VerticalAlignment.Center">
+            <FluentText Size="TextSize.Size600" Weight="TextWeight.Bold">Boards</FluentText>
+            @if (CanEditBoards) {
+                <FluentButton Appearance="ButtonAppearance.Primary" IconStart="@(new Icons.Regular.Size16.Add())"
+                              OnClick="() => showCreateBoard = !showCreateBoard">New board</FluentButton>
+            }
+        </FluentStack>
+
+        @if (showCreateBoard && CanEditBoards) {
+            <FluentCard>
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                    <FluentTextInput @bind-Value="newBoardName" Label="Board name"
+                                     MaxLength="ScoutingLimits.BoardNameMaxLength" Style="width: 100%;"/>
+                    <FluentNumberInput TValue="int?" @bind-Value="newBoardSeason" Label="Draft season (optional)"/>
+                    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
+                        <FluentButton Appearance="ButtonAppearance.Primary"
+                                      Loading="busy"
+                                      Disabled="@(busy || string.IsNullOrWhiteSpace(newBoardName))"
+                                      OnClick="CreateBoardAsync">Create</FluentButton>
+                        <FluentButton Appearance="ButtonAppearance.Default" Disabled="busy"
+                                      OnClick="() => showCreateBoard = false">Cancel</FluentButton>
+                    </FluentStack>
+                </FluentStack>
+            </FluentCard>
+        }
+
+        @if (team.Boards.Count == 0) {
+            <FluentText Style="color: var(--colorNeutralForeground2);">This team has no boards yet.</FluentText>
+        } else {
+            <FluentDataGrid Items="@team.Boards.AsQueryable()" TGridItem="ScoutingBoardSummary" GridTemplateColumns="2fr 1fr 1fr 1.5fr 0.5fr">
+                <TemplateColumn Title="Name">
+                    <a href="@Routes.Scouting.Board(context.Id)">@context.Name</a>
+                </TemplateColumn>
+                <TemplateColumn Title="Season">@(context.DraftSeason?.ToString() ?? "—")</TemplateColumn>
+                <PropertyColumn Property="@(b => b.EntryCount)" Title="Players"/>
+                <TemplateColumn Title="Updated">@context.UpdatedAt.LocalDateTime.ToString("g")</TemplateColumn>
+                <TemplateColumn Title="">
+                    @if (CanEditBoards) {
+                        <FluentButton Appearance="ButtonAppearance.Subtle" Title="Delete board" IconOnly="true"
+                                      Disabled="busy"
+                                      IconStart="@(new Icons.Regular.Size16.Delete())"
+                                      OnClick="() => DeleteBoardAsync(context)"/>
+                    }
+                </TemplateColumn>
+            </FluentDataGrid>
+        }
+    </FluentStack>
+}

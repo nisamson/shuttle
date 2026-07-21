@@ -46,6 +46,13 @@ public static class FakeBackendServiceCollectionExtensions {
         services.AddSingleton<IShuttleDebugClient>(
             sp => new InMemoryShuttleDebugClient(sp.GetRequiredService<AuthenticationStateProvider>()));
 
+        // The scouting client mirrors the server's team/board/comment semantics and seeds a demo team
+        // (owned by the fake caller) so the offline run mode has content to show.
+        services.RemoveAll<IShuttleScoutingClient>();
+        services.AddSingleton<IShuttleScoutingClient>(
+            sp => new InMemoryShuttleScoutingClient(
+                sp.GetRequiredService<AuthenticationStateProvider>(), seedDemoContent: true));
+
         return services;
     }
 }

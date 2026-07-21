@@ -9,6 +9,7 @@ using Shuttle.EFCore.Entities.Index;
 using Shuttle.EFCore.Entities.Performance;
 using Shuttle.EFCore.Entities.Portal;
 using Shuttle.EFCore.Entities.Ratings;
+using Shuttle.EFCore.Entities.Scouting;
 
 namespace Shuttle.EFCore;
 
@@ -43,5 +44,15 @@ public class ShlDbContext : DbContext {
     public DbSet<TpeEvent> TpeEvents { get; set; }
     
     public DbSet<Team> Teams { get; set; }
+
+    public DbSet<ScoutingTeam> ScoutingTeams { get; set; }
+
+    public DbSet<ScoutingTeamMember> ScoutingTeamMembers { get; set; }
+
+    public DbSet<ScoutingBoard> ScoutingBoards { get; set; }
+
+    public DbSet<ScoutingBoardEntry> ScoutingBoardEntries { get; set; }
+
+    public DbSet<ScoutingComment> ScoutingComments { get; set; }
 
 }
