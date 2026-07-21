@@ -1,0 +1,26 @@
+@inherits Microsoft.FluentUI.AspNetCore.Components.FluentDialogInstance
+@using Shuttle.Models.Scouting
+
+<FluentDialogBody>
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="16">
+        <FluentText>Applying to @Content.SelectedCount selected prospect@(Content.SelectedCount == 1 ? "" : "s"). Leave a field unchanged to keep each prospect's current value.</FluentText>
+
+        <FluentSelect TOption="StatusChoice"
+                      TValue="string"
+                      Label="Scouting status"
+                      Items="StatusChoices"
+                      OptionText="@(c => c.Text)"
+                      OptionValue="@(c => c.Value)"
+                      @bind-Value="statusValue"
+                      Style="width: 16rem;"/>
+
+        <FluentSelect TOption="AssigneeChoice"
+                      TValue="string"
+                      Label="Assigned to"
+                      Items="AssigneeChoices"
+                      OptionText="@(c => c.Text)"
+                      OptionValue="@(c => c.Value)"
+                      @bind-Value="assigneeValue"
+                      Style="width: 16rem;"/>
+    </FluentStack>
+</FluentDialogBody>

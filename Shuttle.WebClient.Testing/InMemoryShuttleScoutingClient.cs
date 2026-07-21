@@ -581,6 +581,74 @@ public sealed class InMemoryShuttleScoutingClient : IShuttleScoutingClient {
         }
     }
 
+    public async Task<ScoutingBoardDetail> UpdateEntries(Guid boardId, BulkUpdateScoutingBoardEntriesRequest request, CancellationToken token = default) {
+        var caller = await ResolveCallerAsync();
+        lock (gate) {
+            var (team, board) = RequireBoard(boardId);
+            RequireEditBoards(team, caller);
+
+            if (request.Status is null && !request.ChangeAssignee) {
+                throw Problem(HttpMethod.Post, HttpStatusCode.BadRequest, "Specify a status and/or an assignee to apply.");
+            }
+
+            if (request.Status is { } requested && !Enum.IsDefined(requested)) {
+                throw Problem(HttpMethod.Post, HttpStatusCode.BadRequest, "Unknown prospect status.");
+            }
+
+            var playerIds = request.PlayerIds.Distinct().ToHashSet();
+            if (playerIds.Count == 0) {
+                throw Problem(HttpMethod.Post, HttpStatusCode.BadRequest, "No players were selected.");
+            }
+
+            if (request.ChangeAssignee && request.AssignedToUserId is { } assigneeId) {
+                var assignee = team.Member(assigneeId);
+                if (assignee is null) {
+                    throw Problem(HttpMethod.Post, HttpStatusCode.BadRequest, "The assignee is not a member of this team.");
+                }
+
+                if (assignee.Role < ScoutingTeamRole.Editor) {
+                    throw Problem(HttpMethod.Post, HttpStatusCode.BadRequest,
+                        "The assignee must have edit access (Editor or Owner).");
+                }
+            }
+
+            var selected = board.Entries.Where(e => playerIds.Contains(e.PlayerId)).ToList();
+            if (selected.Count == 0) {
+                throw Problem(HttpMethod.Post, HttpStatusCode.NotFound, "None of the selected players are on this board.");
+            }
+
+            if (request.Status is { } newStatus) {
+                foreach (var entry in selected) {
+                    entry.Status = newStatus;
+                }
+
+                var active = board.Entries
+                    .Where(e => e.Status != ScoutingProspectStatus.Rejected)
+                    .OrderBy(e => e.Rank > 0 ? 0 : 1)
+                    .ThenBy(e => e.Rank)
+                    .ThenBy(e => e.PlayerId)
+                    .ToList();
+                var rank = 1;
+                foreach (var entry in active) {
+                    entry.Rank = rank++;
+                }
+
+                foreach (var entry in board.Entries.Where(e => e.Status == ScoutingProspectStatus.Rejected)) {
+                    entry.Rank = 0;
+                }
+            }
+
+            if (request.ChangeAssignee) {
+                foreach (var entry in selected) {
+                    entry.AssignedToUserId = request.AssignedToUserId;
+                }
+            }
+
+            board.UpdatedAt = DateTimeOffset.UtcNow;
+            return BoardDetail(team, board);
+        }
+    }
+
     private static void MoveWithinActive(List<EntryState> active, EntryState moved, int target) {
         target = Math.Clamp(target, 1, active.Count);
         var from = moved.Rank;

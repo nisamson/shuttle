@@ -78,4 +78,47 @@ public class InMemoryScoutingEntryStatusTests {
 
         Assert.Equal(HttpStatusCode.BadRequest, ex.StatusCode);
     }
+
+    [Fact]
+    public async Task Bulk_status_change_recomputes_active_ranks() {
+        var board = await BoardWithEntriesAsync(1001, 1002, 1003, 1004);
+
+        var refreshed = await client.UpdateEntries(board.Id, new BulkUpdateScoutingBoardEntriesRequest {
+            PlayerIds = [1002, 1003],
+            Status = ScoutingProspectStatus.Rejected,
+        });
+
+        Assert.Equal(0, refreshed.Entries.Single(e => e.PlayerId == 1002).Rank);
+        Assert.Equal(0, refreshed.Entries.Single(e => e.PlayerId == 1003).Rank);
+        Assert.Equal(1, refreshed.Entries.Single(e => e.PlayerId == 1001).Rank);
+        Assert.Equal(2, refreshed.Entries.Single(e => e.PlayerId == 1004).Rank);
+    }
+
+    [Fact]
+    public async Task Bulk_assign_change_assignee_false_leaves_assignees_unchanged() {
+        var board = await BoardWithEntriesAsync(1001, 1002);
+
+        // Status-only bulk update with ChangeAssignee=false must not touch (or validate) assignees.
+        var refreshed = await client.UpdateEntries(board.Id, new BulkUpdateScoutingBoardEntriesRequest {
+            PlayerIds = [1001, 1002],
+            Status = ScoutingProspectStatus.Scouted,
+            ChangeAssignee = false,
+            AssignedToUserId = Guid.NewGuid(),
+        });
+
+        Assert.All(refreshed.Entries, e => Assert.Null(e.AssignedToUserId));
+        Assert.All(refreshed.Entries, e => Assert.Equal(ScoutingProspectStatus.Scouted, e.Status));
+    }
+
+    [Fact]
+    public async Task Bulk_update_with_no_changes_is_rejected() {
+        var board = await BoardWithEntriesAsync(1001);
+
+        var ex = await Assert.ThrowsAnyAsync<ApiException>(() =>
+            client.UpdateEntries(board.Id, new BulkUpdateScoutingBoardEntriesRequest {
+                PlayerIds = [1001],
+            }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, ex.StatusCode);
+    }
 }

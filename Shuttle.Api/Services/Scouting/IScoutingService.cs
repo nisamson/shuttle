@@ -38,6 +38,7 @@ public interface IScoutingService {
     Task<ScoutingResult> RemoveEntriesAsync(Guid boardId, RemoveScoutingBoardEntriesRequest request, ClaimsPrincipal principal, CancellationToken cancellationToken = default);
     Task<ScoutingResult> MoveEntryAsync(Guid boardId, MoveScoutingBoardEntryRequest request, ClaimsPrincipal principal, CancellationToken cancellationToken = default);
     Task<ScoutingResult<ScoutingBoardEntry>> UpdateEntryAsync(Guid boardId, int playerId, UpdateScoutingBoardEntryRequest request, ClaimsPrincipal principal, CancellationToken cancellationToken = default);
+    Task<ScoutingResult<ScoutingBoardDetail>> UpdateEntriesAsync(Guid boardId, BulkUpdateScoutingBoardEntriesRequest request, ClaimsPrincipal principal, CancellationToken cancellationToken = default);
 
     // Comments
     Task<ScoutingResult<IReadOnlyList<ScoutingComment>>> GetBoardCommentsAsync(Guid boardId, ClaimsPrincipal principal, CancellationToken cancellationToken = default);

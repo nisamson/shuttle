@@ -124,6 +124,23 @@ public class ScoutingBoardsController : ControllerBase {
     }
 
     /// <summary>
+    /// Applies a scouting status and/or assignee change to several prospects in one transaction.
+    /// Changing status recomputes the active rank sequence. Owners and editors only.
+    /// </summary>
+    [HttpPost("{boardId:guid}/entries/bulk-update")]
+    [ProducesResponseType<ScoutingBoardDetail>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<ScoutingBoardDetail>> UpdateEntries(
+        Guid boardId,
+        [FromBody] BulkUpdateScoutingBoardEntriesRequest request,
+        CancellationToken cancellationToken) {
+        return (await scouting.UpdateEntriesAsync(boardId, request, User, cancellationToken)).ToActionResult(this);
+    }
+
+    /// <summary>
     /// Moves a player from one rank to another. <c>FromRank</c> guards against stale reorders.
     /// Owners and editors only.
     /// </summary>

@@ -64,6 +64,9 @@
                 <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="12" VerticalAlignment="VerticalAlignment.Center">
                     <FluentText>@SelectedCount selected</FluentText>
                     <FluentButton Appearance="ButtonAppearance.Primary" Loading="busy" Disabled="busy"
+                                  IconStart="@(new Icons.Regular.Size16.Edit())"
+                                  OnClick="BulkEditAsync">Edit selected</FluentButton>
+                    <FluentButton Appearance="ButtonAppearance.Default" Loading="busy" Disabled="busy"
                                   IconStart="@(new Icons.Regular.Size16.Delete())"
                                   OnClick="BulkDeleteAsync">Delete selected</FluentButton>
                     <FluentButton Appearance="ButtonAppearance.Default" Disabled="busy" OnClick="ClearSelection">Clear</FluentButton>
@@ -110,7 +113,7 @@
                         }
                     </ChildContent>
                 </TemplateColumn>
-                <TemplateColumn Title="Status" Align="DataGridCellAlignment.Center">
+                <TemplateColumn Title="Scouting Status" Align="DataGridCellAlignment.Center">
                     <FluentBadge Appearance="@StatusAppearance(context.Status)">@StatusText(context.Status)</FluentBadge>
                 </TemplateColumn>
                 <TemplateColumn Title="Assignee">
@@ -153,7 +156,25 @@
         @if (HasRejected) {
             <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
                 <FluentText Size="TextSize.Size500" Weight="TextWeight.Bold">Rejected prospects</FluentText>
+                @if (CanEditBoards && SelectedRejectedCount > 0) {
+                    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="12" VerticalAlignment="VerticalAlignment.Center">
+                        <FluentText>@SelectedRejectedCount selected</FluentText>
+                        <FluentButton Appearance="ButtonAppearance.Primary" Loading="busy" Disabled="busy"
+                                      IconStart="@(new Icons.Regular.Size16.Edit())"
+                                      OnClick="BulkEditRejectedAsync">Edit selected</FluentButton>
+                        <FluentButton Appearance="ButtonAppearance.Default" Loading="busy" Disabled="busy"
+                                      IconStart="@(new Icons.Regular.Size16.Delete())"
+                                      OnClick="BulkDeleteRejectedAsync">Delete selected</FluentButton>
+                        <FluentButton Appearance="ButtonAppearance.Default" Disabled="busy" OnClick="ClearRejectedSelection">Clear</FluentButton>
+                    </FluentStack>
+                }
                 <FluentDataGrid Items="@RejectedRows" TGridItem="BoardRow" ResizableColumns="true">
+                    @if (CanEditBoards) {
+                        <SelectColumn TGridItem="BoardRow"
+                                      SelectMode="DataGridSelectMode.Multiple"
+                                      SelectFromEntireRow="false"
+                                      @bind-SelectedItems="selectedRejectedRows"/>
+                    }
                     <TemplateColumn Title="Player">
                         <a href="@Routes.Players.Player(context.PlayerId)" target="_blank" rel="noopener noreferrer">@context.Name</a>
                     </TemplateColumn>

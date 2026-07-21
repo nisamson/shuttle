@@ -42,6 +42,7 @@ public partial class ScoutingBoard : ComponentBase {
     // The grid's rows: entries joined with their resolved player cards, rebuilt on every reload.
     private List<BoardRow> rows = [];
     private IEnumerable<BoardRow> selectedRows = [];
+    private IEnumerable<BoardRow> selectedRejectedRows = [];
     private string nameFilter = string.Empty;
     private readonly HashSet<PlayerPosition> selectedPositions = [];
 
@@ -52,6 +53,7 @@ public partial class ScoutingBoard : ComponentBase {
     private bool CanModerate => isAdmin || myRole == ScoutingTeamRole.Owner;
 
     private int SelectedCount => selectedRows.Count();
+    private int SelectedRejectedCount => selectedRejectedRows.Count();
 
     // Only active (non-rejected) prospects participate in the ranked list.
     private int ActiveCount => rows.Count(r => r.Status != ScoutingProspectStatus.Rejected);
@@ -200,6 +202,7 @@ public partial class ScoutingBoard : ComponentBase {
                 })
                 .ToList();
         selectedRows = [];
+        selectedRejectedRows = [];
     }
 
     private async Task ReloadBoardAsync() {
@@ -314,6 +317,8 @@ public partial class ScoutingBoard : ComponentBase {
     };
 
     private static BadgeAppearance StatusAppearance(ScoutingProspectStatus status) => status switch {
+        ScoutingProspectStatus.Pending => BadgeAppearance.Ghost,
+        ScoutingProspectStatus.Scouted => BadgeAppearance.Outline,
         ScoutingProspectStatus.Approved => BadgeAppearance.Filled,
         ScoutingProspectStatus.Rejected => BadgeAppearance.Tint,
         _ => BadgeAppearance.Outline,
@@ -335,8 +340,13 @@ public partial class ScoutingBoard : ComponentBase {
         });
     }
 
-    private async Task BulkDeleteAsync() {
-        var ids = selectedRows.Select(r => r.PlayerId).Distinct().ToList();
+    private Task BulkDeleteAsync() =>
+        BulkDeleteCoreAsync(selectedRows.Select(r => r.PlayerId).Distinct().ToList());
+
+    private Task BulkDeleteRejectedAsync() =>
+        BulkDeleteCoreAsync(selectedRejectedRows.Select(r => r.PlayerId).Distinct().ToList());
+
+    private async Task BulkDeleteCoreAsync(List<int> ids) {
         if (ids.Count == 0) {
             return;
         }
@@ -354,6 +364,42 @@ public partial class ScoutingBoard : ComponentBase {
         await RunAsync(async () => {
             await ScoutingClient.RemoveEntries(BoardId, new RemoveScoutingBoardEntriesRequest { PlayerIds = ids });
             await ReloadBoardAsync();
+        });
+    }
+
+    private Task BulkEditAsync() =>
+        BulkEditCoreAsync(selectedRows.Select(r => r.PlayerId).Distinct().ToList());
+
+    private Task BulkEditRejectedAsync() =>
+        BulkEditCoreAsync(selectedRejectedRows.Select(r => r.PlayerId).Distinct().ToList());
+
+    private async Task BulkEditCoreAsync(List<int> ids) {
+        if (ids.Count == 0) {
+            return;
+        }
+
+        var dialogResult = await DialogService.ShowDialogAsync<ScoutingBulkEditDialog>(options => {
+            options.Modal = true;
+            options.Width = "420px";
+            options.Parameters.Add(nameof(ScoutingBulkEditDialog.Content), new ScoutingBulkEditDialog.Args {
+                SelectedCount = ids.Count,
+                EligibleAssignees = eligibleAssignees,
+            });
+        });
+
+        if (dialogResult.Cancelled || dialogResult.Value is not ScoutingBulkEditDialog.Result edited) {
+            return;
+        }
+
+        await RunAsync(async () => {
+            await ScoutingClient.UpdateEntries(BoardId, new BulkUpdateScoutingBoardEntriesRequest {
+                PlayerIds = ids,
+                Status = edited.Status,
+                ChangeAssignee = edited.ChangeAssignee,
+                AssignedToUserId = edited.AssignedToUserId,
+            });
+            await ReloadBoardAsync();
+            actionMessage = $"Updated {ids.Count} prospect{(ids.Count == 1 ? string.Empty : "s")}.";
         });
     }
 
@@ -399,6 +445,10 @@ public partial class ScoutingBoard : ComponentBase {
 
     private void ClearSelection() {
         selectedRows = [];
+    }
+
+    private void ClearRejectedSelection() {
+        selectedRejectedRows = [];
     }
 
     private async Task OpenEntryCommentsAsync(BoardRow row) {

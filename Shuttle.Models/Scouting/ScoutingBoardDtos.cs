@@ -139,6 +139,36 @@ public record RemoveScoutingBoardEntriesRequest {
 }
 
 /// <summary>
+/// Payload for applying a status and/or assignee change to several prospects on a board in one
+/// request. At least one of <see cref="Status"/> or <see cref="ChangeAssignee"/> must be set;
+/// changing status recomputes the active rank sequence (rejected prospects are unranked and
+/// newly-restored prospects are appended to the end).
+/// </summary>
+public record BulkUpdateScoutingBoardEntriesRequest {
+    /// <summary>Upstream integer ids of the prospects to update.</summary>
+    [Required]
+    public required IReadOnlyList<int> PlayerIds { get; init; }
+
+    /// <summary>The status to apply to every selected prospect, or <c>null</c> to leave statuses unchanged.</summary>
+    public ScoutingProspectStatus? Status { get; init; }
+
+    /// <summary>
+    /// Whether to change the assignee of every selected prospect. When <c>true</c>,
+    /// <see cref="AssignedToUserId"/> is applied (with <c>null</c> meaning "unassign"); when
+    /// <c>false</c> assignees are left as-is. This flag disambiguates "clear the assignee" from
+    /// "leave the assignee unchanged".
+    /// </summary>
+    public bool ChangeAssignee { get; init; }
+
+    /// <summary>
+    /// The <c>ShuttleUser</c> id to assign every selected prospect to (or <c>null</c> to unassign),
+    /// applied only when <see cref="ChangeAssignee"/> is <c>true</c>. The assignee must be a team
+    /// member with edit access (Editor or Owner).
+    /// </summary>
+    public Guid? AssignedToUserId { get; init; }
+}
+
+/// <summary>
 /// Payload for moving a player to a new rank. <see cref="FromRank"/> is an optimistic-concurrency
 /// guard: if it does not match the player's current rank the move is rejected with a conflict, so a
 /// stale client cannot silently reorder based on outdated positions.

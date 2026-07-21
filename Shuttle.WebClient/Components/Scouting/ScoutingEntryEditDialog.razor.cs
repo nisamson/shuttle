@@ -43,7 +43,7 @@ public partial class ScoutingEntryEditDialog : FluentDialogInstance {
         footer.SecondaryAction.Visible = true;
     }
 
-    protected override void OnParametersSet() {
+    protected override void OnInitialized() {
         rank = Content.CurrentRank;
         statusValue = Content.CurrentStatus.ToString();
         assigneeValue = Content.CurrentAssigneeUserId?.ToString() ?? UnassignedValue;

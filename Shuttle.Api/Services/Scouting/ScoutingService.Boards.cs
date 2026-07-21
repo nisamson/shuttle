@@ -585,6 +585,103 @@ public sealed partial class ScoutingService {
         return ScoutingResult<ScoutingBoardEntry>.Ok(dto);
     }
 
+    public async Task<ScoutingResult<ScoutingBoardDetail>> UpdateEntriesAsync(
+        Guid boardId,
+        BulkUpdateScoutingBoardEntriesRequest request,
+        ClaimsPrincipal principal,
+        CancellationToken cancellationToken = default) {
+        var (board, access) = await ResolveBoardAsync(boardId, principal, tracked: true, cancellationToken);
+        if (board is null || access is null) {
+            return ScoutingResult<ScoutingBoardDetail>.NotFound("Board not found.");
+        }
+
+        if (!access.CanEditBoards) {
+            return ScoutingResult<ScoutingBoardDetail>.Forbidden("You do not have permission to edit this board.");
+        }
+
+        if (request.Status is null && !request.ChangeAssignee) {
+            return ScoutingResult<ScoutingBoardDetail>.Invalid("Specify a status and/or an assignee to apply.");
+        }
+
+        if (request.Status is { } requested && !Enum.IsDefined(requested)) {
+            return ScoutingResult<ScoutingBoardDetail>.Invalid("Unknown prospect status.");
+        }
+
+        var playerIds = request.PlayerIds.Distinct().ToHashSet();
+        if (playerIds.Count == 0) {
+            return ScoutingResult<ScoutingBoardDetail>.Invalid("No players were selected.");
+        }
+
+        // Validate the assignee once; it is shared across every selected prospect.
+        if (request.ChangeAssignee && request.AssignedToUserId is { } assigneeId) {
+            var assigneeRole = await db.ScoutingTeamMembers
+                .AsNoTracking()
+                .Where(m => m.ScoutingTeamId == board.ScoutingTeamId && m.ShuttleUserId == assigneeId)
+                .Select(m => (ScoutingTeamRole?)m.Role)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (assigneeRole is null) {
+                return ScoutingResult<ScoutingBoardDetail>.Invalid("The assignee is not a member of this team.");
+            }
+
+            if (!assigneeRole.Value.CanEditBoards()) {
+                return ScoutingResult<ScoutingBoardDetail>.Invalid(
+                    "The assignee must have edit access (Editor or Owner).");
+            }
+        }
+
+        var entries = await db.ScoutingBoardEntries
+            .Where(e => e.ScoutingBoardId == boardId)
+            .OrderBy(e => e.Rank)
+            .ToListAsync(cancellationToken);
+
+        var selected = entries.Where(e => playerIds.Contains(e.PlayerId)).ToList();
+        if (selected.Count == 0) {
+            return ScoutingResult<ScoutingBoardDetail>.NotFound("None of the selected players are on this board.");
+        }
+
+        var now = Now;
+
+        if (request.Status is { } newStatus) {
+            foreach (var entry in selected) {
+                entry.Status = newStatus;
+                entry.UpdatedAt = now;
+            }
+
+            // Recompute the active rank sequence: keep the existing order of prospects that were
+            // already ranked, append newly-restored ones (Rank 0) at the end, and unrank the rejected.
+            var active = entries
+                .Where(e => e.Status != ScoutingProspectStatus.Rejected)
+                .OrderBy(e => e.Rank > 0 ? 0 : 1)
+                .ThenBy(e => e.Rank)
+                .ThenBy(e => e.PlayerId)
+                .ToList();
+            var rank = 1;
+            foreach (var entry in active) {
+                entry.Rank = rank++;
+            }
+
+            foreach (var entry in entries.Where(e => e.Status == ScoutingProspectStatus.Rejected)) {
+                entry.Rank = 0;
+            }
+        }
+
+        if (request.ChangeAssignee) {
+            foreach (var entry in selected.Where(e => e.AssignedToUserId != request.AssignedToUserId)) {
+                entry.AssignedToUserId = request.AssignedToUserId;
+                entry.AssignedAt = request.AssignedToUserId is null ? null : now;
+                entry.UpdatedAt = now;
+            }
+        }
+
+        board.UpdatedAt = now;
+        if (!await TrySaveChangesAsync(cancellationToken)) {
+            return ScoutingResult<ScoutingBoardDetail>.Conflict(
+                "The board was changed by someone else; please reload and try again.");
+        }
+
+        return ScoutingResult<ScoutingBoardDetail>.Ok(await LoadBoardDetailAsync(boardId, cancellationToken));
+    }
+
     // Reorders a prospect within the active (non-rejected) sequence, clamping the target into range
     // and shifting the entries between the old and new positions so ranks stay contiguous.
     private static void MoveWithinActive(

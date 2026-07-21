@@ -74,6 +74,9 @@ public interface IShuttleScoutingClient {
     [Put("/scouting/boards/{boardId}/entries/{playerId}")]
     Task<ScoutingBoardEntry> UpdateEntry(Guid boardId, int playerId, [Body] UpdateScoutingBoardEntryRequest request, CancellationToken token = default);
 
+    [Post("/scouting/boards/{boardId}/entries/bulk-update")]
+    Task<ScoutingBoardDetail> UpdateEntries(Guid boardId, [Body] BulkUpdateScoutingBoardEntriesRequest request, CancellationToken token = default);
+
     // Comments
     [Get("/scouting/boards/{boardId}/comments")]
     Task<IReadOnlyList<ScoutingComment>> GetBoardComments(Guid boardId, CancellationToken token = default);
