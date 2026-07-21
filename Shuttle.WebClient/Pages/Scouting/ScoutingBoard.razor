@@ -69,6 +69,8 @@
                     <FluentButton Appearance="ButtonAppearance.Default" Loading="busy" Disabled="busy"
                                   IconStart="@(new Icons.Regular.Size16.Delete())"
                                   OnClick="BulkDeleteAsync">Delete selected</FluentButton>
+                    <FluentButton Appearance="ButtonAppearance.Default"
+                                  Href="@CompareSelectedUrl" Target="_blank">Compare selected</FluentButton>
                     <FluentButton Appearance="ButtonAppearance.Default" Disabled="busy" OnClick="ClearSelection">Clear</FluentButton>
                 </FluentStack>
             }
@@ -165,6 +167,8 @@
                         <FluentButton Appearance="ButtonAppearance.Default" Loading="busy" Disabled="busy"
                                       IconStart="@(new Icons.Regular.Size16.Delete())"
                                       OnClick="BulkDeleteRejectedAsync">Delete selected</FluentButton>
+                        <FluentButton Appearance="ButtonAppearance.Default"
+                                      Href="@CompareSelectedRejectedUrl" Target="_blank">Compare selected</FluentButton>
                         <FluentButton Appearance="ButtonAppearance.Default" Disabled="busy" OnClick="ClearRejectedSelection">Clear</FluentButton>
                     </FluentStack>
                 }

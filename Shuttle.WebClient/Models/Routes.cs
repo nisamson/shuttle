@@ -33,8 +33,12 @@ public static class Routes {
 
     public static class Players {
         public const string Root = "/players";
+        public const string Compare = "/players/compare";
 
         public static string Player(int playerId) => $"{Root}/{playerId}";
+
+        public static string CompareWith(IEnumerable<int> playerIds) =>
+            $"{Compare}?ids={string.Join(",", playerIds)}";
     }
 
     public static class Users {
