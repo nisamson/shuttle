@@ -230,7 +230,21 @@ public partial class ScoutingBoard : ComponentBase {
         });
     }
 
-    private async Task OnRankEdited(BoardRow row, int newRank) {
+    private async Task EditRankAsync(BoardRow row) {
+        var result = await DialogService.ShowDialogAsync<ScoutingRankEditDialog>(options => {
+            options.Modal = true;
+            options.Width = "360px";
+            options.Parameters.Add(nameof(ScoutingRankEditDialog.Content), new ScoutingRankEditDialog.Args {
+                PlayerName = row.Name,
+                CurrentRank = row.Rank,
+                MaxRank = rows.Count,
+            });
+        });
+
+        if (result.Cancelled || result.Value is not int newRank) {
+            return;
+        }
+
         await MoveAsync(row.PlayerId, row.Rank, newRank);
     }
 

@@ -70,15 +70,15 @@
                 }
                 <TemplateColumn Title="Rank" Sortable="true" SortBy="@RankSort" IsDefaultSortColumn="true"
                                 InitialSortDirection="DataGridSortDirection.Ascending" Align="DataGridCellAlignment.Center">
-                    @if (CanEditBoards) {
-                        <FluentNumberInput TValue="int" Value="context.Rank"
-                                           ValueChanged="v => OnRankEdited(context, v)"
-                                           Min="1" Max="@rows.Count" Disabled="busy"
-                                           StepButtons="NumberInputStepVisibility.Hidden"
-                                           Style="width: 5rem;"/>
-                    } else {
+                    <div style="display: flex; align-items: center; gap: 0.25rem; justify-content: center;">
                         <span>@context.Rank</span>
-                    }
+                        @if (CanEditBoards) {
+                            <FluentButton Appearance="ButtonAppearance.Subtle" Title="Edit rank" IconOnly="true"
+                                          Disabled="busy"
+                                          IconStart="@(new Icons.Regular.Size16.Edit())"
+                                          OnClick="() => EditRankAsync(context)"/>
+                        }
+                    </div>
                 </TemplateColumn>
                 <TemplateColumn Title="Player" Sortable="true" SortBy="@NameSort">
                     <ColumnOptions>
