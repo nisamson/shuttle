@@ -6,15 +6,18 @@
 <ShuttleOptionsContext OptionsChanged="OnOptionsChanged">
     <FluentLayout>
         <FluentLayoutItem Area="LayoutArea.Header">
-            <FluentStack VerticalAlignment="VerticalAlignment.Center">
-                <FluentLayoutHamburger/>
-                <FluentSpacer/>
-                <ShuttleLogo/>
-                <span class="app-title" style="font-weight: 600; font-size: 1.5rem; line-height: 1; margin-inline-start: 0.5rem;">Shuttle</span>
-                <FluentSpacer/>
-                <FeedbackButton/>
-                <ShuttleOptionsButton/>
-            </FluentStack>
+            <div style="position: relative;">
+                <FluentStack VerticalAlignment="VerticalAlignment.Center">
+                    <FluentLayoutHamburger/>
+                    <FluentSpacer/>
+                    <ShuttleLogo/>
+                    <span class="app-title" style="font-weight: 600; font-size: 1.5rem; line-height: 1; margin-inline-start: 0.5rem;">Shuttle</span>
+                    <FluentSpacer/>
+                    <FeedbackButton/>
+                    <ShuttleOptionsButton/>
+                </FluentStack>
+                <PendingRequestIndicator/>
+            </div>
         </FluentLayoutItem>
         <FluentLayoutItem Area="LayoutArea.Navigation"
                           Width="@(NavCollapsed ? "48px" : "250px")"
@@ -41,8 +44,6 @@
         </FluentLayoutItem>
     </FluentLayout>
 </ShuttleOptionsContext>
-
-<PendingRequestIndicator/>
 
 <FluentProviders/>
 

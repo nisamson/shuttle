@@ -1,12 +1,7 @@
 @namespace Shuttle.WebClient.Components
 
 @if (visible) {
-    <div style="position: fixed; inset-block-start: 0; inset-inline-start: 0; inset-inline-end: 0; z-index: 2000; pointer-events: none;">
+    <div style="position: absolute; inset-block-end: 0; inset-inline-start: 0; inset-inline-end: 0; z-index: 2000; pointer-events: none;">
         <FluentProgressBar />
-        <div style="display: flex; justify-content: center; margin-block-start: 8px;">
-            <FluentText Style="pointer-events: auto; background: var(--colorNeutralBackground1); color: var(--colorNeutralForeground1); border: 1px solid var(--colorNeutralStroke1); border-radius: 999px; padding: 4px 14px; font-size: 0.8125rem; box-shadow: var(--elevation-shadow-tooltip);">
-                @description
-            </FluentText>
-        </div>
     </div>
 }

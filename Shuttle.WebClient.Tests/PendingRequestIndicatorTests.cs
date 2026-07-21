@@ -20,13 +20,13 @@ public class PendingRequestIndicatorTests : WebClientTestContext {
     }
 
     [Fact]
-    public void Shows_the_description_while_a_request_is_in_flight_then_hides() {
+    public void Shows_the_progress_bar_while_a_request_is_in_flight_then_hides() {
         var cut = Render<PendingRequestIndicator>();
 
         var token = Tracker.Begin("Looking up players…");
-        cut.WaitForState(() => cut.Markup.Contains("Looking up players…"));
+        cut.WaitForState(() => cut.FindAll("fluent-progress-bar").Count > 0);
 
         token.Dispose();
-        cut.WaitForState(() => !cut.Markup.Contains("Looking up players…"));
+        cut.WaitForState(() => cut.FindAll("fluent-progress-bar").Count == 0);
     }
 }
