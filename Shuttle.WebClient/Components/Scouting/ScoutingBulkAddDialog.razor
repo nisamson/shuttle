@@ -1,0 +1,73 @@
+@inherits Microsoft.FluentUI.AspNetCore.Components.FluentDialogInstance
+@using Shuttle.Models.Players
+@using Shuttle.Shl.Api.Models.Common
+@using Shuttle.WebClient.Models
+
+<FluentDialogBody>
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="16">
+        <FluentText>
+            Paste player names and/or player ids, one per line. Numeric lines are treated as ids.
+            Resolve to preview the matched players before adding them to the board.
+        </FluentText>
+
+        <FluentTextArea @bind-Value="rawText" Style="width: 100%;"
+                        Rows="8"
+                        Resize="TextAreaResize.Vertical"
+                        Placeholder="e.g.&#10;Wayne Gretzky&#10;1042&#10;Bobby Orr"/>
+
+        <div>
+            <FluentButton Appearance="ButtonAppearance.Default"
+                          Loading="resolving"
+                          Disabled="@(resolving || string.IsNullOrWhiteSpace(rawText))"
+                          OnClick="ResolveAsync">Resolve preview</FluentButton>
+        </div>
+
+        @if (resolveError is not null) {
+            <FluentText Color="Color.Error">@resolveError</FluentText>
+        }
+
+        @if (result is not null) {
+            @if (result.Ambiguous.Count > 0) {
+                <FluentText Color="Color.Error">
+                    These names match more than one player; replace them with a player id to continue:
+                    @string.Join(", ", result.Ambiguous).
+                </FluentText>
+            }
+
+            @if (result.NotFound.Count > 0) {
+                <FluentText Color="Color.Warning">
+                    Not found (will be skipped): @string.Join(", ", result.NotFound).
+                </FluentText>
+            }
+
+            @if (result.Resolved.Count > 0) {
+                <FluentText Weight="TextWeight.Bold">@result.Resolved.Count player(s) resolved</FluentText>
+                <FluentDataGrid Items="@ResolvedRows" TGridItem="ResolvedPlayer" ResizableColumns="true">
+                    <TemplateColumn Title="Player" TGridItem="ResolvedPlayer">
+                        <a href="@Routes.Players.Player(context.PlayerId)" target="_blank" rel="noopener noreferrer">@context.Name</a>
+                        @if (Content.ExistingPlayerIds.Contains(context.PlayerId)) {
+                            <FluentBadge Appearance="BadgeAppearance.Outline" Style="margin-inline-start: 6px;">On board</FluentBadge>
+                        }
+                    </TemplateColumn>
+                    <TemplateColumn Title="Position" TGridItem="ResolvedPlayer">
+                        @context.Position.ToShortString()
+                    </TemplateColumn>
+                    <TemplateColumn Title="Draft season" TGridItem="ResolvedPlayer">
+                        @SeasonNumber.Format(context.DraftSeason)
+                    </TemplateColumn>
+                    <TemplateColumn Title="Total TPE" TGridItem="ResolvedPlayer">
+                        @context.TotalTpe.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)
+                    </TemplateColumn>
+                </FluentDataGrid>
+            } else if (result.Ambiguous.Count == 0) {
+                <FluentText Color="Color.Warning">No players matched your input.</FluentText>
+            }
+
+            <div>
+                <FluentButton Appearance="ButtonAppearance.Primary"
+                              Disabled="@(!CanAdd)"
+                              OnClick="AddAsync">@AddButtonLabel</FluentButton>
+            </div>
+        }
+    </FluentStack>
+</FluentDialogBody>

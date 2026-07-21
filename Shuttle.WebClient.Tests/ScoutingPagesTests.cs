@@ -112,4 +112,17 @@ public class ScoutingPagesTests : WebClientTestContext {
         Assert.Contains("1,450", cut.Markup);
         Assert.Contains("12,500", cut.Markup);
     }
+
+    [Fact]
+    public async Task BoardPage_shows_bulk_add_button_for_an_editor() {
+        this.AddAuthorization().SetAuthorized("Test Scout");
+        var team = await Scouting.CreateTeam(new CreateScoutingTeamRequest { Name = "Bulk Scouts" });
+        var board = await Scouting.CreateBoard(team.Id,
+            new CreateScoutingBoardRequest { Name = "Bulk Board", DraftSeason = 73 });
+
+        var cut = Render<ScoutingBoard>(p => p.Add(c => c.BoardId, board.Id));
+
+        cut.WaitForState(() => cut.Markup.Contains("Bulk Board"));
+        Assert.Contains("Bulk add", cut.Markup);
+    }
 }

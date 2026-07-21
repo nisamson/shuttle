@@ -28,6 +28,10 @@
             <FluentText Color="Color.Error">@actionError</FluentText>
         }
 
+        @if (actionMessage is not null) {
+            <FluentText Color="Color.Success">@actionMessage</FluentText>
+        }
+
         @if (CanEditBoards) {
             <FluentCard>
                 <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Bottom">
@@ -45,6 +49,10 @@
                                   Loading="busy"
                                   Disabled="@(busy || pendingPlayer is null)"
                                   OnClick="AddEntryAsync">Add player</FluentButton>
+                    <FluentButton Appearance="ButtonAppearance.Default"
+                                  Disabled="busy"
+                                  IconStart="@(new Icons.Regular.Size16.Add())"
+                                  OnClick="BulkAddAsync">Bulk add</FluentButton>
                 </FluentStack>
             </FluentCard>
         }

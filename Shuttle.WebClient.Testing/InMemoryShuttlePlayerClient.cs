@@ -51,6 +51,79 @@ public sealed class InMemoryShuttlePlayerClient : IShuttlePlayerClient {
         return Task.FromResult(player is null ? null : BuildTimeline(player));
     }
 
+    // Mirrors the server's QUERY /players/resolve semantics against the seed set: case-insensitive
+    // name matching (ambiguous names rejected), unknown ids/names reported, resolved players
+    // de-duplicated preserving order (requested ids first, then name-resolved).
+    public Task<ResolvePlayersResult> ResolvePlayers(ResolvePlayersRequest request, CancellationToken token = default) {
+        var requestedIds = (request.PlayerIds ?? []).ToList();
+        var requestedNames = (request.Names ?? [])
+            .Select(n => n?.Trim() ?? string.Empty)
+            .Where(n => n.Length > 0)
+            .ToList();
+
+        var notFound = new List<string>();
+
+        var byLoweredName = players
+            .GroupBy(p => p.Name.ToLowerInvariant())
+            .ToDictionary(g => g.Key, g => g.Select(p => p.PlayerId).Distinct().ToList());
+
+        var ambiguous = new List<string>();
+        var resolvedFromNames = new List<int>();
+        var seenLoweredNames = new HashSet<string>();
+        foreach (var name in requestedNames) {
+            var lowered = name.ToLowerInvariant();
+            if (!seenLoweredNames.Add(lowered)) {
+                continue;
+            }
+
+            if (!byLoweredName.TryGetValue(lowered, out var ids) || ids.Count == 0) {
+                notFound.Add(name);
+            } else if (ids.Count > 1) {
+                ambiguous.Add(name);
+            } else {
+                resolvedFromNames.Add(ids[0]);
+            }
+        }
+
+        var byId = players.ToDictionary(p => p.PlayerId);
+
+        var resolved = new List<ResolvedPlayer>();
+        var seenIds = new HashSet<int>();
+        foreach (var id in requestedIds) {
+            if (!seenIds.Add(id)) {
+                continue;
+            }
+
+            if (byId.TryGetValue(id, out var card)) {
+                resolved.Add(ToResolved(card));
+            } else {
+                notFound.Add(id.ToString());
+            }
+        }
+
+        foreach (var id in resolvedFromNames) {
+            if (seenIds.Add(id) && byId.TryGetValue(id, out var card)) {
+                resolved.Add(ToResolved(card));
+            }
+        }
+
+        return Task.FromResult(new ResolvePlayersResult {
+            Resolved = resolved,
+            NotFound = notFound,
+            Ambiguous = ambiguous,
+        });
+    }
+
+    private static ResolvedPlayer ToResolved(PlayerCard card) => new() {
+        PlayerId = card.PlayerId,
+        Name = card.Name,
+        Username = card.Username,
+        Status = card.Status,
+        Position = card.Position,
+        DraftSeason = card.DraftSeason,
+        TotalTpe = card.TotalTpe,
+    };
+
     // Synthesizes a deterministic, monotonically increasing TPE ramp from the player's creation date
     // up to their current TotalTpe, so the offline profile renders a real timeline chart. Players
     // with no TPE (e.g. pending/denied) yield an empty timeline, exercising the "no data" state.
