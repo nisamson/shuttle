@@ -70,15 +70,7 @@
                 }
                 <TemplateColumn Title="Rank" Sortable="true" SortBy="@RankSort" IsDefaultSortColumn="true"
                                 InitialSortDirection="DataGridSortDirection.Ascending" Align="DataGridCellAlignment.Center">
-                    <div style="display: flex; align-items: center; gap: 0.25rem; justify-content: center;">
-                        <span>@context.Rank</span>
-                        @if (CanEditBoards) {
-                            <FluentButton Appearance="ButtonAppearance.Subtle" Title="Edit rank" IconOnly="true"
-                                          Disabled="busy"
-                                          IconStart="@(new Icons.Regular.Size16.Edit())"
-                                          OnClick="() => EditRankAsync(context)"/>
-                        }
-                    </div>
+                    <span>@context.Rank</span>
                 </TemplateColumn>
                 <TemplateColumn Title="Player" Sortable="true" SortBy="@NameSort">
                     <ColumnOptions>
@@ -109,6 +101,10 @@
                 </TemplateColumn>
                 @if (CanEditBoards) {
                     <TemplateColumn Title="Actions" Align="DataGridCellAlignment.End">
+                        <FluentButton Appearance="ButtonAppearance.Subtle" Title="Edit" IconOnly="true"
+                                      Disabled="busy"
+                                      IconStart="@(new Icons.Regular.Size16.Edit())"
+                                      OnClick="() => EditEntryAsync(context)"/>
                         <FluentButton Appearance="ButtonAppearance.Subtle" Title="Move up" IconOnly="true"
                                       Disabled="@(busy || context.Rank <= 1)"
                                       IconStart="@(new Icons.Regular.Size16.ArrowUp())"

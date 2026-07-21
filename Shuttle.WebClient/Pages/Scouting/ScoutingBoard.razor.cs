@@ -230,22 +230,24 @@ public partial class ScoutingBoard : ComponentBase {
         });
     }
 
-    private async Task EditRankAsync(BoardRow row) {
-        var result = await DialogService.ShowDialogAsync<ScoutingRankEditDialog>(options => {
+    private async Task EditEntryAsync(BoardRow row) {
+        var result = await DialogService.ShowDialogAsync<ScoutingEntryEditDialog>(options => {
             options.Modal = true;
             options.Width = "360px";
-            options.Parameters.Add(nameof(ScoutingRankEditDialog.Content), new ScoutingRankEditDialog.Args {
+            options.Parameters.Add(nameof(ScoutingEntryEditDialog.Content), new ScoutingEntryEditDialog.Args {
                 PlayerName = row.Name,
                 CurrentRank = row.Rank,
                 MaxRank = rows.Count,
             });
         });
 
-        if (result.Cancelled || result.Value is not int newRank) {
+        if (result.Cancelled || result.Value is not ScoutingEntryEditDialog.Result edited) {
             return;
         }
 
-        await MoveAsync(row.PlayerId, row.Rank, newRank);
+        if (edited.Rank != row.Rank) {
+            await MoveAsync(row.PlayerId, row.Rank, edited.Rank);
+        }
     }
 
     private async Task RemoveAsync(BoardRow row) {
