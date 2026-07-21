@@ -207,6 +207,59 @@ public sealed partial class ScoutingService {
         return ScoutingResult.Ok();
     }
 
+    public async Task<ScoutingResult> RemoveEntriesAsync(
+        Guid boardId,
+        RemoveScoutingBoardEntriesRequest request,
+        ClaimsPrincipal principal,
+        CancellationToken cancellationToken = default) {
+        var (board, access) = await ResolveBoardAsync(boardId, principal, tracked: true, cancellationToken);
+        if (board is null || access is null) {
+            return ScoutingResult.NotFound("Board not found.");
+        }
+
+        if (!access.CanEditBoards) {
+            return ScoutingResult.Forbidden("You do not have permission to edit this board.");
+        }
+
+        var playerIds = request.PlayerIds.Distinct().ToHashSet();
+        if (playerIds.Count == 0) {
+            return ScoutingResult.Invalid("No players were selected for removal.");
+        }
+
+        var entries = await db.ScoutingBoardEntries
+            .Where(e => e.ScoutingBoardId == boardId)
+            .OrderBy(e => e.Rank)
+            .ToListAsync(cancellationToken);
+
+        var removed = entries.Where(e => playerIds.Contains(e.PlayerId)).ToList();
+        if (removed.Count == 0) {
+            return ScoutingResult.NotFound("None of the selected players are on this board.");
+        }
+
+        var removedIds = removed.Select(e => e.Id).ToHashSet();
+
+        // Delete the removed entries' comment threads explicitly (client-cascade relationship).
+        var comments = await db.ScoutingComments
+            .Where(c => c.ScoutingBoardEntryId != null && removedIds.Contains(c.ScoutingBoardEntryId!.Value))
+            .ToListAsync(cancellationToken);
+        db.ScoutingComments.RemoveRange(comments);
+        db.ScoutingBoardEntries.RemoveRange(removed);
+
+        // Compact the surviving ranks to 1..N in their existing order.
+        var rank = 1;
+        foreach (var entry in entries.Where(e => !removedIds.Contains(e.Id))) {
+            entry.Rank = rank++;
+        }
+
+        board.UpdatedAt = Now;
+        if (!await TrySaveChangesAsync(cancellationToken)) {
+            return ScoutingResult.Conflict(
+                "The board was changed by someone else; please reload and try again.");
+        }
+
+        return ScoutingResult.Ok();
+    }
+
     public async Task<ScoutingResult> MoveEntryAsync(
         Guid boardId,
         MoveScoutingBoardEntryRequest request,

@@ -346,6 +346,35 @@ public sealed class InMemoryShuttleScoutingClient : IShuttleScoutingClient {
         }
     }
 
+    public async Task RemoveEntries(Guid boardId, RemoveScoutingBoardEntriesRequest request, CancellationToken token = default) {
+        var caller = await ResolveCallerAsync();
+        lock (gate) {
+            var (team, board) = RequireBoard(boardId);
+            RequireEditBoards(team, caller);
+
+            var playerIds = request.PlayerIds.Distinct().ToHashSet();
+            if (playerIds.Count == 0) {
+                throw Problem(HttpMethod.Post, HttpStatusCode.BadRequest, "No players were selected for removal.");
+            }
+
+            var removed = board.Entries.Where(e => playerIds.Contains(e.PlayerId)).ToList();
+            if (removed.Count == 0) {
+                throw Problem(HttpMethod.Post, HttpStatusCode.NotFound, "None of the selected players are on this board.");
+            }
+
+            var removedIds = removed.Select(e => e.Id).ToHashSet();
+            board.Comments.RemoveAll(c => c.EntryId is { } entryId && removedIds.Contains(entryId));
+            board.Entries.RemoveAll(e => removedIds.Contains(e.Id));
+
+            var rank = 1;
+            foreach (var entry in board.Entries.OrderBy(e => e.Rank).ToList()) {
+                entry.Rank = rank++;
+            }
+
+            board.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+    }
+
     public async Task MoveEntry(Guid boardId, MoveScoutingBoardEntryRequest request, CancellationToken token = default) {
         var caller = await ResolveCallerAsync();
         lock (gate) {

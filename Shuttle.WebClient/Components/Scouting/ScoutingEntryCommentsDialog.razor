@@ -1,0 +1,15 @@
+@inherits Microsoft.FluentUI.AspNetCore.Components.FluentDialogInstance
+
+<FluentDialogBody>
+    @if (loading) {
+        <div><FluentSpinner/> Loading notes…</div>
+    } else {
+        <ScoutingCommentThread Title="Notes"
+                               Comments="comments"
+                               CanComment="Content.CanComment"
+                               CanModerate="Content.CanModerate"
+                               CurrentUserId="Content.CurrentUserId"
+                               OnAdd="AddAsync"
+                               OnChanged="ReloadAsync"/>
+    }
+</FluentDialogBody>

@@ -95,4 +95,21 @@ public class ScoutingPagesTests : WebClientTestContext {
         Assert.Contains("Top Prospects", cut.Markup);
         Assert.Contains("Draft season 73", cut.Markup);
     }
+
+    [Fact]
+    public async Task BoardPage_grid_shows_the_player_position_tpe_and_bank() {
+        this.AddAuthorization().SetAuthorized("Test Scout");
+        var team = await Scouting.CreateTeam(new CreateScoutingTeamRequest { Name = "Stat Scouts" });
+        var board = await Scouting.CreateBoard(team.Id,
+            new CreateScoutingBoardRequest { Name = "Stat Board", DraftSeason = 73 });
+        // Aaron Frost (1001): Center, TPE 1,450, bank $12,500 in the seed data.
+        await Scouting.AddEntry(board.Id, new AddScoutingBoardEntryRequest { PlayerId = 1001 });
+
+        var cut = Render<ScoutingBoard>(p => p.Add(c => c.BoardId, board.Id));
+
+        cut.WaitForState(() => cut.Markup.Contains("Aaron Frost"));
+        Assert.Contains("Aaron Frost", cut.Markup);
+        Assert.Contains("1,450", cut.Markup);
+        Assert.Contains("12,500", cut.Markup);
+    }
 }

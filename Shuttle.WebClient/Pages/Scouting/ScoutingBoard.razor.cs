@@ -8,6 +8,7 @@ using Shuttle.Api.Client;
 using Shuttle.Models.Players;
 using Shuttle.Models.Scouting;
 using Shuttle.Shl.Api.Models.Common;
+using Shuttle.WebClient.Components.Scouting;
 using Shuttle.WebClient.Models;
 using Shuttle.WebClient.Services;
 
@@ -18,6 +19,7 @@ public partial class ScoutingBoard : ComponentBase {
     [Inject] private IShuttlePlayerClient PlayerClient { get; set; } = null!;
     [Inject] private ICurrentUserService CurrentUser { get; set; } = null!;
     [Inject] private IPlayerDirectoryService Directory { get; set; } = null!;
+    [Inject] private IDialogService DialogService { get; set; } = null!;
 
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
@@ -33,15 +35,38 @@ public partial class ScoutingBoard : ComponentBase {
     private string? actionError;
 
     private IReadOnlyList<ScoutingComment> boardComments = [];
-    private readonly Dictionary<int, IReadOnlyList<ScoutingComment>> entryComments = new();
-    private readonly HashSet<int> expandedEntries = [];
     private readonly Dictionary<int, PlayerCard> playerCards = new();
+
+    // The grid's rows: entries joined with their resolved player cards, rebuilt on every reload.
+    private List<BoardRow> rows = [];
+    private IEnumerable<BoardRow> selectedRows = [];
+    private string nameFilter = string.Empty;
 
     private PlayerSuggestion? pendingPlayer;
 
     private bool CanEditBoards => isAdmin || myRole >= ScoutingTeamRole.Editor;
     private bool CanComment => isAdmin || myRole >= ScoutingTeamRole.Editor;
     private bool CanModerate => isAdmin || myRole == ScoutingTeamRole.Owner;
+
+    private int SelectedCount => selectedRows.Count();
+
+    private IQueryable<BoardRow> FilteredRows {
+        get {
+            var query = rows.AsQueryable();
+            if (!string.IsNullOrWhiteSpace(nameFilter)) {
+                var text = nameFilter.Trim();
+                query = query.Where(r => r.Name.Contains(text, StringComparison.OrdinalIgnoreCase));
+            }
+
+            return query;
+        }
+    }
+
+    private static readonly GridSort<BoardRow> RankSort = GridSort<BoardRow>.ByAscending(r => r.Rank);
+    private static readonly GridSort<BoardRow> NameSort = GridSort<BoardRow>.ByAscending(r => r.Name);
+    private static readonly GridSort<BoardRow> PositionSort = GridSort<BoardRow>.ByAscending(r => r.Position);
+    private static readonly GridSort<BoardRow> TpeSort = GridSort<BoardRow>.ByAscending(r => r.Tpe);
+    private static readonly GridSort<BoardRow> BankSort = GridSort<BoardRow>.ByAscending(r => r.Bank);
 
     protected override async Task OnParametersSetAsync() {
         isAdmin = AuthState is not null && (await AuthState).User.IsInRole(RoleNames.Admin);
@@ -56,6 +81,7 @@ public partial class ScoutingBoard : ComponentBase {
             board = await ScoutingClient.GetBoard(BoardId);
             await ResolveRoleAsync();
             await ResolvePlayerCardsAsync();
+            BuildRows();
             boardComments = await ScoutingClient.GetBoardComments(BoardId);
         } catch (ApiException ex) {
             board = null;
@@ -106,19 +132,40 @@ public partial class ScoutingBoard : ComponentBase {
         }
     }
 
+    // Joins each ranked entry with its resolved player card into a flat grid row and clears the
+    // selection, since the previous row instances no longer correspond to the reloaded board.
+    private void BuildRows() {
+        rows = board is null
+            ? []
+            : board.Entries
+                .Select(entry => {
+                    var card = playerCards.GetValueOrDefault(entry.PlayerId);
+                    return new BoardRow {
+                        Id = entry.Id,
+                        PlayerId = entry.PlayerId,
+                        Rank = entry.Rank,
+                        CommentCount = entry.CommentCount,
+                        Name = card?.Name ?? $"Player #{entry.PlayerId}",
+                        Position = card?.Position,
+                        Tpe = card?.TotalTpe,
+                        Bank = card?.BankBalance,
+                    };
+                })
+                .ToList();
+        selectedRows = [];
+    }
+
     private async Task ReloadBoardAsync() {
         try {
             board = await ScoutingClient.GetBoard(BoardId);
             await ResolvePlayerCardsAsync();
+            BuildRows();
         } catch (ApiException ex) {
             actionError = DescribeError(ex);
         } catch (HttpRequestException) {
             actionError = "Failed to reach the server. Please try again.";
         }
     }
-
-    private PlayerCard? PlayerCardFor(int playerId) =>
-        playerCards.TryGetValue(playerId, out var card) ? card : null;
 
     private string PageTitleText =>
         board is null
@@ -127,16 +174,14 @@ public partial class ScoutingBoard : ComponentBase {
                 ? $"{board.Name} - S{season}"
                 : board.Name;
 
-    private string PlayerName(int playerId) =>
-        playerCards.TryGetValue(playerId, out var card) ? card.Name : $"Player #{playerId}";
+    private static string PositionText(BoardRow row) =>
+        row.Position is { } position ? position.ToShortString() : "—";
 
-    private static string PositionShort(PlayerCard card) => card.Position.ToShortString();
+    private static string TpeText(BoardRow row) =>
+        row.Tpe is { } tpe ? tpe.ToString("N0", CultureInfo.InvariantCulture) : "—";
 
-    private static string FormatTpe(PlayerCard card) =>
-        card.TotalTpe.ToString("N0", CultureInfo.InvariantCulture);
-
-    private static string FormatBank(PlayerCard card) =>
-        card.BankBalance.ToString("C0", UsdCulture);
+    private static string BankText(BoardRow row) =>
+        row.Bank is { } bank ? bank.ToString("C0", UsdCulture) : "—";
 
     // Renders bank balances as USD ($12,500) regardless of the browser's locale, matching PlayerProfile.
     private static readonly CultureInfo UsdCulture = CreateUsdCulture();
@@ -148,9 +193,6 @@ public partial class ScoutingBoard : ComponentBase {
         culture.NumberFormat.CurrencyNegativePattern = 1;
         return culture;
     }
-
-    private IReadOnlyList<ScoutingComment> EntryComments(int playerId) =>
-        entryComments.TryGetValue(playerId, out var comments) ? comments : [];
 
     private async Task OnPlayerSearch(OptionsSearchEventArgs<PlayerSuggestion> e) {
         e.Items = await Directory.Search(e.Text);
@@ -173,59 +215,75 @@ public partial class ScoutingBoard : ComponentBase {
         });
     }
 
-    private async Task MoveAsync(ScoutingBoardEntry entry, int toRank) {
+    private async Task MoveAsync(int playerId, int fromRank, int toRank) {
+        if (toRank == fromRank || toRank < 1 || toRank > rows.Count) {
+            return;
+        }
+
         await RunAsync(async () => {
             await ScoutingClient.MoveEntry(BoardId, new MoveScoutingBoardEntryRequest {
-                PlayerId = entry.PlayerId,
-                FromRank = entry.Rank,
+                PlayerId = playerId,
+                FromRank = fromRank,
                 ToRank = toRank,
             });
             await ReloadBoardAsync();
         });
     }
 
-    // Reorders entries when a card is dropped onto another: the dragged player takes the target's rank.
-    private async Task OnEntryDropEnd(FluentDragEventArgs<ScoutingBoardEntry> e) {
-        var source = e.Source?.Item;
-        var target = e.Target?.Item;
-        if (!CanEditBoards || busy || source is null || target is null || source.PlayerId == target.PlayerId) {
-            return;
-        }
-
-        await MoveAsync(source, target.Rank);
+    private async Task OnRankEdited(BoardRow row, int newRank) {
+        await MoveAsync(row.PlayerId, row.Rank, newRank);
     }
 
-    private async Task RemoveAsync(ScoutingBoardEntry entry) {
+    private async Task RemoveAsync(BoardRow row) {
         await RunAsync(async () => {
-            await ScoutingClient.RemoveEntry(BoardId, entry.PlayerId);
-            expandedEntries.Remove(entry.PlayerId);
-            entryComments.Remove(entry.PlayerId);
+            await ScoutingClient.RemoveEntry(BoardId, row.PlayerId);
             await ReloadBoardAsync();
         });
     }
 
-    private async Task ToggleEntryCommentsAsync(ScoutingBoardEntry entry) {
-        if (!expandedEntries.Add(entry.PlayerId)) {
-            expandedEntries.Remove(entry.PlayerId);
+    private async Task BulkDeleteAsync() {
+        var ids = selectedRows.Select(r => r.PlayerId).Distinct().ToList();
+        if (ids.Count == 0) {
             return;
         }
 
-        await ReloadEntryCommentsAsync(entry.PlayerId);
-    }
-
-    private async Task ReloadEntryCommentsAsync(int playerId) {
-        try {
-            entryComments[playerId] = await ScoutingClient.GetEntryComments(BoardId, playerId);
-        } catch (ApiException) {
-            entryComments[playerId] = [];
+        var confirm = await DialogService.ShowConfirmationAsync(
+            message: $"Remove {ids.Count} player{(ids.Count == 1 ? string.Empty : "s")} from this board? " +
+                     "Their notes will also be deleted. This cannot be undone.",
+            title: "Remove selected players?",
+            primaryButton: "Remove",
+            secondaryButton: "Cancel");
+        if (confirm.Cancelled) {
+            return;
         }
 
-        await ReloadBoardAsync();
+        await RunAsync(async () => {
+            await ScoutingClient.RemoveEntries(BoardId, new RemoveScoutingBoardEntriesRequest { PlayerIds = ids });
+            await ReloadBoardAsync();
+        });
     }
 
-    private async Task AddEntryCommentAsync(ScoutingBoardEntry entry, string body) {
-        await ScoutingClient.AddEntryComment(BoardId, entry.PlayerId, new CreateScoutingCommentRequest { Body = body });
-        await ReloadEntryCommentsAsync(entry.PlayerId);
+    private void ClearSelection() {
+        selectedRows = [];
+    }
+
+    private async Task OpenEntryCommentsAsync(BoardRow row) {
+        await DialogService.ShowDialogAsync<ScoutingEntryCommentsDialog>(options => {
+            options.Modal = true;
+            options.Width = "640px";
+            options.Parameters.Add(nameof(ScoutingEntryCommentsDialog.Content), new ScoutingEntryCommentsDialog.Args {
+                BoardId = BoardId,
+                PlayerId = row.PlayerId,
+                Title = $"Notes — {row.Name}",
+                CanComment = CanComment,
+                CanModerate = CanModerate,
+                CurrentUserId = currentUserId,
+            });
+        });
+
+        // The dialog mutates comments directly; reload so the entry's comment count stays current.
+        await ReloadBoardAsync();
+        StateHasChanged();
     }
 
     private async Task AddBoardCommentAsync(string body) {
@@ -274,5 +332,17 @@ public partial class ScoutingBoard : ComponentBase {
     private sealed record ProblemPayload {
         public string? Title { get; init; }
         public string? Detail { get; init; }
+    }
+
+    /// <summary>A flattened board entry (entry data joined with its resolved player card) for the grid.</summary>
+    private sealed record BoardRow {
+        public required Guid Id { get; init; }
+        public required int PlayerId { get; init; }
+        public required int Rank { get; init; }
+        public required int CommentCount { get; init; }
+        public required string Name { get; init; }
+        public PlayerPosition? Position { get; init; }
+        public int? Tpe { get; init; }
+        public int? Bank { get; init; }
     }
 }

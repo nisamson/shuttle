@@ -73,6 +73,20 @@ public class ScoutingBoardsController : ControllerBase {
         return (await scouting.RemoveEntryAsync(boardId, playerId, User, cancellationToken)).ToNoContent(this);
     }
 
+    /// <summary>Removes several players from the board in one transaction and compacts the ranks. Owners and editors only.</summary>
+    [HttpPost("{boardId:guid}/entries/remove")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult> RemoveEntries(
+        Guid boardId,
+        [FromBody] RemoveScoutingBoardEntriesRequest request,
+        CancellationToken cancellationToken) {
+        return (await scouting.RemoveEntriesAsync(boardId, request, User, cancellationToken)).ToNoContent(this);
+    }
+
     /// <summary>
     /// Moves a player from one rank to another. <c>FromRank</c> guards against stale reorders.
     /// Owners and editors only.

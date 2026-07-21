@@ -65,6 +65,12 @@ public record AddScoutingBoardEntryRequest {
     public required int PlayerId { get; init; }
 }
 
+/// <summary>Payload for removing several players from a board in a single request.</summary>
+public record RemoveScoutingBoardEntriesRequest {
+    [Required]
+    public required IReadOnlyList<int> PlayerIds { get; init; }
+}
+
 /// <summary>
 /// Payload for moving a player to a new rank. <see cref="FromRank"/> is an optimistic-concurrency
 /// guard: if it does not match the player's current rank the move is rejected with a conflict, so a

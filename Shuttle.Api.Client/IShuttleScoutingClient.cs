@@ -62,6 +62,9 @@ public interface IShuttleScoutingClient {
     [Delete("/scouting/boards/{boardId}/entries/{playerId}")]
     Task RemoveEntry(Guid boardId, int playerId, CancellationToken token = default);
 
+    [Post("/scouting/boards/{boardId}/entries/remove")]
+    Task RemoveEntries(Guid boardId, [Body] RemoveScoutingBoardEntriesRequest request, CancellationToken token = default);
+
     [Post("/scouting/boards/{boardId}/entries/move")]
     Task MoveEntry(Guid boardId, [Body] MoveScoutingBoardEntryRequest request, CancellationToken token = default);
 

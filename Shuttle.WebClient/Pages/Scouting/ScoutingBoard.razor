@@ -51,61 +51,79 @@
         @if (board.Entries.Count == 0) {
             <FluentText Style="color: var(--colorNeutralForeground2);">No players on this board yet.</FluentText>
         } else {
-            <FluentDragContainer TItem="ScoutingBoardEntry" OnDropEnd="OnEntryDropEnd"
-                                 Style="display: flex; flex-direction: column; gap: 8px;">
-                @foreach (var entry in board.Entries) {
-                    <FluentDropZone Item="entry" Draggable="@CanEditBoards" Droppable="@CanEditBoards" Style="width: 100%;">
-                        <FluentCard>
-                            <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
-                                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="12" VerticalAlignment="VerticalAlignment.Center">
-                                    @if (CanEditBoards) {
-                                        <FluentIcon Value="@(new Icons.Regular.Size20.ReOrderDotsVertical())"
-                                                    Color="Color.Default" Title="Drag to reorder"
-                                                    Style="cursor: grab;"/>
-                                    }
-                                    <FluentText Weight="TextWeight.Bold" Style="min-width: 2.5rem;">#@entry.Rank</FluentText>
-                                    <a href="@Routes.Players.Player(entry.PlayerId)">@PlayerName(entry.PlayerId)</a>
-                                    @if (PlayerCardFor(entry.PlayerId) is { } card) {
-                                        <FluentBadge Appearance="BadgeAppearance.Outline">@PositionShort(card)</FluentBadge>
-                                        <FluentText Style="color: var(--colorNeutralForeground2);">
-                                            @FormatTpe(card) TPE &middot; @FormatBank(card)
-                                        </FluentText>
-                                    }
-                                    <FluentSpacer/>
-                                    <FluentButton Appearance="ButtonAppearance.Subtle" Title="Comments"
-                                                  IconStart="@(new Icons.Regular.Size16.Comment())"
-                                                  OnClick="() => ToggleEntryCommentsAsync(entry)">@entry.CommentCount</FluentButton>
-                                    @if (CanEditBoards) {
-                                        <FluentButton Appearance="ButtonAppearance.Subtle" Title="Move up" IconOnly="true"
-                                                      Disabled="@(busy || entry.Rank <= 1)"
-                                                      IconStart="@(new Icons.Regular.Size16.ArrowUp())"
-                                                      OnClick="() => MoveAsync(entry, entry.Rank - 1)"/>
-                                        <FluentButton Appearance="ButtonAppearance.Subtle" Title="Move down" IconOnly="true"
-                                                      Disabled="@(busy || entry.Rank >= board.Entries.Count)"
-                                                      IconStart="@(new Icons.Regular.Size16.ArrowDown())"
-                                                      OnClick="() => MoveAsync(entry, entry.Rank + 1)"/>
-                                        <FluentButton Appearance="ButtonAppearance.Subtle" Title="Remove player" IconOnly="true"
-                                                      Disabled="busy"
-                                                      IconStart="@(new Icons.Regular.Size16.Delete())"
-                                                      OnClick="() => RemoveAsync(entry)"/>
-                                    }
-                                </FluentStack>
+            @if (CanEditBoards && SelectedCount > 0) {
+                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="12" VerticalAlignment="VerticalAlignment.Center">
+                    <FluentText>@SelectedCount selected</FluentText>
+                    <FluentButton Appearance="ButtonAppearance.Primary" Loading="busy" Disabled="busy"
+                                  IconStart="@(new Icons.Regular.Size16.Delete())"
+                                  OnClick="BulkDeleteAsync">Delete selected</FluentButton>
+                    <FluentButton Appearance="ButtonAppearance.Default" Disabled="busy" OnClick="ClearSelection">Clear</FluentButton>
+                </FluentStack>
+            }
 
-                                @if (expandedEntries.Contains(entry.PlayerId)) {
-                                    <FluentDivider Style="width: 100%;"/>
-                                    <ScoutingCommentThread Title="Notes"
-                                                           Comments="@EntryComments(entry.PlayerId)"
-                                                           CanComment="CanComment"
-                                                           CanModerate="CanModerate"
-                                                           CurrentUserId="currentUserId"
-                                                           OnAdd="body => AddEntryCommentAsync(entry, body)"
-                                                           OnChanged="() => ReloadEntryCommentsAsync(entry.PlayerId)"/>
-                                }
-                            </FluentStack>
-                        </FluentCard>
-                    </FluentDropZone>
+            <FluentDataGrid Items="@FilteredRows" TGridItem="BoardRow" ResizableColumns="true">
+                @if (CanEditBoards) {
+                    <SelectColumn TGridItem="BoardRow"
+                                  SelectMode="DataGridSelectMode.Multiple"
+                                  SelectFromEntireRow="false"
+                                  @bind-SelectedItems="selectedRows"/>
                 }
-            </FluentDragContainer>
+                <TemplateColumn Title="Rank" Sortable="true" SortBy="@RankSort" IsDefaultSortColumn="true"
+                                InitialSortDirection="DataGridSortDirection.Ascending" Align="DataGridCellAlignment.Center">
+                    @if (CanEditBoards) {
+                        <FluentNumberInput TValue="int" Value="context.Rank"
+                                           ValueChanged="v => OnRankEdited(context, v)"
+                                           Min="1" Max="@rows.Count" Disabled="busy"
+                                           StepButtons="NumberInputStepVisibility.Hidden"
+                                           Style="width: 5rem;"/>
+                    } else {
+                        <span>@context.Rank</span>
+                    }
+                </TemplateColumn>
+                <TemplateColumn Title="Player" Sortable="true" SortBy="@NameSort">
+                    <ColumnOptions>
+                        <FluentTextInput @bind-Value="nameFilter" @bind-Value:after="StateHasChanged"
+                                         Immediate="true" Placeholder="Filter by name" Autofocus="true"/>
+                    </ColumnOptions>
+                    <ChildContent>
+                        <a href="@Routes.Players.Player(context.PlayerId)">@context.Name</a>
+                    </ChildContent>
+                </TemplateColumn>
+                <TemplateColumn Title="Position" Sortable="true" SortBy="@PositionSort" Align="DataGridCellAlignment.Center">
+                    @if (context.Position is not null) {
+                        <FluentBadge Appearance="BadgeAppearance.Outline">@PositionText(context)</FluentBadge>
+                    } else {
+                        <span>—</span>
+                    }
+                </TemplateColumn>
+                <TemplateColumn Title="TPE" Sortable="true" SortBy="@TpeSort" Align="DataGridCellAlignment.End">
+                    @TpeText(context)
+                </TemplateColumn>
+                <TemplateColumn Title="Bank" Sortable="true" SortBy="@BankSort" Align="DataGridCellAlignment.End">
+                    @BankText(context)
+                </TemplateColumn>
+                <TemplateColumn Title="Comments" Align="DataGridCellAlignment.Center">
+                    <FluentButton Appearance="ButtonAppearance.Subtle" Title="View notes"
+                                  IconStart="@(new Icons.Regular.Size16.Comment())"
+                                  OnClick="() => OpenEntryCommentsAsync(context)">@context.CommentCount</FluentButton>
+                </TemplateColumn>
+                @if (CanEditBoards) {
+                    <TemplateColumn Title="Actions" Align="DataGridCellAlignment.End">
+                        <FluentButton Appearance="ButtonAppearance.Subtle" Title="Move up" IconOnly="true"
+                                      Disabled="@(busy || context.Rank <= 1)"
+                                      IconStart="@(new Icons.Regular.Size16.ArrowUp())"
+                                      OnClick="() => MoveAsync(context.PlayerId, context.Rank, context.Rank - 1)"/>
+                        <FluentButton Appearance="ButtonAppearance.Subtle" Title="Move down" IconOnly="true"
+                                      Disabled="@(busy || context.Rank >= rows.Count)"
+                                      IconStart="@(new Icons.Regular.Size16.ArrowDown())"
+                                      OnClick="() => MoveAsync(context.PlayerId, context.Rank, context.Rank + 1)"/>
+                        <FluentButton Appearance="ButtonAppearance.Subtle" Title="Remove player" IconOnly="true"
+                                      Disabled="busy"
+                                      IconStart="@(new Icons.Regular.Size16.Delete())"
+                                      OnClick="() => RemoveAsync(context)"/>
+                    </TemplateColumn>
+                }
+            </FluentDataGrid>
         }
 
         <FluentDivider Style="width: 100%;"/>

@@ -289,6 +289,48 @@ public class InMemoryShuttleScoutingClientTests {
         Assert.Equal([1, 2], reloaded.Entries.OrderBy(e => e.Rank).Select(e => e.Rank));
     }
 
+    [Fact]
+    public async Task RemoveEntries_removes_the_set_and_compacts_the_ranks() {
+        var board = await NewBoardAsync();
+        await client.AddEntry(board.Id, new AddScoutingBoardEntryRequest { PlayerId = 1001 });
+        await client.AddEntry(board.Id, new AddScoutingBoardEntryRequest { PlayerId = 1002 });
+        await client.AddEntry(board.Id, new AddScoutingBoardEntryRequest { PlayerId = 1003 });
+        await client.AddEntry(board.Id, new AddScoutingBoardEntryRequest { PlayerId = 1004 });
+
+        // Unknown ids are ignored; known ids are removed together.
+        await client.RemoveEntries(board.Id, new RemoveScoutingBoardEntriesRequest { PlayerIds = [1001, 1003, 9999] });
+
+        var reloaded = await client.GetBoard(board.Id);
+        Assert.Equal([1002, 1004], reloaded.Entries.OrderBy(e => e.Rank).Select(e => e.PlayerId));
+        Assert.Equal([1, 2], reloaded.Entries.OrderBy(e => e.Rank).Select(e => e.Rank));
+    }
+
+    [Fact]
+    public async Task RemoveEntries_forbids_a_viewer() {
+        var (_, viewerId) = FirstSeedUser();
+        var board = await NewBoardAsync();
+        await client.AddEntry(board.Id, new AddScoutingBoardEntryRequest { PlayerId = 1001 });
+        await client.AddMember(board.ScoutingTeamId,
+            new AddScoutingMemberRequest { Username = FirstSeedUser().Username, Role = ScoutingTeamRole.Viewer });
+
+        As(viewerId);
+        await Assert.ThrowsAnyAsync<ApiException>(() =>
+            client.RemoveEntries(board.Id, new RemoveScoutingBoardEntriesRequest { PlayerIds = [1001] }));
+    }
+
+    [Fact]
+    public async Task RemoveEntries_deletes_the_removed_entries_notes() {
+        var board = await NewBoardAsync();
+        await client.AddEntry(board.Id, new AddScoutingBoardEntryRequest { PlayerId = 1001 });
+        await client.AddEntryComment(board.Id, 1001, new CreateScoutingCommentRequest { Body = "Strong forechecker" });
+
+        await client.RemoveEntries(board.Id, new RemoveScoutingBoardEntriesRequest { PlayerIds = [1001] });
+        await client.AddEntry(board.Id, new AddScoutingBoardEntryRequest { PlayerId = 1001 });
+
+        var comments = await client.GetEntryComments(board.Id, 1001);
+        Assert.Empty(comments);
+    }
+
     // Comments --------------------------------------------------------------
 
     [Fact]
