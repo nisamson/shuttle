@@ -83,7 +83,9 @@
                 </TemplateColumn>
                 <TemplateColumn Title="Position" Sortable="true" SortBy="@PositionSort" Align="DataGridCellAlignment.Center">
                     @if (context.Position is not null) {
-                        <FluentBadge Appearance="BadgeAppearance.Outline">@PositionText(context)</FluentBadge>
+                        <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+                            <FluentBadge Appearance="BadgeAppearance.Outline">@PositionText(context)</FluentBadge>
+                        </div>
                     } else {
                         <span>—</span>
                     }
