@@ -273,6 +273,15 @@ public partial class ScoutingBoard : ComponentBase {
     }
 
     private async Task RemoveAsync(BoardRow row) {
+        var confirm = await DialogService.ShowConfirmationAsync(
+            message: $"Remove {row.Name} from this board? Their notes will also be deleted. This cannot be undone.",
+            title: "Remove player?",
+            primaryButton: "Remove",
+            secondaryButton: "Cancel");
+        if (confirm.Cancelled) {
+            return;
+        }
+
         await RunAsync(async () => {
             await ScoutingClient.RemoveEntry(BoardId, row.PlayerId);
             await ReloadBoardAsync();
