@@ -163,6 +163,159 @@ public sealed partial class ScoutingService {
         });
     }
 
+    // Projection used to resolve player names to ids without pulling whole entities.
+    private sealed record NameMatch(int PlayerId, string LoweredName);
+
+    public async Task<ScoutingResult<AddScoutingBoardEntriesResult>> AddEntriesAsync(
+        Guid boardId,
+        AddScoutingBoardEntriesRequest request,
+        ClaimsPrincipal principal,
+        CancellationToken cancellationToken = default) {
+        var (board, access) = await ResolveBoardAsync(boardId, principal, tracked: true, cancellationToken);
+        if (board is null || access is null) {
+            return ScoutingResult<AddScoutingBoardEntriesResult>.NotFound("Board not found.");
+        }
+
+        if (!access.CanEditBoards) {
+            return ScoutingResult<AddScoutingBoardEntriesResult>.Forbidden(
+                "You do not have permission to edit this board.");
+        }
+
+        var requestedIds = (request.PlayerIds ?? []).ToList();
+        var requestedNames = (request.Names ?? [])
+            .Select(n => n?.Trim() ?? string.Empty)
+            .Where(n => n.Length > 0)
+            .ToList();
+
+        if (requestedIds.Count == 0 && requestedNames.Count == 0) {
+            return ScoutingResult<AddScoutingBoardEntriesResult>.Invalid(
+                "Provide at least one player id or name to add.");
+        }
+
+        var notFound = new List<string>();
+
+        // Resolve names -> player ids. Matching is case-insensitive on the trimmed name; any name that
+        // matches more than one player is ambiguous and rejects the whole request.
+        var loweredNames = requestedNames.Select(n => n.ToLowerInvariant()).Distinct().ToList();
+        var nameMatches = new List<NameMatch>();
+        if (loweredNames.Count > 0) {
+            nameMatches = await db.PlayerInformation
+                .Where(p => loweredNames.Contains(p.Name.ToLower()))
+                .Select(p => new NameMatch(p.PlayerId, p.Name.ToLower()))
+                .ToListAsync(cancellationToken);
+        }
+
+        var byLoweredName = nameMatches
+            .GroupBy(m => m.LoweredName)
+            .ToDictionary(g => g.Key, g => g.Select(m => m.PlayerId).Distinct().ToList());
+
+        var ambiguous = new List<string>();
+        var resolvedFromNames = new List<int>();
+        var seenLoweredNames = new HashSet<string>();
+        foreach (var name in requestedNames) {
+            var lowered = name.ToLowerInvariant();
+            if (!seenLoweredNames.Add(lowered)) {
+                continue; // duplicate name within the request
+            }
+
+            if (!byLoweredName.TryGetValue(lowered, out var ids) || ids.Count == 0) {
+                notFound.Add(name);
+            } else if (ids.Count > 1) {
+                ambiguous.Add(name);
+            } else {
+                resolvedFromNames.Add(ids[0]);
+            }
+        }
+
+        if (ambiguous.Count > 0) {
+            return ScoutingResult<AddScoutingBoardEntriesResult>.Invalid(
+                $"These names match more than one player; add them by id instead: {string.Join(", ", ambiguous)}.");
+        }
+
+        // Keep only ids that actually exist in the database; report the rest as not found.
+        var idSet = requestedIds.Distinct().ToList();
+        var existingIds = idSet.Count == 0
+            ? new HashSet<int>()
+            : (await db.PlayerInformation
+                .Where(p => idSet.Contains(p.PlayerId))
+                .Select(p => p.PlayerId)
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+
+        // Build the ordered, de-duplicated candidate list: requested ids first (in request order),
+        // then name-resolved ids, preserving first-seen order.
+        var ordered = new List<int>();
+        var seenIds = new HashSet<int>();
+        foreach (var id in requestedIds) {
+            if (!seenIds.Add(id)) {
+                continue;
+            }
+
+            if (existingIds.Contains(id)) {
+                ordered.Add(id);
+            } else {
+                notFound.Add(id.ToString());
+            }
+        }
+
+        foreach (var id in resolvedFromNames) {
+            if (seenIds.Add(id)) {
+                ordered.Add(id);
+            }
+        }
+
+        var onBoard = (await db.ScoutingBoardEntries
+                .Where(e => e.ScoutingBoardId == boardId)
+                .Select(e => e.PlayerId)
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+
+        var alreadyOnBoard = new List<int>();
+        var toAdd = new List<int>();
+        foreach (var id in ordered) {
+            if (onBoard.Contains(id)) {
+                alreadyOnBoard.Add(id);
+            } else {
+                toAdd.Add(id);
+            }
+        }
+
+        if (toAdd.Count > 0) {
+            var maxRank = await db.ScoutingBoardEntries
+                .Where(e => e.ScoutingBoardId == boardId)
+                .Select(e => (int?)e.Rank)
+                .MaxAsync(cancellationToken) ?? 0;
+
+            var now = Now;
+            var rank = maxRank;
+            foreach (var id in toAdd) {
+                rank++;
+                db.ScoutingBoardEntries.Add(new Entities.ScoutingBoardEntry {
+                    Id = Guid.CreateVersion7(),
+                    ScoutingBoardId = boardId,
+                    PlayerId = id,
+                    Rank = rank,
+                    CreatedAt = now,
+                    UpdatedAt = now,
+                });
+            }
+
+            board.UpdatedAt = now;
+            if (!await TrySaveChangesAsync(cancellationToken)) {
+                return ScoutingResult<AddScoutingBoardEntriesResult>.Conflict(
+                    "The board was changed by someone else; please reload and try again.");
+            }
+        }
+
+        var detail = await LoadBoardDetailAsync(boardId, cancellationToken);
+        return ScoutingResult<AddScoutingBoardEntriesResult>.Ok(new AddScoutingBoardEntriesResult {
+            Board = detail,
+            Added = toAdd,
+            AlreadyOnBoard = alreadyOnBoard,
+            NotFound = notFound,
+        });
+    }
+
     public async Task<ScoutingResult> RemoveEntryAsync(
         Guid boardId,
         int playerId,

@@ -328,6 +328,105 @@ public sealed class InMemoryShuttleScoutingClient : IShuttleScoutingClient {
         }
     }
 
+    public async Task<AddScoutingBoardEntriesResult> AddEntries(Guid boardId, AddScoutingBoardEntriesRequest request, CancellationToken token = default) {
+        var caller = await ResolveCallerAsync();
+        lock (gate) {
+            var (team, board) = RequireBoard(boardId);
+            RequireEditBoards(team, caller);
+
+            var requestedIds = (request.PlayerIds ?? []).ToList();
+            var requestedNames = (request.Names ?? [])
+                .Select(n => n?.Trim() ?? string.Empty)
+                .Where(n => n.Length > 0)
+                .ToList();
+
+            if (requestedIds.Count == 0 && requestedNames.Count == 0) {
+                throw Problem(HttpMethod.Post, HttpStatusCode.BadRequest, "Provide at least one player id or name to add.");
+            }
+
+            var players = SeedData.Players();
+            var notFound = new List<string>();
+
+            // Resolve names -> ids (case-insensitive); a name matching more than one player rejects the request.
+            var ambiguous = new List<string>();
+            var resolvedFromNames = new List<int>();
+            var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var name in requestedNames) {
+                if (!seenNames.Add(name)) {
+                    continue;
+                }
+
+                var matches = players
+                    .Where(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))
+                    .Select(p => p.PlayerId)
+                    .Distinct()
+                    .ToList();
+                if (matches.Count == 0) {
+                    notFound.Add(name);
+                } else if (matches.Count > 1) {
+                    ambiguous.Add(name);
+                } else {
+                    resolvedFromNames.Add(matches[0]);
+                }
+            }
+
+            if (ambiguous.Count > 0) {
+                throw Problem(HttpMethod.Post, HttpStatusCode.BadRequest,
+                    $"These names match more than one player; add them by id instead: {string.Join(", ", ambiguous)}.");
+            }
+
+            var existingIds = players.Select(p => p.PlayerId).ToHashSet();
+
+            var ordered = new List<int>();
+            var seenIds = new HashSet<int>();
+            foreach (var id in requestedIds) {
+                if (!seenIds.Add(id)) {
+                    continue;
+                }
+
+                if (existingIds.Contains(id)) {
+                    ordered.Add(id);
+                } else {
+                    notFound.Add(id.ToString());
+                }
+            }
+
+            foreach (var id in resolvedFromNames) {
+                if (seenIds.Add(id)) {
+                    ordered.Add(id);
+                }
+            }
+
+            var onBoard = board.Entries.Select(e => e.PlayerId).ToHashSet();
+            var alreadyOnBoard = new List<int>();
+            var toAdd = new List<int>();
+            foreach (var id in ordered) {
+                if (onBoard.Contains(id)) {
+                    alreadyOnBoard.Add(id);
+                } else {
+                    toAdd.Add(id);
+                }
+            }
+
+            if (toAdd.Count > 0) {
+                var maxRank = board.Entries.Count == 0 ? 0 : board.Entries.Max(e => e.Rank);
+                foreach (var id in toAdd) {
+                    maxRank++;
+                    board.Entries.Add(new EntryState { Id = Guid.NewGuid(), PlayerId = id, Rank = maxRank });
+                }
+
+                board.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+
+            return new AddScoutingBoardEntriesResult {
+                Board = BoardDetail(board),
+                Added = toAdd,
+                AlreadyOnBoard = alreadyOnBoard,
+                NotFound = notFound,
+            };
+        }
+    }
+
     public async Task RemoveEntry(Guid boardId, int playerId, CancellationToken token = default) {
         var caller = await ResolveCallerAsync();
         lock (gate) {

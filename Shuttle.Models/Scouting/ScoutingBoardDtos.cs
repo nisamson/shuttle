@@ -65,6 +65,43 @@ public record AddScoutingBoardEntryRequest {
     public required int PlayerId { get; init; }
 }
 
+/// <summary>
+/// Payload for adding several players to a board in a single request. Players may be identified by
+/// upstream <see cref="PlayerIds"/> and/or by player <see cref="Names"/>; at least one of the two
+/// must be non-empty. Only players that already exist in the database are added — unknown ids and
+/// names are reported back as skipped rather than failing the request. A name that matches more than
+/// one player is ambiguous and causes the whole request to be rejected.
+/// </summary>
+public record AddScoutingBoardEntriesRequest {
+    /// <summary>Upstream integer ids of players to add. Ids not present in the database are skipped.</summary>
+    public IReadOnlyList<int>? PlayerIds { get; init; }
+
+    /// <summary>
+    /// Player names to resolve and add. Matching is case-insensitive on the trimmed name; a name that
+    /// resolves to more than one player is ambiguous and rejects the request.
+    /// </summary>
+    public IReadOnlyList<string>? Names { get; init; }
+}
+
+/// <summary>
+/// The outcome of a bulk add: the refreshed board plus a breakdown of what happened to each
+/// requested player. On the ambiguous-name rejection path the board is unchanged and
+/// <see cref="Ambiguous"/> lists the offending names.
+/// </summary>
+public record AddScoutingBoardEntriesResult {
+    /// <summary>The board after the add, with its entries in rank order.</summary>
+    public required ScoutingBoardDetail Board { get; init; }
+
+    /// <summary>Player ids that were newly added to the board, in the order they were appended.</summary>
+    public required IReadOnlyList<int> Added { get; init; }
+
+    /// <summary>Requested players that were already on the board and therefore not re-added.</summary>
+    public required IReadOnlyList<int> AlreadyOnBoard { get; init; }
+
+    /// <summary>Requested ids and names that did not match any player in the database.</summary>
+    public required IReadOnlyList<string> NotFound { get; init; }
+}
+
 /// <summary>Payload for removing several players from a board in a single request.</summary>
 public record RemoveScoutingBoardEntriesRequest {
     [Required]

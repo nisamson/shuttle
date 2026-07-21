@@ -59,6 +59,9 @@ public interface IShuttleScoutingClient {
     [Post("/scouting/boards/{boardId}/entries")]
     Task<ScoutingBoardEntry> AddEntry(Guid boardId, [Body] AddScoutingBoardEntryRequest request, CancellationToken token = default);
 
+    [Post("/scouting/boards/{boardId}/entries/bulk")]
+    Task<AddScoutingBoardEntriesResult> AddEntries(Guid boardId, [Body] AddScoutingBoardEntriesRequest request, CancellationToken token = default);
+
     [Delete("/scouting/boards/{boardId}/entries/{playerId}")]
     Task RemoveEntry(Guid boardId, int playerId, CancellationToken token = default);
 
