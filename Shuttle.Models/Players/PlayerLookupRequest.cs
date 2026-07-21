@@ -1,11 +1,11 @@
 namespace Shuttle.Models.Players;
 
 /// <summary>
-/// Batch player-resolution request used by <c>QUERY /players/resolve</c>. Callers supply any mix of
+/// Batch player lookup request used by <c>QUERY /players/lookup</c>. Callers supply any mix of
 /// player ids and/or player names; the endpoint resolves them to concrete players (reporting unknown
 /// and ambiguous inputs) without mutating anything. Backs the WebClient's bulk-add preview.
 /// </summary>
-public sealed record ResolvePlayersRequest {
+public sealed record PlayerLookupRequest {
     /// <summary>Player ids to resolve. Unknown ids are reported in <c>NotFound</c>.</summary>
     public IReadOnlyList<int>? PlayerIds { get; init; }
 

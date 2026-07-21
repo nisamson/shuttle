@@ -53,20 +53,20 @@
 
             @if (result.Resolved.Count > 0) {
                 <FluentText Weight="TextWeight.Bold">@result.Resolved.Count player(s) resolved</FluentText>
-                <FluentDataGrid Items="@ResolvedRows" TGridItem="ResolvedPlayer" ResizableColumns="true">
-                    <TemplateColumn Title="Player" TGridItem="ResolvedPlayer">
+                <FluentDataGrid Items="@ResolvedRows" TGridItem="PlayerLookupMatch" ResizableColumns="true">
+                    <TemplateColumn Title="Player" TGridItem="PlayerLookupMatch">
                         <a href="@Routes.Players.Player(context.PlayerId)" target="_blank" rel="noopener noreferrer">@context.Name</a>
                         @if (Content.ExistingPlayerIds.Contains(context.PlayerId)) {
                             <FluentBadge Appearance="BadgeAppearance.Outline" Style="margin-inline-start: 6px;">On board</FluentBadge>
                         }
                     </TemplateColumn>
-                    <TemplateColumn Title="Position" TGridItem="ResolvedPlayer">
+                    <TemplateColumn Title="Position" TGridItem="PlayerLookupMatch">
                         @context.Position.ToShortString()
                     </TemplateColumn>
-                    <TemplateColumn Title="Draft season" TGridItem="ResolvedPlayer">
+                    <TemplateColumn Title="Draft season" TGridItem="PlayerLookupMatch">
                         @SeasonNumber.Format(context.DraftSeason)
                     </TemplateColumn>
-                    <TemplateColumn Title="Total TPE" TGridItem="ResolvedPlayer">
+                    <TemplateColumn Title="Total TPE" TGridItem="PlayerLookupMatch">
                         @context.TotalTpe.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)
                     </TemplateColumn>
                 </FluentDataGrid>

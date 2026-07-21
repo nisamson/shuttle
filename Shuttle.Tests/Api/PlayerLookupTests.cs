@@ -11,13 +11,13 @@ using Shuttle.Shl.Api.Models.Portal.V1;
 namespace Shuttle.Tests.Api;
 
 /// <summary>
-/// Behavioural tests for <see cref="PlayerController.ResolvePlayers"/> — the batch resolution of
+/// Behavioural tests for <see cref="PlayerController.LookupPlayers"/> — the batch lookup of
 /// player ids and/or names used by the WebClient bulk-add preview. Backed by the EF Core in-memory
 /// provider (the model's SQL Server temporal tables and JSON complex properties make a relational
 /// test store impractical), so these cover the controller's resolution/dedup ordering rather than
 /// database constraints.
 /// </summary>
-public class PlayerResolveTests {
+public class PlayerLookupTests {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     private static ShlDbContext CreateContext() {
@@ -50,10 +50,10 @@ public class PlayerResolveTests {
         return new PlayerController(db, NullLogger<PlayerController>.Instance);
     }
 
-    private static async Task<ResolvePlayersResult> ResolveAsync(PlayerController controller, ResolvePlayersRequest request) {
-        var action = await controller.ResolvePlayers(request, Ct);
+    private static async Task<PlayerLookupResult> LookupAsync(PlayerController controller, PlayerLookupRequest request) {
+        var action = await controller.LookupPlayers(request, Ct);
         var ok = Assert.IsType<OkObjectResult>(action.Result);
-        return Assert.IsType<ResolvePlayersResult>(ok.Value);
+        return Assert.IsType<PlayerLookupResult>(ok.Value);
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public class PlayerResolveTests {
             Player(1002, "Bob", draftSeason: 86, totalTpe: 500),
             Player(1003, "Carol"));
 
-        var result = await ResolveAsync(controller, new ResolvePlayersRequest {
+        var result = await LookupAsync(controller, new PlayerLookupRequest {
             PlayerIds = [1002],
             Names = ["alice"], // case-insensitive
         });
@@ -82,7 +82,7 @@ public class PlayerResolveTests {
     public async Task Reports_unknown_ids_and_names_as_not_found() {
         var controller = await SetupAsync(Player(1001, "Alice"));
 
-        var result = await ResolveAsync(controller, new ResolvePlayersRequest {
+        var result = await LookupAsync(controller, new PlayerLookupRequest {
             PlayerIds = [9999],
             Names = ["Nobody"],
         });
@@ -99,7 +99,7 @@ public class PlayerResolveTests {
             Player(1002, "Dupe"),
             Player(1003, "Unique"));
 
-        var result = await ResolveAsync(controller, new ResolvePlayersRequest {
+        var result = await LookupAsync(controller, new PlayerLookupRequest {
             PlayerIds = [1003],
             Names = ["Dupe"],
         });
@@ -114,7 +114,7 @@ public class PlayerResolveTests {
     public async Task Dedups_same_player_supplied_by_id_and_name() {
         var controller = await SetupAsync(Player(1001, "Alice"));
 
-        var result = await ResolveAsync(controller, new ResolvePlayersRequest {
+        var result = await LookupAsync(controller, new PlayerLookupRequest {
             PlayerIds = [1001],
             Names = ["Alice"],
         });
@@ -126,7 +126,7 @@ public class PlayerResolveTests {
     public async Task Empty_request_is_bad_request() {
         var controller = await SetupAsync(Player(1001, "Alice"));
 
-        var action = await controller.ResolvePlayers(new ResolvePlayersRequest(), Ct);
+        var action = await controller.LookupPlayers(new PlayerLookupRequest(), Ct);
 
         var bad = Assert.IsType<BadRequestObjectResult>(action.Result);
         Assert.Equal(StatusCodes.Status400BadRequest, bad.StatusCode);
@@ -136,8 +136,8 @@ public class PlayerResolveTests {
     public async Task Too_many_inputs_is_bad_request() {
         var controller = await SetupAsync(Player(1001, "Alice"));
 
-        var action = await controller.ResolvePlayers(
-            new ResolvePlayersRequest { PlayerIds = Enumerable.Range(1, 201).ToList() },
+        var action = await controller.LookupPlayers(
+            new PlayerLookupRequest { PlayerIds = Enumerable.Range(1, 201).ToList() },
             Ct);
 
         Assert.IsType<BadRequestObjectResult>(action.Result);

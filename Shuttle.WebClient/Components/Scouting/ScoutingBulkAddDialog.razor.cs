@@ -11,7 +11,7 @@ namespace Shuttle.WebClient.Components.Scouting;
 
 /// <summary>
 /// Dialog for bulk-adding players to a scouting board. The user pastes player names and/or ids (one
-/// per line); the dialog resolves them via <c>QUERY /players/resolve</c> and shows a preview of the
+/// per line); the dialog resolves them via <c>QUERY /players/lookup</c> and shows a preview of the
 /// matched players (plus any not-found or ambiguous inputs) before the caller commits the add. It
 /// closes with the resolved player ids, leaving the caller to perform the bulk add.
 /// </summary>
@@ -25,10 +25,10 @@ public partial class ScoutingBulkAddDialog : FluentDialogInstance {
     private string rawText = string.Empty;
     private bool resolving;
     private string? resolveError;
-    private ResolvePlayersResult? result;
+    private PlayerLookupResult? result;
     private PlayerSuggestion? picked;
 
-    private IQueryable<ResolvedPlayer> ResolvedRows => (result?.Resolved ?? []).AsQueryable();
+    private IQueryable<PlayerLookupMatch> ResolvedRows => (result?.Resolved ?? []).AsQueryable();
 
     // Enabled only once resolution succeeded with at least one player and no ambiguous names, so the
     // user is nudged to disambiguate (by id) rather than silently dropping an ambiguous name.
@@ -58,7 +58,7 @@ public partial class ScoutingBulkAddDialog : FluentDialogInstance {
         resolveError = null;
         result = null;
         try {
-            result = await PlayerClient.ResolvePlayers(ParseInput(rawText));
+            result = await PlayerClient.LookupPlayers(ParseInput(rawText));
         } catch (ApiException ex) {
             resolveError = DescribeError(ex);
         } catch (HttpRequestException) {
@@ -106,7 +106,7 @@ public partial class ScoutingBulkAddDialog : FluentDialogInstance {
 
     // Splits the textarea into ids and names: a line that parses as a positive integer is treated as a
     // player id, everything else as a name. Blank lines are ignored.
-    private static ResolvePlayersRequest ParseInput(string raw) {
+    private static PlayerLookupRequest ParseInput(string raw) {
         var ids = new List<int>();
         var names = new List<string>();
         foreach (var line in raw.Split('\n')) {
@@ -122,7 +122,7 @@ public partial class ScoutingBulkAddDialog : FluentDialogInstance {
             }
         }
 
-        return new ResolvePlayersRequest { PlayerIds = ids, Names = names };
+        return new PlayerLookupRequest { PlayerIds = ids, Names = names };
     }
 
     private static string DescribeError(ApiException ex) {

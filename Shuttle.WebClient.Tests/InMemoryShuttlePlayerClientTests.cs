@@ -105,9 +105,9 @@ public class InMemoryShuttlePlayerClientTests {
     }
 
     [Fact]
-    public async Task ResolvePlayers_resolves_by_id_and_name_ids_first() {
+    public async Task LookupPlayers_resolves_by_id_and_name_ids_first() {
         // 1001 = Aaron Frost, 1002 = Bella Ridge in the seed data.
-        var result = await client.ResolvePlayers(new ResolvePlayersRequest {
+        var result = await client.LookupPlayers(new PlayerLookupRequest {
             PlayerIds = [1002],
             Names = ["aaron frost"], // case-insensitive
         });
@@ -123,8 +123,8 @@ public class InMemoryShuttlePlayerClientTests {
     }
 
     [Fact]
-    public async Task ResolvePlayers_reports_unknown_inputs_as_not_found() {
-        var result = await client.ResolvePlayers(new ResolvePlayersRequest {
+    public async Task LookupPlayers_reports_unknown_inputs_as_not_found() {
+        var result = await client.LookupPlayers(new PlayerLookupRequest {
             PlayerIds = [999_999],
             Names = ["No Such Player"],
         });
@@ -135,8 +135,8 @@ public class InMemoryShuttlePlayerClientTests {
     }
 
     [Fact]
-    public async Task ResolvePlayers_dedups_id_and_name_for_same_player() {
-        var result = await client.ResolvePlayers(new ResolvePlayersRequest {
+    public async Task LookupPlayers_dedups_id_and_name_for_same_player() {
+        var result = await client.LookupPlayers(new PlayerLookupRequest {
             PlayerIds = [1001],
             Names = ["Aaron Frost"],
         });
@@ -145,10 +145,10 @@ public class InMemoryShuttlePlayerClientTests {
     }
 
     [Fact]
-    public async Task ResolvePlayers_flags_ambiguous_names() {
+    public async Task LookupPlayers_flags_ambiguous_names() {
         var custom = new InMemoryShuttlePlayerClient([Card(2001, "Dup"), Card(2002, "Dup"), Card(2003, "Solo")]);
 
-        var result = await custom.ResolvePlayers(new ResolvePlayersRequest { Names = ["Dup", "Solo"] });
+        var result = await custom.LookupPlayers(new PlayerLookupRequest { Names = ["Dup", "Solo"] });
 
         Assert.Contains("Dup", result.Ambiguous);
         Assert.Equal([2003], result.Resolved.Select(p => p.PlayerId));

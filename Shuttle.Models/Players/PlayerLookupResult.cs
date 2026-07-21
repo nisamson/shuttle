@@ -4,12 +4,12 @@ using Shuttle.Shl.Api.Models.Portal.V1;
 namespace Shuttle.Models.Players;
 
 /// <summary>
-/// Result of a batch player-resolution request (<c>QUERY /players/resolve</c>). Resolved players are
+/// Result of a batch player lookup (<c>QUERY /players/lookup</c>). Resolved players are
 /// de-duplicated preserving first-seen order (requested ids first, then name-resolved players).
 /// </summary>
-public sealed record ResolvePlayersResult {
+public sealed record PlayerLookupResult {
     /// <summary>The players that were resolved from the requested ids and names.</summary>
-    public required IReadOnlyList<ResolvedPlayer> Resolved { get; init; }
+    public required IReadOnlyList<PlayerLookupMatch> Resolved { get; init; }
 
     /// <summary>The requested ids (as strings) and names that matched no player.</summary>
     public required IReadOnlyList<string> NotFound { get; init; }
@@ -19,10 +19,10 @@ public sealed record ResolvePlayersResult {
 }
 
 /// <summary>
-/// A slim player summary returned by <c>QUERY /players/resolve</c> — enough to render a resolved
+/// A slim player summary returned by <c>QUERY /players/lookup</c> — enough to render a resolved
 /// preview (name, position, draft season, total TPE) and to feed a follow-up bulk-add by id.
 /// </summary>
-public sealed record ResolvedPlayer {
+public sealed record PlayerLookupMatch {
     public required int PlayerId { get; init; }
     public required string Name { get; init; }
     public required string Username { get; init; }

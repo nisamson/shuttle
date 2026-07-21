@@ -268,16 +268,17 @@ public class PlayerController : ControllerBase {
     private sealed record NameMatch(int PlayerId, string LoweredName);
 
     /// <summary>
-    /// Resolves a batch of player ids and/or names to concrete players without mutating anything.
-    /// Names are matched case-insensitively; a name matching more than one player is reported as
-    /// <c>Ambiguous</c>, and unknown ids/names as <c>NotFound</c>. Uses the HTTP <c>QUERY</c> method
-    /// (a safe, idempotent read that carries a request body). Backs the WebClient bulk-add preview.
+    /// Looks up a batch of player ids and/or names, resolving them to concrete players without
+    /// mutating anything. Names are matched case-insensitively; a name matching more than one player
+    /// is reported as <c>Ambiguous</c>, and unknown ids/names as <c>NotFound</c>. Uses the HTTP
+    /// <c>QUERY</c> method (a safe, idempotent read that carries a request body). Backs the WebClient
+    /// bulk-add preview.
     /// </summary>
-    [AcceptVerbs("QUERY", Route = "resolve")]
-    [ProducesResponseType<ResolvePlayersResult>(StatusCodes.Status200OK)]
+    [AcceptVerbs("QUERY", Route = "lookup")]
+    [ProducesResponseType<PlayerLookupResult>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<ResolvePlayersResult>> ResolvePlayers(
-        [FromBody] ResolvePlayersRequest request,
+    public async Task<ActionResult<PlayerLookupResult>> LookupPlayers(
+        [FromBody] PlayerLookupRequest request,
         CancellationToken cancellationToken) {
         var requestedIds = (request.PlayerIds ?? []).ToList();
         var requestedNames = (request.Names ?? [])
@@ -336,10 +337,10 @@ public class PlayerController : ControllerBase {
         // Fetch slim summaries for every candidate id (requested + name-resolved) in one round trip.
         var candidateIds = requestedIds.Concat(resolvedFromNames).Distinct().ToList();
         var summaries = candidateIds.Count == 0
-            ? new Dictionary<int, ResolvedPlayer>()
+            ? new Dictionary<int, PlayerLookupMatch>()
             : (await db.PlayerInformation
                 .Where(p => candidateIds.Contains(p.PlayerId))
-                .Select(p => new ResolvedPlayer {
+                .Select(p => new PlayerLookupMatch {
                     PlayerId = p.PlayerId,
                     Name = p.Name,
                     Username = p.Username,
@@ -353,7 +354,7 @@ public class PlayerController : ControllerBase {
 
         // Build the ordered, de-duplicated resolved list: requested ids first (in request order),
         // then name-resolved players, preserving first-seen order. Unknown ids fall into NotFound.
-        var resolved = new List<ResolvedPlayer>();
+        var resolved = new List<PlayerLookupMatch>();
         var seenIds = new HashSet<int>();
         foreach (var id in requestedIds) {
             if (!seenIds.Add(id)) {
@@ -373,7 +374,7 @@ public class PlayerController : ControllerBase {
             }
         }
 
-        return Ok(new ResolvePlayersResult {
+        return Ok(new PlayerLookupResult {
             Resolved = resolved,
             NotFound = notFound,
             Ambiguous = ambiguous,

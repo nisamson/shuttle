@@ -51,10 +51,10 @@ public sealed class InMemoryShuttlePlayerClient : IShuttlePlayerClient {
         return Task.FromResult(player is null ? null : BuildTimeline(player));
     }
 
-    // Mirrors the server's QUERY /players/resolve semantics against the seed set: case-insensitive
+    // Mirrors the server's QUERY /players/lookup semantics against the seed set: case-insensitive
     // name matching (ambiguous names rejected), unknown ids/names reported, resolved players
     // de-duplicated preserving order (requested ids first, then name-resolved).
-    public Task<ResolvePlayersResult> ResolvePlayers(ResolvePlayersRequest request, CancellationToken token = default) {
+    public Task<PlayerLookupResult> LookupPlayers(PlayerLookupRequest request, CancellationToken token = default) {
         var requestedIds = (request.PlayerIds ?? []).ToList();
         var requestedNames = (request.Names ?? [])
             .Select(n => n?.Trim() ?? string.Empty)
@@ -87,7 +87,7 @@ public sealed class InMemoryShuttlePlayerClient : IShuttlePlayerClient {
 
         var byId = players.ToDictionary(p => p.PlayerId);
 
-        var resolved = new List<ResolvedPlayer>();
+        var resolved = new List<PlayerLookupMatch>();
         var seenIds = new HashSet<int>();
         foreach (var id in requestedIds) {
             if (!seenIds.Add(id)) {
@@ -95,7 +95,7 @@ public sealed class InMemoryShuttlePlayerClient : IShuttlePlayerClient {
             }
 
             if (byId.TryGetValue(id, out var card)) {
-                resolved.Add(ToResolved(card));
+                resolved.Add(ToMatch(card));
             } else {
                 notFound.Add(id.ToString());
             }
@@ -103,18 +103,18 @@ public sealed class InMemoryShuttlePlayerClient : IShuttlePlayerClient {
 
         foreach (var id in resolvedFromNames) {
             if (seenIds.Add(id) && byId.TryGetValue(id, out var card)) {
-                resolved.Add(ToResolved(card));
+                resolved.Add(ToMatch(card));
             }
         }
 
-        return Task.FromResult(new ResolvePlayersResult {
+        return Task.FromResult(new PlayerLookupResult {
             Resolved = resolved,
             NotFound = notFound,
             Ambiguous = ambiguous,
         });
     }
 
-    private static ResolvedPlayer ToResolved(PlayerCard card) => new() {
+    private static PlayerLookupMatch ToMatch(PlayerCard card) => new() {
         PlayerId = card.PlayerId,
         Name = card.Name,
         Username = card.Username,

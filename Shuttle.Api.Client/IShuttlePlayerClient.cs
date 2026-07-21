@@ -53,12 +53,12 @@ public interface IShuttlePlayerClient {
     Task<IReadOnlyList<TpeTimelinePoint>?> GetPlayerTpeTimeline(int playerId, CancellationToken token = default);
 
     /// <summary>
-    /// Resolves a batch of player ids and/or names to concrete players (reporting unknown and
-    /// ambiguous inputs) without mutating anything. Uses the HTTP <c>QUERY</c> verb. Backs the
-    /// bulk-add preview.
+    /// Looks up a batch of player ids and/or names, resolving them to concrete players (reporting
+    /// unknown and ambiguous inputs) without mutating anything. Uses the HTTP <c>QUERY</c> verb. Backs
+    /// the bulk-add preview.
     /// </summary>
-    /// <param name="request">The ids and/or names to resolve.</param>
+    /// <param name="request">The ids and/or names to look up.</param>
     /// <param name="token">A cancellation token.</param>
-    [HttpQuery("/players/resolve")]
-    Task<ResolvePlayersResult> ResolvePlayers([Body] ResolvePlayersRequest request, CancellationToken token = default);
+    [HttpQuery("/players/lookup")]
+    Task<PlayerLookupResult> LookupPlayers([Body] PlayerLookupRequest request, CancellationToken token = default);
 }

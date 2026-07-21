@@ -9,8 +9,8 @@ namespace Shuttle.Tests.Api;
 
 /// <summary>
 /// Verifies the Refit client actually emits the (non-standard) HTTP <c>QUERY</c> verb for
-/// <see cref="IShuttlePlayerClient.ResolvePlayers"/>, with the request serialized into the body —
-/// the fake-backend tests exercise the resolution semantics but never the real HTTP method, so this
+/// <see cref="IShuttlePlayerClient.LookupPlayers"/>, with the request serialized into the body —
+/// the fake-backend tests exercise the lookup semantics but never the real HTTP method, so this
 /// guards the custom <see cref="HttpQueryAttribute"/> wiring.
 /// </summary>
 public class RefitQueryMethodTests {
@@ -26,7 +26,7 @@ public class RefitQueryMethodTests {
             }
 
             var payload = JsonSerializer.Serialize(
-                new ResolvePlayersResult { Resolved = [], NotFound = [], Ambiguous = [] });
+                new PlayerLookupResult { Resolved = [], NotFound = [], Ambiguous = [] });
             return new HttpResponseMessage(HttpStatusCode.OK) {
                 Content = new StringContent(payload, Encoding.UTF8, "application/json"),
             };
@@ -34,7 +34,7 @@ public class RefitQueryMethodTests {
     }
 
     [Fact]
-    public async Task ResolvePlayers_sends_QUERY_verb_with_json_body() {
+    public async Task LookupPlayers_sends_QUERY_verb_with_json_body() {
         var handler = new CapturingHandler();
         using var http = new HttpClient(handler) { BaseAddress = new Uri("http://localhost") };
         var settings = new RefitSettings {
@@ -42,13 +42,13 @@ public class RefitQueryMethodTests {
         };
         var client = RestService.For<IShuttlePlayerClient>(http, settings);
 
-        await client.ResolvePlayers(
-            new ResolvePlayersRequest { PlayerIds = [1001], Names = ["Aaron Frost"] },
+        await client.LookupPlayers(
+            new PlayerLookupRequest { PlayerIds = [1001], Names = ["Aaron Frost"] },
             TestContext.Current.CancellationToken);
 
         Assert.NotNull(handler.Request);
         Assert.Equal("QUERY", handler.Request!.Method.Method);
-        Assert.Equal("/players/resolve", handler.Request.RequestUri!.AbsolutePath);
+        Assert.Equal("/players/lookup", handler.Request.RequestUri!.AbsolutePath);
         Assert.NotNull(handler.Body);
         Assert.Contains("playerIds", handler.Body!, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Aaron Frost", handler.Body!, StringComparison.OrdinalIgnoreCase);
