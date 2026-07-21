@@ -262,6 +262,124 @@ public class PlayerController : ControllerBase {
 
         return Ok(timeline);
     }
+
+    private const int MaxResolveInputs = 200;
+
+    private sealed record NameMatch(int PlayerId, string LoweredName);
+
+    /// <summary>
+    /// Looks up a batch of player ids and/or names, resolving them to concrete players without
+    /// mutating anything. Names are matched case-insensitively; a name matching more than one player
+    /// is reported as <c>Ambiguous</c>, and unknown ids/names as <c>NotFound</c>. Uses the HTTP
+    /// <c>QUERY</c> method (a safe, idempotent read that carries a request body). Backs the WebClient
+    /// bulk-add preview.
+    /// </summary>
+    [AcceptVerbs("QUERY", Route = "lookup")]
+    [ProducesResponseType<PlayerLookupResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<PlayerLookupResult>> LookupPlayers(
+        [FromBody] PlayerLookupRequest request,
+        CancellationToken cancellationToken) {
+        var requestedIds = (request.PlayerIds ?? []).ToList();
+        var requestedNames = (request.Names ?? [])
+            .Select(n => n?.Trim() ?? string.Empty)
+            .Where(n => n.Length > 0)
+            .ToList();
+
+        if (requestedIds.Count == 0 && requestedNames.Count == 0) {
+            return BadRequest(new ProblemDetails {
+                Detail = "Provide at least one player id or name to resolve.",
+                Status = StatusCodes.Status400BadRequest,
+            });
+        }
+
+        if (requestedIds.Count + requestedNames.Count > MaxResolveInputs) {
+            return BadRequest(new ProblemDetails {
+                Detail = $"Too many inputs; resolve at most {MaxResolveInputs} players at a time.",
+                Status = StatusCodes.Status400BadRequest,
+            });
+        }
+
+        var notFound = new List<string>();
+
+        // Resolve names -> player ids. Matching is case-insensitive on the trimmed name; any name that
+        // matches more than one player is ambiguous and cannot be resolved to a single player.
+        var loweredNames = requestedNames.Select(n => n.ToLowerInvariant()).Distinct().ToList();
+        var nameMatches = loweredNames.Count == 0
+            ? []
+            : await db.PlayerInformation
+                .Where(p => loweredNames.Contains(p.Name.ToLower()))
+                .Select(p => new NameMatch(p.PlayerId, p.Name.ToLower()))
+                .ToListAsync(cancellationToken);
+
+        var byLoweredName = nameMatches
+            .GroupBy(m => m.LoweredName)
+            .ToDictionary(g => g.Key, g => g.Select(m => m.PlayerId).Distinct().ToList());
+
+        var ambiguous = new List<string>();
+        var resolvedFromNames = new List<int>();
+        var seenLoweredNames = new HashSet<string>();
+        foreach (var name in requestedNames) {
+            var lowered = name.ToLowerInvariant();
+            if (!seenLoweredNames.Add(lowered)) {
+                continue; // duplicate name within the request
+            }
+
+            if (!byLoweredName.TryGetValue(lowered, out var ids) || ids.Count == 0) {
+                notFound.Add(name);
+            } else if (ids.Count > 1) {
+                ambiguous.Add(name);
+            } else {
+                resolvedFromNames.Add(ids[0]);
+            }
+        }
+
+        // Fetch slim summaries for every candidate id (requested + name-resolved) in one round trip.
+        var candidateIds = requestedIds.Concat(resolvedFromNames).Distinct().ToList();
+        var summaries = candidateIds.Count == 0
+            ? new Dictionary<int, PlayerLookupMatch>()
+            : (await db.PlayerInformation
+                .Where(p => candidateIds.Contains(p.PlayerId))
+                .Select(p => new PlayerLookupMatch {
+                    PlayerId = p.PlayerId,
+                    Name = p.Name,
+                    Username = p.Username,
+                    Status = p.Status,
+                    Position = p.Position,
+                    DraftSeason = p.DraftSeason,
+                    TotalTpe = p.TotalTpe,
+                })
+                .ToListAsync(cancellationToken))
+            .ToDictionary(p => p.PlayerId);
+
+        // Build the ordered, de-duplicated resolved list: requested ids first (in request order),
+        // then name-resolved players, preserving first-seen order. Unknown ids fall into NotFound.
+        var resolved = new List<PlayerLookupMatch>();
+        var seenIds = new HashSet<int>();
+        foreach (var id in requestedIds) {
+            if (!seenIds.Add(id)) {
+                continue;
+            }
+
+            if (summaries.TryGetValue(id, out var player)) {
+                resolved.Add(player);
+            } else {
+                notFound.Add(id.ToString());
+            }
+        }
+
+        foreach (var id in resolvedFromNames) {
+            if (seenIds.Add(id) && summaries.TryGetValue(id, out var player)) {
+                resolved.Add(player);
+            }
+        }
+
+        return Ok(new PlayerLookupResult {
+            Resolved = resolved,
+            NotFound = notFound,
+            Ambiguous = ambiguous,
+        });
+    }
 }
 
 internal static class PlayerQueryableExtensions {

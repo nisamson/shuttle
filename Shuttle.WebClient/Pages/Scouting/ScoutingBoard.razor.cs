@@ -33,6 +33,7 @@ public partial class ScoutingBoard : ComponentBase {
     private bool busy;
     private string? loadError;
     private string? actionError;
+    private string? actionMessage;
 
     private IReadOnlyList<ScoutingComment> boardComments = [];
     private readonly Dictionary<int, PlayerCard> playerCards = new();
@@ -310,6 +311,46 @@ public partial class ScoutingBoard : ComponentBase {
         });
     }
 
+    private async Task BulkAddAsync() {
+        var existing = board?.Entries.Select(e => e.PlayerId).ToHashSet() ?? [];
+        var dialogResult = await DialogService.ShowDialogAsync<ScoutingBulkAddDialog>(options => {
+            options.Modal = true;
+            options.Width = "640px";
+            options.Parameters.Add(nameof(ScoutingBulkAddDialog.Content), new ScoutingBulkAddDialog.Args {
+                ExistingPlayerIds = existing,
+            });
+        });
+
+        if (dialogResult.Cancelled
+            || dialogResult.Value is not ScoutingBulkAddDialog.Result added
+            || added.PlayerIds.Count == 0) {
+            return;
+        }
+
+        await RunAsync(async () => {
+            var response = await ScoutingClient.AddEntries(BoardId, new AddScoutingBoardEntriesRequest {
+                PlayerIds = added.PlayerIds,
+            });
+            await ReloadBoardAsync();
+            actionMessage = SummarizeBulkAdd(response);
+        });
+    }
+
+    private static string SummarizeBulkAdd(AddScoutingBoardEntriesResult result) {
+        var parts = new List<string> {
+            $"Added {result.Added.Count} player{(result.Added.Count == 1 ? string.Empty : "s")}",
+        };
+        if (result.AlreadyOnBoard.Count > 0) {
+            parts.Add($"{result.AlreadyOnBoard.Count} already on board");
+        }
+
+        if (result.NotFound.Count > 0) {
+            parts.Add($"{result.NotFound.Count} not found");
+        }
+
+        return string.Join(", ", parts) + ".";
+    }
+
     private void ClearSelection() {
         selectedRows = [];
     }
@@ -349,6 +390,7 @@ public partial class ScoutingBoard : ComponentBase {
     private async Task RunAsync(Func<Task> action) {
         busy = true;
         actionError = null;
+        actionMessage = null;
         try {
             await action();
         } catch (ApiException ex) {

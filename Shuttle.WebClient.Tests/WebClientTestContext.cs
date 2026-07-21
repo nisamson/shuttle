@@ -32,5 +32,6 @@ public abstract class WebClientTestContext : BunitContext {
         Services.AddSingleton<IPlayerDirectoryService, PlayerDirectoryService>();
         Services.AddSingleton<IUserDirectoryService, UserDirectoryService>();
         Services.AddSingleton<ICurrentUserService, CurrentUserService>();
+        Services.AddSingleton<IPendingRequestTracker, PendingRequestTracker>();
     }
 }

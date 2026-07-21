@@ -103,4 +103,69 @@ public class InMemoryShuttlePlayerClientTests {
 
         Assert.Equal(100, result.PageSize);
     }
+
+    [Fact]
+    public async Task LookupPlayers_resolves_by_id_and_name_ids_first() {
+        // 1001 = Aaron Frost, 1002 = Bella Ridge in the seed data.
+        var result = await client.LookupPlayers(new PlayerLookupRequest {
+            PlayerIds = [1002],
+            Names = ["aaron frost"], // case-insensitive
+        });
+
+        Assert.Equal([1002, 1001], result.Resolved.Select(p => p.PlayerId));
+        Assert.Empty(result.NotFound);
+        Assert.Empty(result.Ambiguous);
+
+        var frost = result.Resolved.Single(p => p.PlayerId == 1001);
+        Assert.Equal("Aaron Frost", frost.Name);
+        Assert.Equal(70, frost.DraftSeason);
+        Assert.Equal(1450, frost.TotalTpe);
+    }
+
+    [Fact]
+    public async Task LookupPlayers_reports_unknown_inputs_as_not_found() {
+        var result = await client.LookupPlayers(new PlayerLookupRequest {
+            PlayerIds = [999_999],
+            Names = ["No Such Player"],
+        });
+
+        Assert.Empty(result.Resolved);
+        Assert.Contains("999999", result.NotFound);
+        Assert.Contains("No Such Player", result.NotFound);
+    }
+
+    [Fact]
+    public async Task LookupPlayers_dedups_id_and_name_for_same_player() {
+        var result = await client.LookupPlayers(new PlayerLookupRequest {
+            PlayerIds = [1001],
+            Names = ["Aaron Frost"],
+        });
+
+        Assert.Equal([1001], result.Resolved.Select(p => p.PlayerId));
+    }
+
+    [Fact]
+    public async Task LookupPlayers_flags_ambiguous_names() {
+        var custom = new InMemoryShuttlePlayerClient([Card(2001, "Dup"), Card(2002, "Dup"), Card(2003, "Solo")]);
+
+        var result = await custom.LookupPlayers(new PlayerLookupRequest { Names = ["Dup", "Solo"] });
+
+        Assert.Contains("Dup", result.Ambiguous);
+        Assert.Equal([2003], result.Resolved.Select(p => p.PlayerId));
+        Assert.Empty(result.NotFound);
+    }
+
+    private static PlayerCard Card(int id, string name) => new() {
+        PlayerId = id,
+        UserId = id,
+        Username = $"user{id}",
+        Name = name,
+        Status = PlayerStatus.Active,
+        Position = PlayerPosition.Center,
+        Handedness = PlayerHandedness.Left,
+        TotalTpe = 0,
+        AppliedTpe = 0,
+        BankedTpe = 0,
+        BankBalance = 0,
+    };
 }

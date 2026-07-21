@@ -64,6 +64,24 @@ public class ScoutingBoardsController : ControllerBase {
         return (await scouting.AddEntryAsync(boardId, request, User, cancellationToken)).ToActionResult(this);
     }
 
+    /// <summary>
+    /// Adds several players to the board in one transaction, identified by upstream id and/or player
+    /// name; only players that exist in the database are appended. A name matching more than one
+    /// player rejects the request. Owners and editors only.
+    /// </summary>
+    [HttpPost("{boardId:guid}/entries/bulk")]
+    [ProducesResponseType<AddScoutingBoardEntriesResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<AddScoutingBoardEntriesResult>> AddEntries(
+        Guid boardId,
+        [FromBody] AddScoutingBoardEntriesRequest request,
+        CancellationToken cancellationToken) {
+        return (await scouting.AddEntriesAsync(boardId, request, User, cancellationToken)).ToActionResult(this);
+    }
+
     /// <summary>Removes a player from the board and closes the rank gap. Owners and editors only.</summary>
     [HttpDelete("{boardId:guid}/entries/{playerId:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
