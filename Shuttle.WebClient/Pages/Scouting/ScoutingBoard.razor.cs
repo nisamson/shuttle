@@ -41,6 +41,7 @@ public partial class ScoutingBoard : ComponentBase {
     private List<BoardRow> rows = [];
     private IEnumerable<BoardRow> selectedRows = [];
     private string nameFilter = string.Empty;
+    private readonly HashSet<PlayerPosition> selectedPositions = [];
 
     private PlayerSuggestion? pendingPlayer;
 
@@ -58,8 +59,29 @@ public partial class ScoutingBoard : ComponentBase {
                 query = query.Where(r => r.Name.Contains(text, StringComparison.OrdinalIgnoreCase));
             }
 
+            if (selectedPositions.Count > 0) {
+                query = query.Where(r => r.Position != null && selectedPositions.Contains(r.Position.Value));
+            }
+
             return query;
         }
+    }
+
+    // The distinct positions present on the board, in a stable canonical order, for the column filter.
+    private IEnumerable<PlayerPosition> AvailablePositions =>
+        rows.Where(r => r.Position is not null)
+            .Select(r => r.Position!.Value)
+            .Distinct()
+            .OrderBy(p => p);
+
+    private void TogglePosition(PlayerPosition position, bool selected) {
+        if (selected) {
+            selectedPositions.Add(position);
+        } else {
+            selectedPositions.Remove(position);
+        }
+
+        StateHasChanged();
     }
 
     private static readonly GridSort<BoardRow> RankSort = GridSort<BoardRow>.ByAscending(r => r.Rank);

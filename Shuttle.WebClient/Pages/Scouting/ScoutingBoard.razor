@@ -3,6 +3,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Shuttle.Models.Players
 @using Shuttle.Models.Scouting
+@using Shuttle.Shl.Api.Models.Common
 @using Shuttle.WebClient.Components.Scouting
 @using Shuttle.WebClient.Models
 
@@ -78,17 +79,28 @@
                                          Immediate="true" Placeholder="Filter by name" Autofocus="true"/>
                     </ColumnOptions>
                     <ChildContent>
-                        <a href="@Routes.Players.Player(context.PlayerId)">@context.Name</a>
+                        <a href="@Routes.Players.Player(context.PlayerId)" target="_blank" rel="noopener noreferrer">@context.Name</a>
                     </ChildContent>
                 </TemplateColumn>
                 <TemplateColumn Title="Position" Sortable="true" SortBy="@PositionSort" Align="DataGridCellAlignment.Center">
-                    @if (context.Position is not null) {
-                        <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
-                            <FluentBadge Appearance="BadgeAppearance.Outline">@PositionText(context)</FluentBadge>
-                        </div>
-                    } else {
-                        <span>—</span>
-                    }
+                    <ColumnOptions>
+                        <FluentStack Orientation="Orientation.Vertical" VerticalGap="4">
+                            @foreach (var pos in AvailablePositions) {
+                                <FluentCheckbox Margin="0" Label="@pos.ToShortString()"
+                                                Value="@selectedPositions.Contains(pos)"
+                                                ValueChanged="v => TogglePosition(pos, v)"/>
+                            }
+                        </FluentStack>
+                    </ColumnOptions>
+                    <ChildContent>
+                        @if (context.Position is not null) {
+                            <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+                                <FluentBadge Appearance="BadgeAppearance.Outline">@PositionText(context)</FluentBadge>
+                            </div>
+                        } else {
+                            <span>—</span>
+                        }
+                    </ChildContent>
                 </TemplateColumn>
                 <TemplateColumn Title="TPE" Sortable="true" SortBy="@TpeSort" Align="DataGridCellAlignment.End">
                     @TpeText(context)
