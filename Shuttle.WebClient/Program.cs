@@ -24,24 +24,33 @@ var useFakeBackend = builder.Configuration.GetValue<bool>("Testing:FakeBackend")
 if (useFakeBackend) {
     builder.Services.AddShuttleFakeBackend();
 } else {
+    // Registers each in-flight backend request with the pending-request tracker (for the app-wide
+    // "communicating with server" indicator). Attached as the outermost handler on every client.
+    builder.Services.AddTransient<PendingRequestHandler>();
+
     // Typed Refit clients for the Shuttle backend API (player endpoints, etc.).
-    builder.Services.AddShuttleApiClient(new Uri(apiBaseAddress));
+    builder.Services.AddShuttleApiClient(new Uri(apiBaseAddress))
+        .AddHttpMessageHandler<PendingRequestHandler>();
 
     // The league/team endpoints are public (anonymous), so no access-token handler is attached.
-    builder.Services.AddShuttleLeagueClient(new Uri(apiBaseAddress));
+    builder.Services.AddShuttleLeagueClient(new Uri(apiBaseAddress))
+        .AddHttpMessageHandler<PendingRequestHandler>();
 
     // The user client is attached to the access-token handler so authenticated callers receive the
     // richer (Discord-bearing) projection; anonymous callers fall through without a token.
     builder.Services.AddScoped<ApiAccessTokenHandler>();
     builder.Services.AddShuttleUserClient(new Uri(apiBaseAddress))
+        .AddHttpMessageHandler<PendingRequestHandler>()
         .AddHttpMessageHandler<ApiAccessTokenHandler>();
 
     // The dev-only debug endpoints require an authenticated caller, so attach the token handler too.
     builder.Services.AddShuttleDebugClient(new Uri(apiBaseAddress))
+        .AddHttpMessageHandler<PendingRequestHandler>()
         .AddHttpMessageHandler<ApiAccessTokenHandler>();
 
     // The scouting endpoints all require an authenticated caller, so attach the token handler.
     builder.Services.AddShuttleScoutingClient(new Uri(apiBaseAddress))
+        .AddHttpMessageHandler<PendingRequestHandler>()
         .AddHttpMessageHandler<ApiAccessTokenHandler>();
 
     builder.Services.AddMsalAuthentication(options => {
@@ -62,6 +71,7 @@ if (useFakeBackend) {
 
 builder.Services.AddFluentUIComponents();
 builder.Services.AddLocalStorageServices();
+builder.Services.AddSingleton<IPendingRequestTracker, PendingRequestTracker>();
 builder.Services.AddSingleton<IBlogService, BlogService>();
 builder.Services.AddSingleton<IShuttleOptionsStorage, ShuttleOptionsLocalStorage>();
 builder.Services.AddSingleton<IPlayerDirectoryService, PlayerDirectoryService>();
