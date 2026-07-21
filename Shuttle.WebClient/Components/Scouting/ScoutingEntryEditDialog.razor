@@ -1,10 +1,35 @@
 @inherits Microsoft.FluentUI.AspNetCore.Components.FluentDialogInstance
+@using Shuttle.Models.Scouting
 
 <FluentDialogBody>
-    <FluentStack Orientation="Orientation.Vertical" VerticalGap="12">
-        <FluentNumberInput TValue="int" @bind-Value="rank"
-                           Label="@($"Rank (1–{Content.MaxRank})")"
-                           Min="1" Max="@Content.MaxRank"
-                           Style="width: 8rem;"/>
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="16">
+        <FluentSelect TOption="ScoutingProspectStatus"
+                      TValue="string"
+                      Label="Status"
+                      Items="Statuses"
+                      OptionText="@(s => s.ToString())"
+                      OptionValue="@(s => s.ToString())"
+                      @bind-Value="statusValue"
+                      Style="width: 12rem;"/>
+
+        <FluentSelect TOption="AssigneeChoice"
+                      TValue="string"
+                      Label="Assigned to"
+                      Items="AssigneeChoices"
+                      OptionText="@(c => c.Text)"
+                      OptionValue="@(c => c.Value)"
+                      @bind-Value="assigneeValue"
+                      Style="width: 12rem;"/>
+
+        @if (!IsRejected) {
+            <FluentNumberInput TValue="int" @bind-Value="rank"
+                               Label="@($"Rank (1–{Content.MaxRank})")"
+                               Min="1" Max="@Content.MaxRank"
+                               Style="width: 8rem;"/>
+        } else {
+            <FluentText Style="color: var(--colorNeutralForeground2);">
+                Rejected prospects are unranked and shown in the rejected list.
+            </FluentText>
+        }
     </FluentStack>
 </FluentDialogBody>

@@ -28,15 +28,45 @@ public record ScoutingBoardDetail {
     public required IReadOnlyList<ScoutingBoardEntry> Entries { get; init; }
 }
 
-/// <summary>A single ranked player on a board.</summary>
+/// <summary>
+/// The scouting lifecycle state of a prospect on a board. Values are mutually exclusive and advance
+/// as a member scouts and then decides on the player.
+/// </summary>
+public enum ScoutingProspectStatus {
+    /// <summary>Not yet scouted; the default state for a newly added prospect.</summary>
+    Pending = 0,
+
+    /// <summary>Has been scouted, but no accept/reject decision has been made yet.</summary>
+    Scouted = 1,
+
+    /// <summary>Scouted and approved for the team's draft plans.</summary>
+    Approved = 2,
+
+    /// <summary>Scouted and rejected. Rejected prospects are pulled out of the active rank sequence.</summary>
+    Rejected = 3
+}
+
+/// <summary>A single player on a board, with its scouting status and (optional) assignee.</summary>
 public record ScoutingBoardEntry {
     public required Guid Id { get; init; }
 
     /// <summary>The upstream integer id of the ranked player.</summary>
     public required int PlayerId { get; init; }
 
-    /// <summary>The player's 1-based rank on the board.</summary>
+    /// <summary>
+    /// The player's 1-based rank among the board's active (non-rejected) prospects, or <c>0</c> when
+    /// the prospect is <see cref="ScoutingProspectStatus.Rejected"/> and therefore unranked.
+    /// </summary>
     public required int Rank { get; init; }
+
+    /// <summary>The prospect's scouting status.</summary>
+    public required ScoutingProspectStatus Status { get; init; }
+
+    /// <summary>The <c>ShuttleUser</c> id this prospect is assigned to scout, or <c>null</c> if unassigned.</summary>
+    public Guid? AssignedToUserId { get; init; }
+
+    /// <summary>The username of the assignee, or <c>null</c> if unassigned.</summary>
+    public string? AssignedToUsername { get; init; }
 
     /// <summary>Number of comments in this entry's thread.</summary>
     public required int CommentCount { get; init; }
@@ -109,6 +139,36 @@ public record RemoveScoutingBoardEntriesRequest {
 }
 
 /// <summary>
+/// Payload for applying a status and/or assignee change to several prospects on a board in one
+/// request. At least one of <see cref="Status"/> or <see cref="ChangeAssignee"/> must be set;
+/// changing status recomputes the active rank sequence (rejected prospects are unranked and
+/// newly-restored prospects are appended to the end).
+/// </summary>
+public record BulkUpdateScoutingBoardEntriesRequest {
+    /// <summary>Upstream integer ids of the prospects to update.</summary>
+    [Required]
+    public required IReadOnlyList<int> PlayerIds { get; init; }
+
+    /// <summary>The status to apply to every selected prospect, or <c>null</c> to leave statuses unchanged.</summary>
+    public ScoutingProspectStatus? Status { get; init; }
+
+    /// <summary>
+    /// Whether to change the assignee of every selected prospect. When <c>true</c>,
+    /// <see cref="AssignedToUserId"/> is applied (with <c>null</c> meaning "unassign"); when
+    /// <c>false</c> assignees are left as-is. This flag disambiguates "clear the assignee" from
+    /// "leave the assignee unchanged".
+    /// </summary>
+    public bool ChangeAssignee { get; init; }
+
+    /// <summary>
+    /// The <c>ShuttleUser</c> id to assign every selected prospect to (or <c>null</c> to unassign),
+    /// applied only when <see cref="ChangeAssignee"/> is <c>true</c>. The assignee must be a team
+    /// member with edit access (Editor or Owner).
+    /// </summary>
+    public Guid? AssignedToUserId { get; init; }
+}
+
+/// <summary>
 /// Payload for moving a player to a new rank. <see cref="FromRank"/> is an optimistic-concurrency
 /// guard: if it does not match the player's current rank the move is rejected with a conflict, so a
 /// stale client cannot silently reorder based on outdated positions.
@@ -117,4 +177,28 @@ public record MoveScoutingBoardEntryRequest {
     public required int PlayerId { get; init; }
     public required int FromRank { get; init; }
     public required int ToRank { get; init; }
+}
+
+/// <summary>
+/// Payload for editing a single prospect's status, assignment, and (for active prospects) rank in
+/// one atomic update. Setting <see cref="Status"/> to <see cref="ScoutingProspectStatus.Rejected"/>
+/// unranks the prospect and compacts the remaining active ranks; leaving <c>Rejected</c> re-ranks it
+/// at the end of the active list unless <see cref="Rank"/> requests a specific position.
+/// </summary>
+public record UpdateScoutingBoardEntryRequest {
+    /// <summary>The prospect's new scouting status.</summary>
+    public required ScoutingProspectStatus Status { get; init; }
+
+    /// <summary>
+    /// The <c>ShuttleUser</c> id to assign the prospect to, or <c>null</c> to leave it unassigned.
+    /// The assignee must be a team member with edit access (Editor or Owner).
+    /// </summary>
+    public Guid? AssignedToUserId { get; init; }
+
+    /// <summary>
+    /// The desired 1-based rank among the board's active prospects. Ignored when <see cref="Status"/>
+    /// is <see cref="ScoutingProspectStatus.Rejected"/> (rejected prospects are unranked). When
+    /// <c>null</c> the prospect keeps its current position (or is appended when leaving rejection).
+    /// </summary>
+    public int? Rank { get; init; }
 }

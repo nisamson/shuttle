@@ -125,4 +125,21 @@ public class ScoutingPagesTests : WebClientTestContext {
         cut.WaitForState(() => cut.Markup.Contains("Bulk Board"));
         Assert.Contains("Bulk add", cut.Markup);
     }
+
+    [Fact]
+    public async Task BoardPage_shows_rejected_prospects_in_a_separate_section() {
+        this.AddAuthorization().SetAuthorized("Test Scout");
+        var team = await Scouting.CreateTeam(new CreateScoutingTeamRequest { Name = "Reject Scouts" });
+        var board = await Scouting.CreateBoard(team.Id,
+            new CreateScoutingBoardRequest { Name = "Reject Board", DraftSeason = 73 });
+        await Scouting.AddEntry(board.Id, new AddScoutingBoardEntryRequest { PlayerId = 1001 });
+        await Scouting.AddEntry(board.Id, new AddScoutingBoardEntryRequest { PlayerId = 1002 });
+        await Scouting.UpdateEntry(board.Id, 1002,
+            new UpdateScoutingBoardEntryRequest { Status = ScoutingProspectStatus.Rejected });
+
+        var cut = Render<ScoutingBoard>(p => p.Add(c => c.BoardId, board.Id));
+
+        cut.WaitForState(() => cut.Markup.Contains("Reject Board"));
+        Assert.Contains("Rejected prospects", cut.Markup);
+    }
 }

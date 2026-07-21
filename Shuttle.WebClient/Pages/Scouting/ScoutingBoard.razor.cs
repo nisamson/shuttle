@@ -37,10 +37,12 @@ public partial class ScoutingBoard : ComponentBase {
 
     private IReadOnlyList<ScoutingComment> boardComments = [];
     private readonly Dictionary<int, PlayerCard> playerCards = new();
+    private IReadOnlyList<ScoutingEntryEditDialog.AssigneeOption> eligibleAssignees = [];
 
     // The grid's rows: entries joined with their resolved player cards, rebuilt on every reload.
     private List<BoardRow> rows = [];
     private IEnumerable<BoardRow> selectedRows = [];
+    private IEnumerable<BoardRow> selectedRejectedRows = [];
     private string nameFilter = string.Empty;
     private readonly HashSet<PlayerPosition> selectedPositions = [];
 
@@ -51,10 +53,16 @@ public partial class ScoutingBoard : ComponentBase {
     private bool CanModerate => isAdmin || myRole == ScoutingTeamRole.Owner;
 
     private int SelectedCount => selectedRows.Count();
+    private int SelectedRejectedCount => selectedRejectedRows.Count();
+
+    // Only active (non-rejected) prospects participate in the ranked list.
+    private int ActiveCount => rows.Count(r => r.Status != ScoutingProspectStatus.Rejected);
+
+    private bool HasRejected => rows.Any(r => r.Status == ScoutingProspectStatus.Rejected);
 
     private IQueryable<BoardRow> FilteredRows {
         get {
-            var query = rows.AsQueryable();
+            var query = rows.Where(r => r.Status != ScoutingProspectStatus.Rejected).AsQueryable();
             if (!string.IsNullOrWhiteSpace(nameFilter)) {
                 var text = nameFilter.Trim();
                 query = query.Where(r => r.Name.Contains(text, StringComparison.OrdinalIgnoreCase));
@@ -68,9 +76,15 @@ public partial class ScoutingBoard : ComponentBase {
         }
     }
 
-    // The distinct positions present on the board, in a stable canonical order, for the column filter.
+    // Rejected prospects, shown in their own list below the active board, in rejection order.
+    private IQueryable<BoardRow> RejectedRows =>
+        rows.Where(r => r.Status == ScoutingProspectStatus.Rejected)
+            .OrderBy(r => r.Name)
+            .AsQueryable();
+
+    // The distinct positions present among the active prospects, in a stable canonical order, for the column filter.
     private IEnumerable<PlayerPosition> AvailablePositions =>
-        rows.Where(r => r.Position is not null)
+        rows.Where(r => r.Status != ScoutingProspectStatus.Rejected && r.Position is not null)
             .Select(r => r.Position!.Value)
             .Distinct()
             .OrderBy(p => p);
@@ -129,8 +143,17 @@ public partial class ScoutingBoard : ComponentBase {
         try {
             var team = await ScoutingClient.GetTeam(board.ScoutingTeamId);
             myRole = team.MyRole;
+            eligibleAssignees = team.Members
+                .Where(m => m.Role >= ScoutingTeamRole.Editor)
+                .OrderBy(m => m.Username, StringComparer.OrdinalIgnoreCase)
+                .Select(m => new ScoutingEntryEditDialog.AssigneeOption {
+                    UserId = m.UserId,
+                    Username = m.Username,
+                })
+                .ToList();
         } catch (ApiException) {
             myRole = null;
+            eligibleAssignees = [];
         }
     }
 
@@ -167,6 +190,9 @@ public partial class ScoutingBoard : ComponentBase {
                         Id = entry.Id,
                         PlayerId = entry.PlayerId,
                         Rank = entry.Rank,
+                        Status = entry.Status,
+                        AssignedToUserId = entry.AssignedToUserId,
+                        AssignedToUsername = entry.AssignedToUsername,
                         CommentCount = entry.CommentCount,
                         Name = card?.Name ?? $"Player #{entry.PlayerId}",
                         Position = card?.Position,
@@ -176,6 +202,7 @@ public partial class ScoutingBoard : ComponentBase {
                 })
                 .ToList();
         selectedRows = [];
+        selectedRejectedRows = [];
     }
 
     private async Task ReloadBoardAsync() {
@@ -239,7 +266,7 @@ public partial class ScoutingBoard : ComponentBase {
     }
 
     private async Task MoveAsync(int playerId, int fromRank, int toRank) {
-        if (toRank == fromRank || toRank < 1 || toRank > rows.Count) {
+        if (toRank == fromRank || toRank < 1 || toRank > ActiveCount) {
             return;
         }
 
@@ -260,7 +287,10 @@ public partial class ScoutingBoard : ComponentBase {
             options.Parameters.Add(nameof(ScoutingEntryEditDialog.Content), new ScoutingEntryEditDialog.Args {
                 PlayerName = row.Name,
                 CurrentRank = row.Rank,
-                MaxRank = rows.Count,
+                MaxRank = Math.Max(ActiveCount, 1),
+                CurrentStatus = row.Status,
+                CurrentAssigneeUserId = row.AssignedToUserId,
+                EligibleAssignees = eligibleAssignees,
             });
         });
 
@@ -268,10 +298,31 @@ public partial class ScoutingBoard : ComponentBase {
             return;
         }
 
-        if (edited.Rank != row.Rank) {
-            await MoveAsync(row.PlayerId, row.Rank, edited.Rank);
-        }
+        await RunAsync(async () => {
+            await ScoutingClient.UpdateEntry(BoardId, row.PlayerId, new UpdateScoutingBoardEntryRequest {
+                Status = edited.Status,
+                AssignedToUserId = edited.AssignedToUserId,
+                Rank = edited.Rank,
+            });
+            await ReloadBoardAsync();
+        });
     }
+
+    private static string StatusText(ScoutingProspectStatus status) => status switch {
+        ScoutingProspectStatus.Pending => "Pending",
+        ScoutingProspectStatus.Scouted => "Scouted",
+        ScoutingProspectStatus.Approved => "Approved",
+        ScoutingProspectStatus.Rejected => "Rejected",
+        _ => status.ToString(),
+    };
+
+    private static BadgeAppearance StatusAppearance(ScoutingProspectStatus status) => status switch {
+        ScoutingProspectStatus.Pending => BadgeAppearance.Ghost,
+        ScoutingProspectStatus.Scouted => BadgeAppearance.Outline,
+        ScoutingProspectStatus.Approved => BadgeAppearance.Filled,
+        ScoutingProspectStatus.Rejected => BadgeAppearance.Tint,
+        _ => BadgeAppearance.Outline,
+    };
 
     private async Task RemoveAsync(BoardRow row) {
         var confirm = await DialogService.ShowConfirmationAsync(
@@ -289,8 +340,13 @@ public partial class ScoutingBoard : ComponentBase {
         });
     }
 
-    private async Task BulkDeleteAsync() {
-        var ids = selectedRows.Select(r => r.PlayerId).Distinct().ToList();
+    private Task BulkDeleteAsync() =>
+        BulkDeleteCoreAsync(selectedRows.Select(r => r.PlayerId).Distinct().ToList());
+
+    private Task BulkDeleteRejectedAsync() =>
+        BulkDeleteCoreAsync(selectedRejectedRows.Select(r => r.PlayerId).Distinct().ToList());
+
+    private async Task BulkDeleteCoreAsync(List<int> ids) {
         if (ids.Count == 0) {
             return;
         }
@@ -308,6 +364,42 @@ public partial class ScoutingBoard : ComponentBase {
         await RunAsync(async () => {
             await ScoutingClient.RemoveEntries(BoardId, new RemoveScoutingBoardEntriesRequest { PlayerIds = ids });
             await ReloadBoardAsync();
+        });
+    }
+
+    private Task BulkEditAsync() =>
+        BulkEditCoreAsync(selectedRows.Select(r => r.PlayerId).Distinct().ToList());
+
+    private Task BulkEditRejectedAsync() =>
+        BulkEditCoreAsync(selectedRejectedRows.Select(r => r.PlayerId).Distinct().ToList());
+
+    private async Task BulkEditCoreAsync(List<int> ids) {
+        if (ids.Count == 0) {
+            return;
+        }
+
+        var dialogResult = await DialogService.ShowDialogAsync<ScoutingBulkEditDialog>(options => {
+            options.Modal = true;
+            options.Width = "420px";
+            options.Parameters.Add(nameof(ScoutingBulkEditDialog.Content), new ScoutingBulkEditDialog.Args {
+                SelectedCount = ids.Count,
+                EligibleAssignees = eligibleAssignees,
+            });
+        });
+
+        if (dialogResult.Cancelled || dialogResult.Value is not ScoutingBulkEditDialog.Result edited) {
+            return;
+        }
+
+        await RunAsync(async () => {
+            await ScoutingClient.UpdateEntries(BoardId, new BulkUpdateScoutingBoardEntriesRequest {
+                PlayerIds = ids,
+                Status = edited.Status,
+                ChangeAssignee = edited.ChangeAssignee,
+                AssignedToUserId = edited.AssignedToUserId,
+            });
+            await ReloadBoardAsync();
+            actionMessage = $"Updated {ids.Count} prospect{(ids.Count == 1 ? string.Empty : "s")}.";
         });
     }
 
@@ -353,6 +445,10 @@ public partial class ScoutingBoard : ComponentBase {
 
     private void ClearSelection() {
         selectedRows = [];
+    }
+
+    private void ClearRejectedSelection() {
+        selectedRejectedRows = [];
     }
 
     private async Task OpenEntryCommentsAsync(BoardRow row) {
@@ -428,6 +524,9 @@ public partial class ScoutingBoard : ComponentBase {
         public required Guid Id { get; init; }
         public required int PlayerId { get; init; }
         public required int Rank { get; init; }
+        public required ScoutingProspectStatus Status { get; init; }
+        public Guid? AssignedToUserId { get; init; }
+        public string? AssignedToUsername { get; init; }
         public required int CommentCount { get; init; }
         public required string Name { get; init; }
         public PlayerPosition? Position { get; init; }
