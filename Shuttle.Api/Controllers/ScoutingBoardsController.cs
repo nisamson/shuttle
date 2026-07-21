@@ -91,6 +91,24 @@ public class ScoutingBoardsController : ControllerBase {
         return (await scouting.RemoveEntryAsync(boardId, playerId, User, cancellationToken)).ToNoContent(this);
     }
 
+    /// <summary>
+    /// Updates a prospect's scouting status, assignment, and (for active prospects) rank in one
+    /// request. Rejecting unranks the prospect and compacts the active ranks. Owners and editors only.
+    /// </summary>
+    [HttpPut("{boardId:guid}/entries/{playerId:int}")]
+    [ProducesResponseType<ScoutingBoardEntry>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<ScoutingBoardEntry>> UpdateEntry(
+        Guid boardId,
+        int playerId,
+        [FromBody] UpdateScoutingBoardEntryRequest request,
+        CancellationToken cancellationToken) {
+        return (await scouting.UpdateEntryAsync(boardId, playerId, request, User, cancellationToken)).ToActionResult(this);
+    }
+
     /// <summary>Removes several players from the board in one transaction and compacts the ranks. Owners and editors only.</summary>
     [HttpPost("{boardId:guid}/entries/remove")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

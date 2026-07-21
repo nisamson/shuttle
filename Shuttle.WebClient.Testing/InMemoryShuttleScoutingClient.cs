@@ -255,7 +255,7 @@ public sealed class InMemoryShuttleScoutingClient : IShuttleScoutingClient {
             };
             team.Boards.Add(board);
             team.UpdatedAt = now;
-            return BoardDetail(board);
+            return BoardDetail(team, board);
         }
     }
 
@@ -268,7 +268,7 @@ public sealed class InMemoryShuttleScoutingClient : IShuttleScoutingClient {
                 throw Problem(HttpMethod.Get, HttpStatusCode.Forbidden, "You are not a member of this team.");
             }
 
-            return BoardDetail(board);
+            return BoardDetail(team, board);
         }
     }
 
@@ -285,7 +285,7 @@ public sealed class InMemoryShuttleScoutingClient : IShuttleScoutingClient {
             board.Name = name;
             board.DraftSeason = request.DraftSeason;
             board.UpdatedAt = DateTimeOffset.UtcNow;
-            return BoardDetail(board);
+            return BoardDetail(team, board);
         }
     }
 
@@ -323,6 +323,9 @@ public sealed class InMemoryShuttleScoutingClient : IShuttleScoutingClient {
                 Id = entry.Id,
                 PlayerId = entry.PlayerId,
                 Rank = entry.Rank,
+                Status = entry.Status,
+                AssignedToUserId = null,
+                AssignedToUsername = null,
                 CommentCount = 0,
             };
         }
@@ -419,7 +422,7 @@ public sealed class InMemoryShuttleScoutingClient : IShuttleScoutingClient {
             }
 
             return new AddScoutingBoardEntriesResult {
-                Board = BoardDetail(board),
+                Board = BoardDetail(team, board),
                 Added = toAdd,
                 AlreadyOnBoard = alreadyOnBoard,
                 NotFound = notFound,
@@ -437,8 +440,11 @@ public sealed class InMemoryShuttleScoutingClient : IShuttleScoutingClient {
                 ?? throw Problem(HttpMethod.Delete, HttpStatusCode.NotFound, "That player is not on this board.");
 
             board.Entries.Remove(removed);
-            foreach (var entry in board.Entries.Where(e => e.Rank > removed.Rank)) {
-                entry.Rank--;
+            if (removed.Status != ScoutingProspectStatus.Rejected) {
+                foreach (var entry in board.Entries.Where(e =>
+                             e.Status != ScoutingProspectStatus.Rejected && e.Rank > removed.Rank)) {
+                    entry.Rank--;
+                }
             }
 
             board.UpdatedAt = DateTimeOffset.UtcNow;
@@ -466,7 +472,10 @@ public sealed class InMemoryShuttleScoutingClient : IShuttleScoutingClient {
             board.Entries.RemoveAll(e => removedIds.Contains(e.Id));
 
             var rank = 1;
-            foreach (var entry in board.Entries.OrderBy(e => e.Rank).ToList()) {
+            foreach (var entry in board.Entries
+                         .Where(e => e.Status != ScoutingProspectStatus.Rejected)
+                         .OrderBy(e => e.Rank)
+                         .ToList()) {
                 entry.Rank = rank++;
             }
 
@@ -483,14 +492,20 @@ public sealed class InMemoryShuttleScoutingClient : IShuttleScoutingClient {
             var moved = board.Entries.FirstOrDefault(e => e.PlayerId == request.PlayerId)
                 ?? throw Problem(HttpMethod.Post, HttpStatusCode.NotFound, "That player is not on this board.");
 
+            if (moved.Status == ScoutingProspectStatus.Rejected) {
+                throw Problem(HttpMethod.Post, HttpStatusCode.BadRequest,
+                    "Rejected prospects are unranked; restore the prospect before moving it.");
+            }
+
             if (moved.Rank != request.FromRank) {
                 throw Problem(HttpMethod.Post, HttpStatusCode.Conflict,
                     "The player's position has changed since you loaded the board; refresh and try again.");
             }
 
-            if (request.ToRank < 1 || request.ToRank > board.Entries.Count) {
+            var active = board.Entries.Where(e => e.Status != ScoutingProspectStatus.Rejected).ToList();
+            if (request.ToRank < 1 || request.ToRank > active.Count) {
                 throw Problem(HttpMethod.Post, HttpStatusCode.BadRequest,
-                    $"Target rank must be between 1 and {board.Entries.Count}.");
+                    $"Target rank must be between 1 and {active.Count}.");
             }
 
             var from = moved.Rank;
@@ -500,11 +515,11 @@ public sealed class InMemoryShuttleScoutingClient : IShuttleScoutingClient {
             }
 
             if (to < from) {
-                foreach (var entry in board.Entries.Where(e => e.Rank >= to && e.Rank < from)) {
+                foreach (var entry in active.Where(e => e.Rank >= to && e.Rank < from)) {
                     entry.Rank++;
                 }
             } else {
-                foreach (var entry in board.Entries.Where(e => e.Rank > from && e.Rank <= to)) {
+                foreach (var entry in active.Where(e => e.Rank > from && e.Rank <= to)) {
                     entry.Rank--;
                 }
             }
@@ -512,6 +527,78 @@ public sealed class InMemoryShuttleScoutingClient : IShuttleScoutingClient {
             moved.Rank = to;
             board.UpdatedAt = DateTimeOffset.UtcNow;
         }
+    }
+
+    public async Task<ScoutingBoardEntry> UpdateEntry(Guid boardId, int playerId, UpdateScoutingBoardEntryRequest request, CancellationToken token = default) {
+        var caller = await ResolveCallerAsync();
+        lock (gate) {
+            var (team, board) = RequireBoard(boardId);
+            RequireEditBoards(team, caller);
+
+            if (!Enum.IsDefined(request.Status)) {
+                throw Problem(HttpMethod.Put, HttpStatusCode.BadRequest, "Unknown prospect status.");
+            }
+
+            var entry = RequireEntry(board, playerId, HttpMethod.Put);
+
+            if (request.AssignedToUserId is { } assigneeId) {
+                var assignee = team.Member(assigneeId);
+                if (assignee is null) {
+                    throw Problem(HttpMethod.Put, HttpStatusCode.BadRequest, "The assignee is not a member of this team.");
+                }
+
+                if (assignee.Role < ScoutingTeamRole.Editor) {
+                    throw Problem(HttpMethod.Put, HttpStatusCode.BadRequest,
+                        "The assignee must have edit access (Editor or Owner).");
+                }
+            }
+
+            var wasRejected = entry.Status == ScoutingProspectStatus.Rejected;
+            var isRejected = request.Status == ScoutingProspectStatus.Rejected;
+            var active = board.Entries.Where(e => e.Status != ScoutingProspectStatus.Rejected).ToList();
+
+            if (!wasRejected && isRejected) {
+                var vacatedRank = entry.Rank;
+                entry.Rank = 0;
+                foreach (var other in active.Where(e => e.Id != entry.Id && e.Rank > vacatedRank)) {
+                    other.Rank--;
+                }
+            } else if (wasRejected && !isRejected) {
+                var maxActiveRank = active.Count == 0 ? 0 : active.Max(e => e.Rank);
+                entry.Rank = maxActiveRank + 1;
+                active.Add(entry);
+                if (request.Rank is { } target) {
+                    MoveWithinActive(active, entry, target);
+                }
+            } else if (!isRejected && request.Rank is { } target) {
+                MoveWithinActive(active, entry, target);
+            }
+
+            entry.Status = request.Status;
+            entry.AssignedToUserId = request.AssignedToUserId;
+            board.UpdatedAt = DateTimeOffset.UtcNow;
+            return EntryDto(team, board, entry);
+        }
+    }
+
+    private static void MoveWithinActive(List<EntryState> active, EntryState moved, int target) {
+        target = Math.Clamp(target, 1, active.Count);
+        var from = moved.Rank;
+        if (from == target) {
+            return;
+        }
+
+        if (target < from) {
+            foreach (var entry in active.Where(e => e.Id != moved.Id && e.Rank >= target && e.Rank < from)) {
+                entry.Rank++;
+            }
+        } else {
+            foreach (var entry in active.Where(e => e.Id != moved.Id && e.Rank > from && e.Rank <= target)) {
+                entry.Rank--;
+            }
+        }
+
+        moved.Rank = target;
     }
 
     // Comments --------------------------------------------------------------
@@ -714,7 +801,7 @@ public sealed class InMemoryShuttleScoutingClient : IShuttleScoutingClient {
             .ToList(),
     };
 
-    private static ScoutingBoardDetail BoardDetail(BoardState board) => new() {
+    private static ScoutingBoardDetail BoardDetail(TeamState team, BoardState board) => new() {
         Id = board.Id,
         ScoutingTeamId = board.TeamId,
         Name = board.Name,
@@ -723,13 +810,18 @@ public sealed class InMemoryShuttleScoutingClient : IShuttleScoutingClient {
         UpdatedAt = board.UpdatedAt,
         Entries = board.Entries
             .OrderBy(e => e.Rank)
-            .Select(e => new ScoutingBoardEntry {
-                Id = e.Id,
-                PlayerId = e.PlayerId,
-                Rank = e.Rank,
-                CommentCount = board.Comments.Count(c => c.EntryId == e.Id),
-            })
+            .Select(e => EntryDto(team, board, e))
             .ToList(),
+    };
+
+    private static ScoutingBoardEntry EntryDto(TeamState team, BoardState board, EntryState e) => new() {
+        Id = e.Id,
+        PlayerId = e.PlayerId,
+        Rank = e.Rank,
+        Status = e.Status,
+        AssignedToUserId = e.AssignedToUserId,
+        AssignedToUsername = e.AssignedToUserId is { } id ? team.Member(id)?.Username : null,
+        CommentCount = board.Comments.Count(c => c.EntryId == e.Id),
     };
 
     private static IReadOnlyList<ScoutingComment> Thread(BoardState board, Guid? entryId) =>
@@ -885,6 +977,8 @@ public sealed class InMemoryShuttleScoutingClient : IShuttleScoutingClient {
         public required Guid Id { get; init; }
         public required int PlayerId { get; init; }
         public required int Rank { get; set; }
+        public ScoutingProspectStatus Status { get; set; } = ScoutingProspectStatus.Pending;
+        public Guid? AssignedToUserId { get; set; }
     }
 
     private sealed class CommentState {

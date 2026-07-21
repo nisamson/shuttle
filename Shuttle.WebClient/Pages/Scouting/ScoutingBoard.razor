@@ -110,6 +110,12 @@
                         }
                     </ChildContent>
                 </TemplateColumn>
+                <TemplateColumn Title="Status" Align="DataGridCellAlignment.Center">
+                    <FluentBadge Appearance="@StatusAppearance(context.Status)">@StatusText(context.Status)</FluentBadge>
+                </TemplateColumn>
+                <TemplateColumn Title="Assignee">
+                    @(context.AssignedToUsername ?? "—")
+                </TemplateColumn>
                 <TemplateColumn Title="TPE" Sortable="true" SortBy="@TpeSort" Align="DataGridCellAlignment.End">
                     @TpeText(context)
                 </TemplateColumn>
@@ -132,7 +138,7 @@
                                       IconStart="@(new Icons.Regular.Size16.ArrowUp())"
                                       OnClick="() => MoveAsync(context.PlayerId, context.Rank, context.Rank - 1)"/>
                         <FluentButton Appearance="ButtonAppearance.Subtle" Title="Move down" IconOnly="true"
-                                      Disabled="@(busy || context.Rank >= rows.Count)"
+                                      Disabled="@(busy || context.Rank >= ActiveCount)"
                                       IconStart="@(new Icons.Regular.Size16.ArrowDown())"
                                       OnClick="() => MoveAsync(context.PlayerId, context.Rank, context.Rank + 1)"/>
                         <FluentButton Appearance="ButtonAppearance.Subtle" Title="Remove player" IconOnly="true"
@@ -142,6 +148,46 @@
                     </TemplateColumn>
                 }
             </FluentDataGrid>
+        }
+
+        @if (HasRejected) {
+            <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                <FluentText Size="TextSize.Size500" Weight="TextWeight.Bold">Rejected prospects</FluentText>
+                <FluentDataGrid Items="@RejectedRows" TGridItem="BoardRow" ResizableColumns="true">
+                    <TemplateColumn Title="Player">
+                        <a href="@Routes.Players.Player(context.PlayerId)" target="_blank" rel="noopener noreferrer">@context.Name</a>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Position" Align="DataGridCellAlignment.Center">
+                        @if (context.Position is not null) {
+                            <FluentBadge Appearance="BadgeAppearance.Outline">@PositionText(context)</FluentBadge>
+                        } else {
+                            <span>—</span>
+                        }
+                    </TemplateColumn>
+                    <TemplateColumn Title="Assignee">
+                        @(context.AssignedToUsername ?? "—")
+                    </TemplateColumn>
+                    <TemplateColumn Title="TPE" Align="DataGridCellAlignment.End">@TpeText(context)</TemplateColumn>
+                    <TemplateColumn Title="Bank" Align="DataGridCellAlignment.End">@BankText(context)</TemplateColumn>
+                    <TemplateColumn Title="Comments" Align="DataGridCellAlignment.Center">
+                        <FluentButton Appearance="ButtonAppearance.Subtle" Title="View notes"
+                                      IconStart="@(new Icons.Regular.Size16.Comment())"
+                                      OnClick="() => OpenEntryCommentsAsync(context)">@context.CommentCount</FluentButton>
+                    </TemplateColumn>
+                    @if (CanEditBoards) {
+                        <TemplateColumn Title="Actions" Align="DataGridCellAlignment.End">
+                            <FluentButton Appearance="ButtonAppearance.Subtle" Title="Edit" IconOnly="true"
+                                          Disabled="busy"
+                                          IconStart="@(new Icons.Regular.Size16.Edit())"
+                                          OnClick="() => EditEntryAsync(context)"/>
+                            <FluentButton Appearance="ButtonAppearance.Subtle" Title="Remove player" IconOnly="true"
+                                          Disabled="busy"
+                                          IconStart="@(new Icons.Regular.Size16.Delete())"
+                                          OnClick="() => RemoveAsync(context)"/>
+                        </TemplateColumn>
+                    }
+                </FluentDataGrid>
+            </FluentStack>
         }
 
         <FluentDivider Style="width: 100%;"/>
