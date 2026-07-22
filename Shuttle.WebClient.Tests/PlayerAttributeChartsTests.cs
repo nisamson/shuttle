@@ -1,4 +1,5 @@
 using Plotly.Blazor.Traces;
+using Shuttle.Models.Players;
 using Shuttle.Shl.Api.Models.Common;
 using Shuttle.WebClient.Services;
 
@@ -105,6 +106,61 @@ public class PlayerAttributeChartsTests {
         Assert.Single(set.Combined!.Data);
         Assert.Equal("All attributes", TraceName(set.Combined.Data[0]));
     }
+
+    [Fact]
+    public void BuildTimelineOverlay_overlays_one_series_per_player_with_points() {
+        var start = new DateTime(2021, 3, 1, 0, 0, 0, DateTimeKind.Utc);
+        var series = new List<(string, IReadOnlyList<TpeTimelinePoint>)> {
+            ("Alice", Points(start, (0, 10), (30, 40))),
+            ("Bob", Points(start.AddDays(5), (0, 5), (30, 25))),
+            ("Empty", Array.Empty<TpeTimelinePoint>()),
+        };
+
+        var chart = PlayerAttributeCharts.BuildTimelineOverlay(series, align: false, dark: false);
+
+        Assert.NotNull(chart);
+        // The empty series is dropped; the two with points are overlaid as Scatter traces.
+        var scatters = chart!.Data.OfType<Scatter>().ToList();
+        Assert.Equal(2, scatters.Count);
+        Assert.Equal(new[] { "Alice", "Bob" }, scatters.Select(s => s.Name));
+    }
+
+    [Fact]
+    public void BuildTimelineOverlay_returns_null_when_no_player_has_points() {
+        var series = new List<(string, IReadOnlyList<TpeTimelinePoint>)> {
+            ("Empty", Array.Empty<TpeTimelinePoint>()),
+        };
+
+        Assert.Null(PlayerAttributeCharts.BuildTimelineOverlay(series, align: false, dark: false));
+    }
+
+    [Fact]
+    public void BuildTimelineOverlay_align_shifts_every_series_to_a_common_start() {
+        var start = new DateTime(2021, 3, 1, 0, 0, 0, DateTimeKind.Utc);
+        var series = new List<(string, IReadOnlyList<TpeTimelinePoint>)> {
+            ("Alice", Points(start, (0, 10), (30, 40))),
+            ("Bob", Points(start.AddDays(5), (0, 5), (30, 25))),
+        };
+
+        var unaligned = PlayerAttributeCharts.BuildTimelineOverlay(series, align: false, dark: false)!;
+        var starts = unaligned.Data.OfType<Scatter>().Select(s => (DateTime)s.X![0]).Distinct().ToList();
+        Assert.Equal(2, starts.Count);
+
+        var aligned = PlayerAttributeCharts.BuildTimelineOverlay(series, align: true, dark: false)!;
+        var alignedStarts = aligned.Data.OfType<Scatter>().Select(s => (DateTime)s.X![0]).Distinct().ToList();
+        Assert.Single(alignedStarts);
+        Assert.Equal(start, alignedStarts[0]);
+        // Alignment shifts origins only; each series keeps its own span (30 days here).
+        var bob = aligned.Data.OfType<Scatter>().Single(s => s.Name == "Bob");
+        Assert.Equal(start.AddDays(30), (DateTime)bob.X![^1]);
+    }
+
+    private static IReadOnlyList<TpeTimelinePoint> Points(
+        DateTime start, params (int DayOffset, int TotalTpe)[] points) =>
+        points.Select(p => new TpeTimelinePoint {
+            TaskDate = start.AddDays(p.DayOffset),
+            TotalTpe = p.TotalTpe,
+        }).ToList();
 
     private static string TraceName(Plotly.Blazor.ITrace trace) => trace switch {
         ScatterPolar s => s.Name!,

@@ -61,6 +61,9 @@ public class PlayerComparisonTests : WebClientTestContext {
         Status = PlayerStatus.Active,
         Position = PlayerPosition.Center,
         Handedness = PlayerHandedness.Left,
+        // Distinct creation dates so the in-memory client's synthesized TPE timelines start on
+        // different days (exercising the "align start dates" option).
+        CreationDate = new DateTime(2021, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddDays(id),
         TotalTpe = 1000,
         AppliedTpe = 1000,
         BankedTpe = 0,
@@ -119,8 +122,8 @@ public class PlayerComparisonTests : WebClientTestContext {
     }
 
     [Fact]
-    public void More_than_six_charted_players_shows_the_soft_cap_hint() {
-        var cut = RenderCompare(1001, 1002, 1003, 1004, 1005, 1006, 1007);
+    public void More_than_the_cap_of_charted_players_shows_the_soft_cap_hint() {
+        var cut = RenderCompare(1001, 1002, 1003, 1004);
 
         cut.WaitForState(() => cut.Markup.Contains("Skater attributes"));
         Assert.Contains("easier to read with", cut.Markup);
@@ -128,7 +131,7 @@ public class PlayerComparisonTests : WebClientTestContext {
 
     [Fact]
     public void At_the_soft_cap_the_add_box_is_disabled() {
-        var cut = RenderCompare(1001, 1002, 1003, 1004, 1005, 1006);
+        var cut = RenderCompare(1001, 1002, 1003);
 
         cut.WaitForState(() => cut.Markup.Contains("Skater attributes"));
         Assert.Contains("holds up to", cut.Markup);
@@ -157,6 +160,14 @@ public class PlayerComparisonTests : WebClientTestContext {
 
         var nav = Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
         Assert.EndsWith(Routes.Players.Compare, nav.Uri);
+    }
+
+    [Fact]
+    public void The_comparison_page_offers_a_tpe_timeline_tab() {
+        var cut = RenderCompare(1001, 1002);
+        cut.WaitForState(() => cut.Markup.Contains("Skater attributes"));
+
+        Assert.Contains("TPE timeline", cut.Markup);
     }
 
     private sealed class FakeOptionsStorage : IShuttleOptionsStorage {

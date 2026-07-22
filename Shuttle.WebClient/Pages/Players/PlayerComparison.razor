@@ -79,31 +79,67 @@
         </FluentStack>
     } else if (requestedIds.Count == 0) {
         <FluentText Size="TextSize.Size300" Block="true">Add two or more players above to start comparing their attributes.</FluentText>
-    } else if (combinedChart is null) {
-        <FluentText>None of the selected players have in-game attributes to chart yet.</FluentText>
+    } else if (SelectedCards.Count == 0) {
+        <FluentText>None of the selected players could be loaded.</FluentText>
     } else {
         <FluentDivider/>
-        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
-            <FluentText Size="TextSize.Size500" Weight="TextWeight.Bold">@ComparisonHeading</FluentText>
-            <FluentSpacer/>
-            <FluentSwitch @bind-Value="groupedView" @bind-Value:after="OnViewChanged">Break out by category</FluentSwitch>
-        </FluentStack>
+        <FluentTabs @bind-ActiveTabId="activeTabId" @bind-ActiveTabId:after="OnTabChangedAsync" Width="100%">
+            <FluentTab Header="Attributes" Id="@AttributesTabId">
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="16">
+                    @if (combinedChart is null) {
+                        <FluentText>None of the selected players have in-game attributes to chart yet.</FluentText>
+                    } else {
+                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
+                            <FluentText Size="TextSize.Size500" Weight="TextWeight.Bold">@ComparisonHeading</FluentText>
+                            <FluentSpacer/>
+                            <FluentSwitch @bind-Value="groupedView" @bind-Value:after="OnViewChanged">Break out by category</FluentSwitch>
+                        </FluentStack>
 
-        @if (groupedView) {
-            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(340px, 1fr));gap:24px;width:100%;">
-                @foreach (var group in attributeCharts) {
-                    <div style="display:flex;flex-direction:column;">
-                        <FluentText Weight="TextWeight.Bold" Block="true" Style="text-align:center;">@group.Title</FluentText>
-                        <div style="width:100%;height:360px;">
-                            <PlotlyChart Config="chartConfig" Layout="group.Layout" Data="group.Data" @ref="group.Chart"/>
+                        @if (groupedView) {
+                            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(340px, 1fr));gap:24px;width:100%;">
+                                @foreach (var group in attributeCharts) {
+                                    <div style="display:flex;flex-direction:column;">
+                                        <FluentText Weight="TextWeight.Bold" Block="true" Style="text-align:center;">@group.Title</FluentText>
+                                        <div style="width:100%;height:360px;">
+                                            <PlotlyChart Config="chartConfig" Layout="group.Layout" Data="group.Data" @ref="group.Chart"/>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        } else {
+                            <div style="width:100%;height:60vh;min-height:420px;">
+                                <PlotlyChart Config="chartConfig" Layout="combinedChart.Layout" Data="combinedChart.Data" @ref="combinedChart.Chart"/>
+                            </div>
+                        }
+                    }
+                </FluentStack>
+            </FluentTab>
+            <FluentTab Header="TPE timeline" Id="@TimelineTabId">
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="16">
+                    @if (timelineChart is not null) {
+                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
+                            <FluentText Size="TextSize.Size500" Weight="TextWeight.Bold">Total TPE</FluentText>
+                            <FluentSpacer/>
+                            <FluentSwitch @bind-Value="alignTimelines" @bind-Value:after="OnAlignChanged">Align start dates</FluentSwitch>
+                        </FluentStack>
+                    }
+
+                    @if (!timelineLoaded || timelineLoading) {
+                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
+                            <FluentSpinner/>
+                            <FluentText>Loading TPE timelines…</FluentText>
+                        </FluentStack>
+                    } else if (timelineError is not null) {
+                        <FluentMessageBar Intent="MessageBarIntent.Error" Title="Failed to load TPE timelines">@timelineError</FluentMessageBar>
+                    } else if (timelineChart is null) {
+                        <FluentText>None of the selected players have a recorded TPE timeline yet.</FluentText>
+                    } else {
+                        <div style="width:100%;height:60vh;min-height:420px;">
+                            <PlotlyChart Config="chartConfig" Layout="timelineChart.Layout" Data="timelineChart.Data" @ref="timelineChart.Chart"/>
                         </div>
-                    </div>
-                }
-            </div>
-        } else {
-            <div style="width:100%;height:60vh;min-height:420px;">
-                <PlotlyChart Config="chartConfig" Layout="combinedChart.Layout" Data="combinedChart.Data" @ref="combinedChart.Chart"/>
-            </div>
-        }
+                    }
+                </FluentStack>
+            </FluentTab>
+        </FluentTabs>
     }
 </FluentStack>

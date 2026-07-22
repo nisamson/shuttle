@@ -13,7 +13,7 @@ namespace Shuttle.WebClient.Pages.Players;
 
 public partial class PlayerComparison : ComponentBase, IDisposable {
     /// <summary>The most players the add-UX will let you accumulate before nudging you to stop.</summary>
-    public const int MaxComparison = 6;
+    public const int MaxComparison = 3;
 
     [Parameter, SupplyParameterFromQuery(Name = "ids")] public string? Ids { get; set; }
 
@@ -35,8 +35,21 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
     private readonly Config chartConfig = new() { Responsive = true };
     private readonly List<AttributeChart> attributeCharts = new();
     private AttributeChart? combinedChart;
-    private bool groupedView = true;
+    private bool groupedView;
     private bool needsRedraw;
+
+    private const string AttributesTabId = "attributes";
+    private const string TimelineTabId = "tpe-timeline";
+    private string activeTabId = AttributesTabId;
+
+    // TPE timelines are fetched lazily the first time the timeline tab is opened, then cached per
+    // player so re-ordering or removing a player never re-fetches the ones already loaded.
+    private readonly Dictionary<int, IReadOnlyList<TpeTimelinePoint>> timelines = new();
+    private AttributeChart? timelineChart;
+    private bool timelineLoading;
+    private bool timelineLoaded;
+    private string? timelineError;
+    private bool alignTimelines;
 
     private PlayerSuggestion? selectedToAdd;
     private bool loading;
@@ -85,6 +98,12 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
 
             ComputeGroups();
             RebuildCharts();
+
+            // If the timeline tab has already been opened, keep it in sync with the current selection
+            // (fetching any newly added players and rebuilding the overlay).
+            if (activeTabId == TimelineTabId) {
+                await LoadTimelinesAsync();
+            }
         } catch (Exception ex) {
             loadError = ex.Message;
         } finally {
@@ -146,6 +165,71 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
         needsRedraw = true;
     }
 
+    // The timeline is loaded lazily the first time its tab is opened so comparisons that are never
+    // inspected for progression don't incur the extra backend calls. Every tab change also flags a
+    // redraw so the now-visible chart resizes to its container (hidden charts render at zero size).
+    private async Task OnTabChangedAsync() {
+        if (activeTabId == TimelineTabId) {
+            await LoadTimelinesAsync();
+        }
+
+        needsRedraw = true;
+    }
+
+    private async Task LoadTimelinesAsync() {
+        var toFetch = SelectedCards
+            .Where(c => !timelines.ContainsKey(c.PlayerId))
+            .Select(c => c.PlayerId)
+            .ToList();
+
+        if (toFetch.Count > 0) {
+            timelineLoading = true;
+            timelineError = null;
+            StateHasChanged();
+
+            try {
+                var results = await Task.WhenAll(toFetch.Select(FetchTimelineAsync));
+                foreach (var (id, points) in results) {
+                    timelines[id] = points ?? Array.Empty<TpeTimelinePoint>();
+                }
+            } catch (Exception ex) {
+                timelineError = ex.Message;
+            } finally {
+                timelineLoading = false;
+            }
+        }
+
+        timelineLoaded = true;
+        BuildTimelineChart();
+        needsRedraw = true;
+    }
+
+    private async Task<(int Id, IReadOnlyList<TpeTimelinePoint>? Points)> FetchTimelineAsync(int id) {
+        try {
+            return (id, await PlayerClient.GetPlayerTpeTimeline(id));
+        } catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound) {
+            return (id, null);
+        }
+    }
+
+    // Overlays one step-line TPE series per selected player. When alignment is on, each series is
+    // shifted so every player's first recorded point lands on the earliest player's start, letting
+    // you compare progression pace from a common origin rather than by absolute calendar date.
+    private void BuildTimelineChart() {
+        var series = SelectedCards
+            .Select(c => (c.Name, Points: timelines.GetValueOrDefault(c.PlayerId)))
+            .Where(x => x.Points is not null)
+            .Select(x => (x.Name, Points: x.Points!))
+            .ToList();
+
+        timelineChart = PlayerAttributeCharts.BuildTimelineOverlay(series, alignTimelines, darkMode);
+    }
+
+    private void OnAlignChanged() {
+        BuildTimelineChart();
+        needsRedraw = true;
+    }
+
     private static List<int> ParseIds(string? ids) {
         if (string.IsNullOrWhiteSpace(ids)) {
             return new List<int>();
@@ -193,6 +277,7 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
         }
 
         ApplyTheme(combinedChart);
+        ApplyTheme(timelineChart);
         needsRedraw = true;
         InvokeAsync(StateHasChanged);
     }
@@ -210,11 +295,13 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
 
         needsRedraw = false;
 
-        // Only redraw the charts for the currently visible view; the hidden ones may have been
+        // Only redraw the charts for the currently visible tab/view; the hidden ones may have been
         // disposed, so their captured refs must not be touched.
-        var visible = groupedView
-            ? (IEnumerable<AttributeChart>)attributeCharts
-            : combinedChart is null ? Array.Empty<AttributeChart>() : new[] { combinedChart };
+        var visible = activeTabId == TimelineTabId
+            ? timelineChart is null ? Array.Empty<AttributeChart>() : new[] { timelineChart }
+            : groupedView
+                ? (IEnumerable<AttributeChart>)attributeCharts
+                : combinedChart is null ? Array.Empty<AttributeChart>() : new[] { combinedChart };
 
         foreach (var group in visible) {
             if (group.Chart is null) {

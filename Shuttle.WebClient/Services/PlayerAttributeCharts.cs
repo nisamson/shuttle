@@ -283,4 +283,68 @@ public static class PlayerAttributeCharts {
             },
         };
     }
+
+    // Themed cartesian layout for the TPE timeline: a date x-axis with an auto-ranged TPE y-axis.
+    // Shared by the player profile (single series) and the comparison page (one series per player).
+    public static Plotly.Blazor.Layout BuildTimelineLayout(bool dark) {
+        const string transparent = "rgba(0,0,0,0)";
+        var foreground = dark ? "#e6e6e6" : "#242424";
+        var grid = dark ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.16)";
+
+        return new Plotly.Blazor.Layout {
+            AutoSize = true,
+            PaperBgColor = transparent,
+            PlotBgColor = transparent,
+            Font = new Plotly.Blazor.LayoutLib.Font { Color = foreground },
+            XAxis = new List<Plotly.Blazor.LayoutLib.XAxis> {
+                new() {
+                    Type = Plotly.Blazor.LayoutLib.XAxisLib.TypeEnum.Date,
+                    Color = foreground,
+                    GridColor = grid,
+                },
+            },
+            YAxis = new List<Plotly.Blazor.LayoutLib.YAxis> {
+                new() { Color = foreground, GridColor = grid },
+            },
+        };
+    }
+
+    /// <summary>
+    /// Builds the "Total TPE" timeline chart, overlaying one step-line series per player. When
+    /// <paramref name="align"/> is set, every series is shifted so its first point lands on the
+    /// earliest player's start date, aligning origins while preserving each player's own pace.
+    /// Series with no points are dropped; returns <c>null</c> when nothing can be charted.
+    /// </summary>
+    public static AttributeChart? BuildTimelineOverlay(
+        IReadOnlyList<(string Name, IReadOnlyList<Shuttle.Models.Players.TpeTimelinePoint> Points)> series,
+        bool align, bool dark) {
+        var valid = series.Where(s => s.Points is { Count: > 0 }).ToList();
+        if (valid.Count == 0) {
+            return null;
+        }
+
+        var earliestStart = valid.Min(s => s.Points[0].TaskDate);
+
+        var data = new List<ITrace>();
+        foreach (var (name, points) in valid) {
+            var offset = align ? earliestStart - points[0].TaskDate : TimeSpan.Zero;
+            data.Add(new Plotly.Blazor.Traces.Scatter {
+                X = points.Select(p => (object)p.TaskDate.Add(offset)).ToList(),
+                Y = points.Select(p => (object)p.TotalTpe).ToList(),
+                Mode = Plotly.Blazor.Traces.ScatterLib.ModeFlag.Lines | Plotly.Blazor.Traces.ScatterLib.ModeFlag.Markers,
+                // A step ("hv") line reflects that the cumulative total holds until the next event.
+                Line = new Plotly.Blazor.Traces.ScatterLib.Line {
+                    Shape = Plotly.Blazor.Traces.ScatterLib.LineLib.ShapeEnum.Hv,
+                },
+                Name = name,
+            });
+        }
+
+        return new AttributeChart {
+            Title = "Total TPE",
+            Layout = BuildTimelineLayout(dark),
+            LayoutFactory = BuildTimelineLayout,
+            Data = data,
+        };
+    }
 }

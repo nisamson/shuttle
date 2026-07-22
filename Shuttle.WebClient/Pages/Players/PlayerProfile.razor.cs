@@ -240,28 +240,8 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
         card?.Attributes is { } attributes ? PlayerAttributeCharts.ExcludedAttributeLabels(attributes) : null;
 
     // Themed cartesian layout for the TPE timeline: a date x-axis with an auto-ranged TPE y-axis.
-    private static Plotly.Blazor.Layout BuildTimelineLayout(bool dark) {
-        const string transparent = "rgba(0,0,0,0)";
-        var foreground = dark ? "#e6e6e6" : "#242424";
-        var grid = dark ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.16)";
-
-        return new Plotly.Blazor.Layout {
-            AutoSize = true,
-            PaperBgColor = transparent,
-            PlotBgColor = transparent,
-            Font = new Plotly.Blazor.LayoutLib.Font { Color = foreground },
-            XAxis = new List<Plotly.Blazor.LayoutLib.XAxis> {
-                new() {
-                    Type = Plotly.Blazor.LayoutLib.XAxisLib.TypeEnum.Date,
-                    Color = foreground,
-                    GridColor = grid,
-                },
-            },
-            YAxis = new List<Plotly.Blazor.LayoutLib.YAxis> {
-                new() { Color = foreground, GridColor = grid },
-            },
-        };
-    }
+    private static Plotly.Blazor.Layout BuildTimelineLayout(bool dark) =>
+        PlayerAttributeCharts.BuildTimelineLayout(dark);
 
     private string PositionText => card?.Position.ToShortString() ?? string.Empty;
 
