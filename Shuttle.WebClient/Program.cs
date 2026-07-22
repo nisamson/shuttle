@@ -89,4 +89,10 @@ var app = builder.Build();
 app.Services.GetRequiredService<ILoggerFactory>()
     .CreateLogger<Program>();
 
+// Ensure the signed-in caller's account is created/initialized as soon as the app starts (the MSAL
+// redirect returns to a freshly loaded app that is already authenticated, so this covers "on login").
+// Fire-and-forget: the account warms in the background without blocking the first paint. Subsequent
+// in-session sign-in/out transitions are handled by CurrentUserService's auth-state subscription.
+_ = app.Services.GetRequiredService<ICurrentUserService>().EnsureInitializedAsync();
+
 await app.RunAsync();
