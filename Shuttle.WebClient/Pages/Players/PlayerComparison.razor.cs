@@ -222,7 +222,23 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
             .Select(x => (x.Name, Points: x.Points!))
             .ToList();
 
-        timelineChart = PlayerAttributeCharts.BuildTimelineOverlay(series, alignTimelines, darkMode);
+        var rebuilt = PlayerAttributeCharts.BuildTimelineOverlay(series, alignTimelines, darkMode);
+
+        if (rebuilt is null || timelineChart is null) {
+            // First build (or nothing to chart): adopt the new object outright; its ref binds on render.
+            timelineChart = rebuilt;
+            return;
+        }
+
+        // Update the existing chart object in place — swap its Layout and refill its Data — so the
+        // captured PlotlyChart ref survives and React() picks up the new traces. Replacing the object
+        // would orphan the @ref (Blazor reuses the PlotlyChart instance without reassigning the ref),
+        // leaving Chart null so the redraw never runs and the graph appears frozen.
+        timelineChart.Layout = rebuilt.Layout;
+        timelineChart.Data.Clear();
+        foreach (var trace in rebuilt.Data) {
+            timelineChart.Data.Add(trace);
+        }
     }
 
     private void OnAlignChanged() {
