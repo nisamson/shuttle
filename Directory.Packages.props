@@ -1,22 +1,23 @@
-﻿<Project>
+<Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <EntityFrameworkVersion>10.0.9</EntityFrameworkVersion>
     <MicrosoftIdentityWebVersion>4.12.0</MicrosoftIdentityWebVersion>
     <FluentUIVersion>5.0.0-rc.4-26180.1</FluentUIVersion>
+    <OpenTelemetryVersion>1.15.3</OpenTelemetryVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="AccessibleColors" Version="1.0.10" />
     <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.1.0" />
     <PackageVersion Include="Aspire.Hosting.Azure.AppConfiguration" Version="13.1.0" />
     <PackageVersion Include="Aspire.Hosting.Azure.AppContainers" Version="13.1.0" />
-    <PackageVersion Include="Aspire.Hosting.Azure.AppService" Version="13.1.2-preview.1.26125.13" />
-    <PackageVersion Include="Aspire.Hosting.Azure.Functions" Version="13.1.2" />
-    <PackageVersion Include="Aspire.Hosting.Azure.Sql" Version="13.1.2" />
+    <PackageVersion Include="Aspire.Hosting.Azure.AppService" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Hosting.Azure.Functions" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Hosting.Azure.Sql" Version="13.4.6" />
     <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.1.0" />
-    <PackageVersion Include="Aspire.Microsoft.Data.SqlClient" Version="13.1.2" />
+    <PackageVersion Include="Aspire.Microsoft.Data.SqlClient" Version="13.4.6" />
     <PackageVersion Include="AngleSharp" Version="1.5.0" />
-    <PackageVersion Include="Azure.Identity" Version="1.17.2" />
+    <PackageVersion Include="Azure.Identity" Version="1.18.0" />
     <PackageVersion Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.4.0" />
     <PackageVersion Include="Blazor.LocalStorage.WebAssembly" Version="9.0.1" />
     <PackageVersion Include="bunit" Version="2.7.2" />
@@ -44,7 +45,8 @@
     <PackageVersion Include="Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore" Version="2.1.0" />
     <PackageVersion Include="Microsoft.Azure.Functions.Worker.Sdk" Version="2.0.7" />
     <PackageVersion Include="Microsoft.Azure.WebJobs.Extensions" Version="5.2.1" />
-    <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.1.4" />
+    <PackageVersion Include="Microsoft.Data.SqlClient.Extensions.Azure" Version="1.0.0" />
+    <PackageVersion Include="Microsoft.Data.SqlClient.Extensions.Abstractions" Version="1.0.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="$(EntityFrameworkVersion)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Abstractions" Version="$(EntityFrameworkVersion)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="$(EntityFrameworkVersion)" />
@@ -72,11 +74,11 @@
     <PackageVersion Include="Microsoft.OpenApi" Version="2.7.5" />
     <PackageVersion Include="Microsoft.Playwright" Version="1.61.0" />
     <PackageVersion Include="Nerdbank.GitVersioning" Version="3.9.50" />
-    <PackageVersion Include="OpenTelemetry" Version="1.15.0" />
-    <PackageVersion Include="OpenTelemetry.Api" Version="1.15.3" />
-    <PackageVersion Include="OpenTelemetry.Exporter.Console" Version="1.15.3" />
-    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
-    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.14.0" />
+    <PackageVersion Include="OpenTelemetry" Version="$(OpenTelemetryVersion)" />
+    <PackageVersion Include="OpenTelemetry.Api" Version="$(OpenTelemetryVersion)" />
+    <PackageVersion Include="OpenTelemetry.Exporter.Console" Version="$(OpenTelemetryVersion)" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="$(OpenTelemetryVersion)" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="$(OpenTelemetryVersion)" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.14.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.15.0-beta.1" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.14.0" />
