@@ -76,7 +76,9 @@ builder.Services.AddSingleton<IBlogService, BlogService>();
 builder.Services.AddSingleton<IShuttleOptionsStorage, ShuttleOptionsLocalStorage>();
 builder.Services.AddSingleton<IPlayerDirectoryService, PlayerDirectoryService>();
 builder.Services.AddSingleton<IUserDirectoryService, UserDirectoryService>();
-builder.Services.AddSingleton<ICurrentUserService, CurrentUserService>();
+// Scoped (not singleton) because it depends on the scoped AuthenticationStateProvider; in a
+// standalone WASM app the single app scope makes this effectively a per-app instance anyway.
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 if (builder.HostEnvironment.IsDevelopment()) {
     builder.Logging.AddFilter("Microsoft.AspNetCore.Components.RenderTree.*", LogLevel.None);
     builder.Logging.SetMinimumLevel(LogLevel.Trace);
@@ -88,11 +90,5 @@ var app = builder.Build();
 
 app.Services.GetRequiredService<ILoggerFactory>()
     .CreateLogger<Program>();
-
-// Ensure the signed-in caller's account is created/initialized as soon as the app starts (the MSAL
-// redirect returns to a freshly loaded app that is already authenticated, so this covers "on login").
-// Fire-and-forget: the account warms in the background without blocking the first paint. Subsequent
-// in-session sign-in/out transitions are handled by CurrentUserService's auth-state subscription.
-_ = app.Services.GetRequiredService<ICurrentUserService>().EnsureInitializedAsync();
 
 await app.RunAsync();
