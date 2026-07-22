@@ -14,7 +14,10 @@
         <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
-        <PackageReference Include="Microsoft.Data.SqlClient"/>
+        <PackageReference Include="Microsoft.Data.SqlClient.Extensions.Azure" />
+        <!-- Pulled in transitively by the Azure extension; alias it out of the global namespace so its
+             Microsoft.Data.SqlClient.SqlAuthenticationMethod shim doesn't collide with the SqlClient type (CS0433). -->
+        <PackageReference Include="Microsoft.Data.SqlClient.Extensions.Abstractions" Aliases="SqlClientExtAbstractions" />
         <PackageReference Include="linq2db.EntityFrameworkCore" />
         <PackageReference Include="OpenTelemetry" />
         <PackageReference Include="OpenTelemetry.Api" />

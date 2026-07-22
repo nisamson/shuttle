@@ -148,10 +148,10 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
     }
 
     private void RebuildCharts() {
-        attributeCharts.Clear();
-        combinedChart = null;
-
         if (chartedPlayers.Count == 0) {
+            attributeCharts.Clear();
+            combinedChart = null;
+            needsRedraw = true;
             return;
         }
 
@@ -160,9 +160,50 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
             .ToList();
 
         var set = PlayerAttributeCharts.BuildOverlay(series, darkMode);
-        combinedChart = set.Combined;
-        attributeCharts.AddRange(set.Categories);
+
+        // Update the charts in place — reuse the existing AttributeChart objects and only swap their
+        // Layout/Data — so each PlotlyChart's captured @ref survives and React() redraws with the new
+        // traces. Replacing the objects would orphan the refs on the reused chart components (Blazor
+        // does not rebind @ref when it reuses a component instance), leaving the graph frozen until a
+        // full page reload. This matters on the synchronous rebuild path (removing or reordering an
+        // already-loaded player) where no loading state intervenes to recreate the chart components.
+        combinedChart = MergeChart(combinedChart, set.Combined);
+
+        if (SameShape(attributeCharts, set.Categories)) {
+            for (var i = 0; i < set.Categories.Count; i++) {
+                MergeInto(attributeCharts[i], set.Categories[i]);
+            }
+        } else {
+            attributeCharts.Clear();
+            attributeCharts.AddRange(set.Categories);
+        }
+
         needsRedraw = true;
+    }
+
+    // Two chart sets share the same shape when they have the same categories in the same order; only
+    // then is it safe to merge in place. A different shape (e.g. the remaining players switch the
+    // comparison between skaters and goaltenders) replaces the objects, and the @key on the chart
+    // components forces the reused ones to rebind their refs.
+    private static bool SameShape(IReadOnlyList<AttributeChart> existing, IReadOnlyList<AttributeChart> updated) =>
+        existing.Count == updated.Count
+        && existing.Zip(updated, (a, b) => a.Title == b.Title).All(same => same);
+
+    private static AttributeChart? MergeChart(AttributeChart? existing, AttributeChart? updated) {
+        if (existing is null || updated is null) {
+            return updated;
+        }
+
+        MergeInto(existing, updated);
+        return existing;
+    }
+
+    private static void MergeInto(AttributeChart target, AttributeChart source) {
+        target.Layout = source.Layout;
+        target.Data.Clear();
+        foreach (var trace in source.Data) {
+            target.Data.Add(trace);
+        }
     }
 
     // The timeline is loaded lazily the first time its tab is opened so comparisons that are never

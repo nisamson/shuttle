@@ -1,3 +1,4 @@
+using System.Reflection;
 using Bunit;
 using Bunit.TestDoubles;
 using Microsoft.Extensions.DependencyInjection;
@@ -169,6 +170,33 @@ public class PlayerComparisonTests : WebClientTestContext {
 
         Assert.Contains("TPE timeline", cut.Markup);
     }
+
+    [Fact]
+    public void Removing_a_player_updates_the_combined_chart_in_place() {
+        var cut = RenderCompare(1001, 1002, 1003);
+        cut.WaitForState(() => cut.Markup.Contains("Skater attributes"));
+
+        var before = GetCombinedChart(cut);
+        Assert.NotNull(before);
+        // One overlaid trace per charted player.
+        Assert.Equal(3, before!.Data.Count);
+
+        // Drop the first player via its chip button. The remaining players are already cached, so the
+        // page rebuilds on the synchronous path (no loading state to recreate the chart component).
+        // The combined chart must be mutated in place — the same instance with the reduced trace set —
+        // so its captured PlotlyChart @ref stays valid and the graph redraws without a full refresh.
+        cut.FindAll("fluent-button[title^='Remove']")[0].Click();
+        cut.WaitForState(() => GetCombinedChart(cut)?.Data.Count == 2);
+
+        var after = GetCombinedChart(cut);
+        Assert.Same(before, after);
+        Assert.Equal(2, after!.Data.Count);
+    }
+
+    private static AttributeChart? GetCombinedChart(IRenderedComponent<PlayerComparison> cut) =>
+        (AttributeChart?)typeof(PlayerComparison)
+            .GetField("combinedChart", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(cut.Instance);
 
     private sealed class FakeOptionsStorage : IShuttleOptionsStorage {
         public ShuttleOptions CurrentOptions => ShuttleOptions.Default;

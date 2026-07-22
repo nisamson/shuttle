@@ -491,3 +491,5 @@ $RECYCLE.BIN/
 *.sqlite3
 
 docs/nocommit
+# Aspire deploy/publish manifest output
+Shuttle.Backend.Aspire/aspire-output/
