@@ -451,6 +451,15 @@ public partial class ScoutingBoard : ComponentBase {
         selectedRejectedRows = [];
     }
 
+    // Comparison is read-only, so it's available regardless of edit rights. It's rendered as an
+    // anchor with target="_blank" (rather than a JS window.open) so the browser opens it in a new tab
+    // natively — no interop, and no popup-blocker issues — leaving the board and its selection intact.
+    private string CompareSelectedUrl =>
+        Routes.Players.CompareWith(selectedRows.Select(r => r.PlayerId).Distinct());
+
+    private string CompareSelectedRejectedUrl =>
+        Routes.Players.CompareWith(selectedRejectedRows.Select(r => r.PlayerId).Distinct());
+
     private async Task OpenEntryCommentsAsync(BoardRow row) {
         await DialogService.ShowDialogAsync<ScoutingEntryCommentsDialog>(options => {
             options.Modal = true;

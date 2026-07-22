@@ -31,7 +31,7 @@ public abstract class WebClientTestContext : BunitContext {
                 sp.GetService<Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider>()));
         Services.AddSingleton<IPlayerDirectoryService, PlayerDirectoryService>();
         Services.AddSingleton<IUserDirectoryService, UserDirectoryService>();
-        Services.AddSingleton<ICurrentUserService, CurrentUserService>();
+        Services.AddScoped<ICurrentUserService, CurrentUserService>();
         Services.AddSingleton<IPendingRequestTracker, PendingRequestTracker>();
     }
 }

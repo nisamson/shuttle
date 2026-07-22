@@ -76,7 +76,9 @@ builder.Services.AddSingleton<IBlogService, BlogService>();
 builder.Services.AddSingleton<IShuttleOptionsStorage, ShuttleOptionsLocalStorage>();
 builder.Services.AddSingleton<IPlayerDirectoryService, PlayerDirectoryService>();
 builder.Services.AddSingleton<IUserDirectoryService, UserDirectoryService>();
-builder.Services.AddSingleton<ICurrentUserService, CurrentUserService>();
+// Scoped (not singleton) because it depends on the scoped AuthenticationStateProvider; in a
+// standalone WASM app the single app scope makes this effectively a per-app instance anyway.
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 if (builder.HostEnvironment.IsDevelopment()) {
     builder.Logging.AddFilter("Microsoft.AspNetCore.Components.RenderTree.*", LogLevel.None);
     builder.Logging.SetMinimumLevel(LogLevel.Trace);

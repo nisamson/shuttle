@@ -142,4 +142,31 @@ public class ScoutingPagesTests : WebClientTestContext {
         cut.WaitForState(() => cut.Markup.Contains("Reject Board"));
         Assert.Contains("Rejected prospects", cut.Markup);
     }
+
+    [Fact]
+    public async Task BoardPage_compare_selected_is_a_navigable_anchor_to_the_compare_page() {
+        this.AddAuthorization().SetAuthorized("Test Scout");
+        var team = await Scouting.CreateTeam(new CreateScoutingTeamRequest { Name = "Compare Scouts" });
+        var board = await Scouting.CreateBoard(team.Id,
+            new CreateScoutingBoardRequest { Name = "Compare Board", DraftSeason = 73 });
+        await Scouting.AddEntry(board.Id, new AddScoutingBoardEntryRequest { PlayerId = 1001 });
+        await Scouting.AddEntry(board.Id, new AddScoutingBoardEntryRequest { PlayerId = 1002 });
+
+        var cut = Render<ScoutingBoard>(p => p.Add(c => c.BoardId, board.Id));
+        cut.WaitForState(() => cut.Markup.Contains("Compare Board"));
+
+        // Select every prospect via the grid's header "select all" control so the bulk toolbar shows.
+        cut.Find("th.select-all svg").Click();
+        cut.WaitForState(() => cut.Markup.Contains("Compare selected"));
+
+        // The action must be a real navigating anchor (fluent-anchor-button), not a plain button that
+        // does nothing on click, pointing at the compare page with the selected players.
+        var anchor = cut.FindAll("fluent-anchor-button")
+            .Single(a => (a.TextContent ?? string.Empty).Contains("Compare selected"));
+        var href = anchor.GetAttribute("href");
+        Assert.Contains(Routes.Players.Compare, href);
+        Assert.Contains("1001", href!);
+        Assert.Contains("1002", href);
+        Assert.Equal("_blank", anchor.GetAttribute("target"));
+    }
 }

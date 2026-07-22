@@ -1,0 +1,145 @@
+@page "/players/compare"
+@using Plotly.Blazor
+@using Shuttle.Models.Players
+@using Shuttle.WebClient.Models
+@using Shuttle.WebClient.Services
+
+<PageTitle>Compare players</PageTitle>
+
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="16">
+    <FluentText Size="TextSize.Size800" Weight="TextWeight.Bold">Compare players</FluentText>
+    <FluentText Size="TextSize.Size300" Block="true">
+        Add players to overlay their in-game attributes on the same charts. A comparison covers a single
+        player type (skaters or goaltenders). Your selection is stored in the page URL, so you can
+        bookmark or share it.
+    </FluentText>
+
+    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="12" VerticalAlignment="VerticalAlignment.Bottom" Wrap="true">
+        <FluentAutocomplete TOption="PlayerSuggestion"
+                            TValue="string"
+                            Width="320px"
+                            Label="Add a player"
+                            Placeholder="Search by name or username"
+                            Disabled="AddDisabled"
+                            OnOptionsSearch="OnPlayerSearch"
+                            OptionText="@(p => $"{p.Name} ({p.Username})")"
+                            OptionValue="@(p => p.PlayerId.ToString())"
+                            SelectedItem="selectedToAdd"
+                            SelectedItemChanged="OnPlayerSelected"/>
+        @if (AddDisabled) {
+            <FluentText Size="TextSize.Size200">A comparison holds up to @MaxComparison players.</FluentText>
+        }
+    </FluentStack>
+
+    @if (loadError is not null) {
+        <FluentMessageBar Intent="MessageBarIntent.Error" Title="Failed to load players">@loadError</FluentMessageBar>
+    }
+
+    @if (notFoundIds.Count > 0) {
+        <FluentMessageBar Intent="MessageBarIntent.Warning" Title="Some players couldn't be found">
+            No player exists for: @string.Join(", ", notFoundIds).
+        </FluentMessageBar>
+    }
+
+    @if (excludedPlayers.Count > 0) {
+        <FluentMessageBar Intent="MessageBarIntent.Warning" Title="Some players aren't charted">
+            <FluentStack Orientation="Orientation.Vertical" VerticalGap="2">
+                @foreach (var excluded in excludedPlayers) {
+                    <FluentText Size="TextSize.Size200"><strong>@excluded.Card.Name</strong> — @excluded.Reason</FluentText>
+                }
+            </FluentStack>
+        </FluentMessageBar>
+    }
+
+    @if (chartedPlayers.Count > MaxComparison) {
+        <FluentMessageBar Intent="MessageBarIntent.Info" Title="Large comparison">
+            Comparisons are easier to read with @MaxComparison or fewer players.
+        </FluentMessageBar>
+    }
+
+    @if (SelectedCards.Count > 0) {
+        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" Wrap="true" VerticalAlignment="VerticalAlignment.Center">
+            @foreach (var selected in SelectedCards) {
+                <span style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--neutral-stroke-rest);border-radius:16px;padding:2px 4px 2px 10px;">
+                    <a href="@Routes.Players.Player(selected.PlayerId)" style="text-decoration:none;color:var(--accent-foreground-rest);">@selected.Name</a>
+                    <FluentButton Appearance="ButtonAppearance.Subtle" IconOnly="true" Title="@($"Remove {selected.Name}")"
+                                  OnClick="() => Remove(selected.PlayerId)">
+                        <FluentIcon Value="@(new Icons.Regular.Size16.Dismiss())"/>
+                    </FluentButton>
+                </span>
+            }
+            <FluentButton Appearance="ButtonAppearance.Subtle" OnClick="ClearAll">Clear all</FluentButton>
+        </FluentStack>
+    }
+
+    @if (loading) {
+        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
+            <FluentSpinner/>
+            <FluentText>Loading players…</FluentText>
+        </FluentStack>
+    } else if (requestedIds.Count == 0) {
+        <FluentText Size="TextSize.Size300" Block="true">Add two or more players above to start comparing their attributes.</FluentText>
+    } else if (SelectedCards.Count == 0) {
+        <FluentText>None of the selected players could be loaded.</FluentText>
+    } else {
+        <FluentDivider/>
+        <FluentTabs @bind-ActiveTabId="activeTabId" @bind-ActiveTabId:after="OnTabChangedAsync" Width="100%">
+            <FluentTab Header="Attributes" Id="@AttributesTabId">
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="16">
+                    @if (combinedChart is null) {
+                        <FluentText>None of the selected players have in-game attributes to chart yet.</FluentText>
+                    } else {
+                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
+                            <FluentText Size="TextSize.Size500" Weight="TextWeight.Bold">@ComparisonHeading</FluentText>
+                            <FluentSpacer/>
+                            <FluentSwitch @bind-Value="groupedView" @bind-Value:after="OnViewChanged">Break out by category</FluentSwitch>
+                        </FluentStack>
+
+                        @if (groupedView) {
+                            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(340px, 1fr));gap:24px;width:100%;">
+                                @foreach (var group in attributeCharts) {
+                                    <div style="display:flex;flex-direction:column;">
+                                        <FluentText Weight="TextWeight.Bold" Block="true" Style="text-align:center;">@group.Title</FluentText>
+                                        <div style="width:100%;height:360px;">
+                                            <PlotlyChart Config="chartConfig" Layout="group.Layout" Data="group.Data" @ref="group.Chart"/>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        } else {
+                            <div style="width:100%;height:60vh;min-height:420px;">
+                                <PlotlyChart Config="chartConfig" Layout="combinedChart.Layout" Data="combinedChart.Data" @ref="combinedChart.Chart"/>
+                            </div>
+                        }
+                    }
+                </FluentStack>
+            </FluentTab>
+            <FluentTab Header="TPE timeline" Id="@TimelineTabId">
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="16">
+                    @if (timelineChart is not null) {
+                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
+                            <FluentText Size="TextSize.Size500" Weight="TextWeight.Bold">Total TPE</FluentText>
+                            <FluentSpacer/>
+                            <FluentSwitch @bind-Value="alignTimelines" @bind-Value:after="OnAlignChanged">Align start dates</FluentSwitch>
+                        </FluentStack>
+                    }
+
+                    @if (!timelineLoaded || timelineLoading) {
+                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
+                            <FluentSpinner/>
+                            <FluentText>Loading TPE timelines…</FluentText>
+                        </FluentStack>
+                    } else if (timelineError is not null) {
+                        <FluentMessageBar Intent="MessageBarIntent.Error" Title="Failed to load TPE timelines">@timelineError</FluentMessageBar>
+                    } else if (timelineChart is null) {
+                        <FluentText>None of the selected players have a recorded TPE timeline yet.</FluentText>
+                    } else {
+                        <div style="width:100%;height:60vh;min-height:420px;">
+                            <PlotlyChart Config="chartConfig" Layout="timelineChart.Layout" Data="timelineChart.Data" @ref="timelineChart.Chart"/>
+                        </div>
+                    }
+                </FluentStack>
+            </FluentTab>
+        </FluentTabs>
+    }
+</FluentStack>
