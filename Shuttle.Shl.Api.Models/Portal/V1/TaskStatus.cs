@@ -5,6 +5,8 @@ namespace Shuttle.Shl.Api.Models.Portal.V1;
 
 [JsonConverter(typeof(JsonStringEnumConverter<TaskStatus>))]
 public enum TaskStatus {
+    [JsonStringEnumMemberName("Draftee Free Agent")]
+    DrafteeFreeAgent,
     [JsonStringEnumMemberName("SMJHL Rookie")]
     SmjhlRookie,
     [JsonStringEnumMemberName("SHL/Send-down")]
@@ -16,6 +18,7 @@ public enum TaskStatus {
 public static class TaskStatusExtensions {
     extension(TaskStatus @this) {
         public string ToValueString() => @this switch {
+            TaskStatus.DrafteeFreeAgent => "Draftee Free Agent",
             TaskStatus.SmjhlRookie => "SMJHL Rookie",
             TaskStatus.ShlOrSendDown => "SHL/Send-down",
             TaskStatus.Retired => "Retired",
@@ -23,6 +26,7 @@ public static class TaskStatusExtensions {
         };
         
         public static TaskStatus FromString(string status) => status.ToLower() switch {
+            "draftee free agent" => TaskStatus.DrafteeFreeAgent,
             "smjhl rookie" => TaskStatus.SmjhlRookie,
             "shl/send-down" => TaskStatus.ShlOrSendDown,
             "retired" => TaskStatus.Retired,

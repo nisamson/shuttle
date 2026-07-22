@@ -45,6 +45,7 @@ public class PlayerInfoRefitOptionsTests {
     }
 
     [Theory]
+    [InlineData("\"Draftee Free Agent\"", TaskStatus.DrafteeFreeAgent)]
     [InlineData("\"SMJHL Rookie\"", TaskStatus.SmjhlRookie)]
     [InlineData("\"SHL/Send-down\"", TaskStatus.ShlOrSendDown)]
     [InlineData("\"Retired\"", TaskStatus.Retired)]
