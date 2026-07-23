@@ -10,35 +10,35 @@
 
     <ItemGroup>
         <PackageReference Include="Aspire.Microsoft.Data.SqlClient" />
-        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" NoWarn="NU1605"/>
-        <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" NoWarn="NU1605"/>
-        <PackageReference Include="Microsoft.AspNetCore.OpenApi"/>
-        <PackageReference Include="Microsoft.OpenApi"/>
-        <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI"/>
-        <PackageReference Include="Microsoft.Identity.Web"/>
-        <PackageReference Include="Microsoft.Identity.Web.DownstreamApi"/>
-        <PackageReference Include="Microsoft.Identity.Web.UI"/>
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" NoWarn="NU1605" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" NoWarn="NU1605" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+        <PackageReference Include="Microsoft.OpenApi" />
+        <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" />
+        <PackageReference Include="Microsoft.Identity.Web" />
+        <PackageReference Include="Microsoft.Identity.Web.DownstreamApi" />
+        <PackageReference Include="Microsoft.Identity.Web.UI" />
 
-        <PackageReference Include="CrystalQuartz.AspNetCore"/>
-        <PackageReference Include="Quartz"/>
-        <PackageReference Include="Quartz.AspNetCore"/>
-        <PackageReference Include="Quartz.Plugins"/>
-        <PackageReference Include="Quartz.Serialization.SystemTextJson"/>
-        <PackageReference Include="OpenTelemetry.Instrumentation.Quartz"/>
-        <PackageReference Include="OpenTelemetry.Extensions.Hosting"/>
+        <PackageReference Include="CrystalQuartz.AspNetCore" />
+        <PackageReference Include="Quartz" />
+        <PackageReference Include="Quartz.AspNetCore" />
+        <PackageReference Include="Quartz.Plugins" />
+        <PackageReference Include="Quartz.Serialization.SystemTextJson" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.Quartz" />
+        <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
 
-        <PackageReference Include="Azure.Identity"/>
-        <PackageReference Include="Microsoft.EntityFrameworkCore"/>
-        <PackageReference Include="Microsoft.EntityFrameworkCore.Design"/>
-        <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer"/>
-        <PackageReference Include="linq2db.EntityFrameworkCore"/>
-        <PackageReference Include="Nerdbank.GitVersioning"/>
+        <PackageReference Include="Azure.Identity" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+        <PackageReference Include="linq2db.EntityFrameworkCore" />
+        <PackageReference Include="Nerdbank.GitVersioning" />
 
-        <PackageReference Include="Polly.Core"/>
-        <PackageReference Include="Polly.RateLimiting"/>
-        <PackageReference Include="Polly.Extensions"/>
+        <PackageReference Include="Polly.Core" />
+        <PackageReference Include="Polly.RateLimiting" />
+        <PackageReference Include="Polly.Extensions" />
 
-        <PackageReference Include="System.Linq.Async"/>
+        <PackageReference Include="System.Linq.Async" />
 
         <PackageReference Include="Facet" />
     </ItemGroup>
@@ -47,11 +47,12 @@
         <ProjectReference Include="..\Shuttle.EFCore\Shuttle.EFCore.csproj" />
         <ProjectReference Include="..\Shuttle.Models\Shuttle.Models.csproj" />
         <ProjectReference Include="..\Shuttle.Shl.Api.Client\Shuttle.Shl.Api.Client.csproj" />
-        <ProjectReference Include="..\Shuttle.ServiceDefaults\Shuttle.ServiceDefaults.csproj"/>
+        <ProjectReference Include="..\Shuttle.ServiceDefaults\Shuttle.ServiceDefaults.csproj" />
+        <ProjectReference Include="..\Shuttle.WebClient.Shared\Shuttle.WebClient.Shared.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-        <Folder Include="Services\Portal\"/>
+        <Folder Include="Services\Portal\" />
         <Folder Include="Services\Services\" />
     </ItemGroup>
 

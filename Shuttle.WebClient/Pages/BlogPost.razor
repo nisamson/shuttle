@@ -1,14 +1,19 @@
 @page "/blogs/{Slug}"
 @using Shuttle.WebClient.Components
 @using Shuttle.WebClient.Models
-@using Shuttle.WebClient.Services
+@using Shuttle.WebClient.Shared.Blogs
+@using Shuttle.WebClient.Shared.Meta
 @inject IBlogService BlogService
+@inject NavigationManager Navigation
 
 @if (entry is null) {
     <PageTitle>Article not found</PageTitle>
     <h1>Article not found</h1>
     <p>The requested article could not be found.</p>
 } else {
+    <HeadContent>
+        <MetaTags Metadata="metadata!" />
+    </HeadContent>
     <PageTitle>@entry.Title</PageTitle>
     <article class="blog-post">
         <FluentText Size="TextSize.Size200" Block="true">@entry.Date.ToString("MMMM d, yyyy")</FluentText>
@@ -22,8 +27,18 @@
     public string? Slug { get; set; }
 
     private BlogEntry? entry;
+    private PageMetadata? metadata;
 
     protected override void OnParametersSet() {
         entry = Slug is null ? null : BlogService.GetEntry(Slug);
+        metadata = entry is null
+            ? null
+            : new PageMetadata {
+                Title = entry.Title,
+                Description = BlogService.GetExcerpt(entry),
+                CanonicalUrl = Navigation.Uri,
+                ImageUrl = Navigation.ToAbsoluteUri("icon.svg").ToString(),
+                OgType = "article",
+            };
     }
 }

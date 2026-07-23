@@ -4,6 +4,7 @@ using Microsoft.FluentUI.AspNetCore.Components;
 using Shuttle.Api.Client;
 using Shuttle.WebClient;
 using Shuttle.WebClient.Services;
+using Shuttle.WebClient.Shared.Blogs;
 using Shuttle.WebClient.Testing;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);

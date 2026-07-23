@@ -1,26 +1,16 @@
 using System.Globalization;
+using System.Text;
+using System.Text.RegularExpressions;
 using Markdig;
-using Shuttle.WebClient.Models;
 
-namespace Shuttle.WebClient.Services;
-
-public interface IBlogService {
-    /// <summary>All blog entries, newest first.</summary>
-    IReadOnlyList<BlogEntry> GetEntries();
-
-    /// <summary>Gets a single entry by its slug, or <see langword="null"/> if not found.</summary>
-    BlogEntry? GetEntry(string slug);
-
-    /// <summary>Renders markdown content to HTML.</summary>
-    string RenderHtml(string markdown);
-}
+namespace Shuttle.WebClient.Shared.Blogs;
 
 /// <summary>
 /// Serves blog articles from the markdown files embedded from the <c>BlogEntries</c> folder.
 /// Each file is named <c>yyyyMMdd-Title.md</c>; the date comes from the name prefix and the title
 /// from the first top-level markdown heading.
 /// </summary>
-public sealed class BlogService : IBlogService {
+public sealed partial class BlogService : IBlogService {
     private const string ResourceMarker = ".BlogEntries.";
 
     private readonly IReadOnlyList<BlogEntry> entries;
@@ -39,6 +29,44 @@ public sealed class BlogService : IBlogService {
         entries.FirstOrDefault(e => string.Equals(e.Slug, slug, StringComparison.OrdinalIgnoreCase));
 
     public string RenderHtml(string markdown) => Markdown.ToHtml(markdown, pipeline);
+
+    public string GetExcerpt(BlogEntry entry, int maxLength = 200) {
+        ArgumentNullException.ThrowIfNull(entry);
+
+        // Drop the leading title heading so the excerpt reflects the body, then strip markdown to
+        // plain text and collapse whitespace.
+        var body = RemoveFirstHeading(entry.Markdown);
+        var plain = Markdown.ToPlainText(body, pipeline);
+        plain = WhitespaceRegex().Replace(plain, " ").Trim();
+
+        if (plain.Length <= maxLength) {
+            return plain;
+        }
+
+        var truncated = plain[..maxLength];
+        var lastSpace = truncated.LastIndexOf(' ');
+        if (lastSpace > 0) {
+            truncated = truncated[..lastSpace];
+        }
+
+        return truncated.TrimEnd() + "\u2026";
+    }
+
+    private static string RemoveFirstHeading(string markdown) {
+        using var reader = new StringReader(markdown);
+        var builder = new StringBuilder();
+        var removed = false;
+        while (reader.ReadLine() is { } line) {
+            if (!removed && line.TrimStart().StartsWith("# ", StringComparison.Ordinal)) {
+                removed = true;
+                continue;
+            }
+
+            builder.AppendLine(line);
+        }
+
+        return builder.ToString();
+    }
 
     private static IReadOnlyList<BlogEntry> LoadEntries() {
         var assembly = typeof(BlogService).Assembly;
@@ -102,4 +130,7 @@ public sealed class BlogService : IBlogService {
 
         return null;
     }
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex WhitespaceRegex();
 }

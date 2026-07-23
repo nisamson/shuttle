@@ -1,0 +1,31 @@
+@namespace Shuttle.WebClient.Shared.Meta
+
+@* Emits SEO + Open Graph (Discord) + Twitter-card head tags for the supplied metadata. Values are
+   bound through Razor, so titles/descriptions coming from user data are HTML-encoded automatically. *@
+
+<title>@Metadata.Title</title>
+<meta name="description" content="@Metadata.Description" />
+<link rel="canonical" href="@Metadata.CanonicalUrl" />
+
+<meta property="og:title" content="@Metadata.Title" />
+<meta property="og:description" content="@Metadata.Description" />
+<meta property="og:url" content="@Metadata.CanonicalUrl" />
+<meta property="og:type" content="@Metadata.OgType" />
+<meta property="og:site_name" content="@Metadata.SiteName" />
+@if (!string.IsNullOrEmpty(Metadata.ImageUrl)) {
+    <meta property="og:image" content="@Metadata.ImageUrl" />
+}
+
+<meta name="twitter:card" content="@Metadata.TwitterCard" />
+<meta name="twitter:title" content="@Metadata.Title" />
+<meta name="twitter:description" content="@Metadata.Description" />
+@if (!string.IsNullOrEmpty(Metadata.ImageUrl)) {
+    <meta name="twitter:image" content="@Metadata.ImageUrl" />
+}
+
+@code {
+    /// <summary>The page metadata to render as head tags.</summary>
+    [Parameter]
+    [EditorRequired]
+    public PageMetadata Metadata { get; set; } = default!;
+}
