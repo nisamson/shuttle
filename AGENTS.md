@@ -127,6 +127,15 @@ orchestration host.
   Referenced by the server project.
 - **`Shuttle.Shl.Api.Client`** / **`Shuttle.Shl.Api.Models`** — typed clients and DTOs for
   the upstream SHL Index and Portal APIs.
+- **`Shuttle.WebClient.Shared`** — a **Razor Class Library** shared by the WebClient (WASM) and
+  `Shuttle.Api` (server). Owns the reusable SEO / social-embed head component
+  (`Meta/MetaTags.razor` + `Meta/MetaDocument.razor`, driven by the `Meta/PageMetadata` record)
+  and the blog engine (`Blogs/BlogService`, `IBlogService`, `BlogEntry`, plus the embedded
+  `BlogEntries/*.md`). The API server-side-renders `MetaDocument` to an HTML string (via
+  `HtmlRenderer`) for the anonymous `GET /meta/{**path}` endpoint (see `Shuttle.Api/Meta/`),
+  which crawlers / Discord's unfurler hit; the WebClient reuses `MetaTags` via `<HeadContent>`.
+  Uses the WASM-compatible `Microsoft.AspNetCore.Components.Web` package (not a framework
+  reference) so it builds for `browser-wasm`.
 - **`Shuttle.Models`**, **`Shuttle.Core`**, **`Shuttle.EloCalc`**, **`Shuttle.Math`** —
   domain models and shared utility/calculation libraries.
 - **`Shuttle.Backend.Aspire`** — .NET Aspire AppHost that orchestrates `shuttle-api`,
@@ -168,17 +177,16 @@ in `.razor` files, most with a matching `.razor.cs` code-behind and (where neede
   `HelloApiView`).
 - **`Layout/`** — app shell: `MainLayout`, `ShuttleNavMenu`, `LoginDisplay`, and
   `RedirectToLogin`.
-- **`Services/`** — client-side services and state. `BlogService` renders the embedded
-  `BlogEntries` markdown; `PlayerDirectoryService` fetches the slim player suggestion
-  directory once and caches it in memory + `localStorage` for local autocomplete;
-  `ShuttleOptionsLocalStorage`/`IShuttleOptionsStorage` persist user options;
-  `ArrayClaimsPrincipalFactory` expands the array-valued `roles` claim.
+- **`Services/`** — client-side services and state. `PlayerDirectoryService` fetches the slim
+  player suggestion directory once and caches it in memory + `localStorage` for local
+  autocomplete; `ShuttleOptionsLocalStorage`/`IShuttleOptionsStorage` persist user options;
+  `ArrayClaimsPrincipalFactory` expands the array-valued `roles` claim. (The blog engine —
+  `IBlogService`/`BlogService`, `BlogEntry`, and the `BlogEntries/*.md` articles — lives in the
+  shared `Shuttle.WebClient.Shared` library so the API can render blog meta too.)
 - **`Models/`** — client-side models and constants: `Routes` (typed route/URL constants —
-  prefer these over hard-coded paths), `KnownRoles`, `BlogEntry`, and `Options/`
+  prefer these over hard-coded paths), `KnownRoles`, and `Options/`
   (`IShuttleOptions`, `ShuttleOptions`, `ShuttleOptionsModel`).
 - **`Extensions/`** — `ClaimsPrincipalExtensions` and other small helpers.
-- **`BlogEntries/`** — markdown articles (named `yyyyMMdd-Title.md`) embedded as resources
-  and surfaced through `BlogService`.
 - **`wwwroot/`** — static web assets: `index.html`, `appsettings.json` +
   `appsettings.Development.json` (the latter points `Api:BaseUrl` at the local dev API),
   `css/`, `js/`, and icons.

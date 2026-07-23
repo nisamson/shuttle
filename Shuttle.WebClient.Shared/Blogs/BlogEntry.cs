@@ -1,4 +1,4 @@
-namespace Shuttle.WebClient.Models;
+namespace Shuttle.WebClient.Shared.Blogs;
 
 /// <summary>
 /// A blog article sourced from an embedded markdown file in the <c>BlogEntries</c> folder.

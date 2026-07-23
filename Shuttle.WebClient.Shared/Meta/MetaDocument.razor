@@ -1,0 +1,23 @@
+@namespace Shuttle.WebClient.Shared.Meta
+
+@* A minimal, self-contained HTML document whose <head> carries the meta tags. Rendered to a string
+   server-side (via HtmlRenderer) and returned to crawlers / Discord's unfurler, which only read the
+   head. The body is intentionally empty apart from a link back to the real app. *@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <MetaTags Metadata="Metadata" />
+</head>
+<body>
+    <a href="@Metadata.CanonicalUrl">@Metadata.Title</a>
+</body>
+</html>
+
+@code {
+    /// <summary>The page metadata to render into the document head.</summary>
+    [Parameter]
+    [EditorRequired]
+    public PageMetadata Metadata { get; set; } = default!;
+}

@@ -36,6 +36,7 @@
     <ItemGroup>
         <ProjectReference Include="..\Shuttle.Api.Client\Shuttle.Api.Client.csproj" />
         <ProjectReference Include="..\Shuttle.Models\Shuttle.Models.csproj" />
+        <ProjectReference Include="..\Shuttle.WebClient.Shared\Shuttle.WebClient.Shared.csproj" />
         <ProjectReference Include="..\Shuttle.WebClient.Testing\Shuttle.WebClient.Testing.csproj" />
     </ItemGroup>
 
@@ -45,11 +46,6 @@
 
     <ItemGroup>
       <AdditionalFiles Include="Components\Options\ShuttleOptionsContext.razor" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <None Remove="BlogEntries\**\*.md" />
-      <EmbeddedResource Include="BlogEntries\**\*.md" />
     </ItemGroup>
 
     <ItemGroup>
