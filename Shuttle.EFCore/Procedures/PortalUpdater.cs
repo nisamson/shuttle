@@ -60,6 +60,9 @@ public class PortalUpdater {
 
         await UpdatePlayerTpeEvents(players, token);
         dbContext.ChangeTracker.Clear();
+
+        await UpdatePlayerEarnedTpe(token);
+        dbContext.ChangeTracker.Clear();
     }
 
     private async Task UpdateUsers(IList<PlayerInfo> playerInfo, CancellationToken token = default) {
@@ -134,6 +137,10 @@ public class PortalUpdater {
     // Maximum number of concurrent TPE-timeline requests to the portal. The timeline endpoint is
     // per-player, so this bounds the fan-out while keeping the whole ingest from running serially.
     private const int TpeTimelineConcurrency = 8;
+
+    // Rows per earned-TPE merge batch. The endpoint returns ~11k rows across all seasons; merging
+    // them in one statement exceeds the SQL command timeout, so we merge in batches of this size.
+    private const int EarnedTpeMergeBatchSize = 2000;
 
     // Only ingest TPE timelines for players who are still progressing: active players, plus players
     // who retired recently enough that late-arriving TPE could still land. Long-retired, pending, and
@@ -213,5 +220,47 @@ public class PortalUpdater {
             .InsertWhenNotMatched()
             .UpdateWhenMatchedAnd((t, s) => t.TotalTpe != s.TotalTpe)
             .MergeAsync(token);
+    }
+
+    private async Task UpdatePlayerEarnedTpe(CancellationToken token = default) {
+        using var activity = ActivitySources.ShuttleEfCore.StartActivity();
+        logger.LogInformation("Updating player earned TPE");
+
+        // A single unfiltered call returns every player's per-season earned-TPE summary across all
+        // seasons, so we ingest the full history in one pass.
+        var entries = await portalClient.GetEarnedTpe(token: token);
+        logger.LogInformation("Got {Count} earned TPE entries from portal", entries.Count);
+        activity?.SetTag("earnedTpeCount", entries.Count);
+
+        // Collapse on the (PlayerId, Season) key so the merge source stays key-unique.
+        var earnedTpe = entries
+            .Select(PlayerEarnedTpe.FromShlApi)
+            .GroupBy(e => new { e.PlayerId, e.Season })
+            .Select(g => g.Last())
+            .ToList();
+
+        // Merge in batches: a single merge over all ~11k rows exceeds the SQL command timeout, so we
+        // chunk the source to keep each merge statement small enough to complete comfortably.
+        var totalChanged = 0;
+        foreach (var batch in earnedTpe.Chunk(EarnedTpeMergeBatchSize)) {
+            totalChanged += await dbContext.PlayerEarnedTpe.Merge()
+                .Using(batch)
+                .OnTargetKey()
+                .InsertWhenNotMatched()
+                .UpdateWhenMatchedAnd((t, s) =>
+                    t.EarnedTpe != s.EarnedTpe
+                    || t.Regression != s.Regression
+                    || t.ActivityCheck != s.ActivityCheck
+                    || t.Training != s.Training
+                    || t.TrainingCamp != s.TrainingCamp
+                    || t.Coaching != s.Coaching
+                    || t.Pt != s.Pt
+                    || t.Fantasy != s.Fantasy
+                    || t.Recruitment != s.Recruitment
+                    || t.Correction != s.Correction
+                    || t.Other != s.Other)
+                .MergeAsync(token);
+        }
+        logger.LogInformation("Changed {Count} player earned TPE entries", totalChanged);
     }
 }
