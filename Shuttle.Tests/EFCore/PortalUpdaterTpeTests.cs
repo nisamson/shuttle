@@ -133,17 +133,37 @@ public class PortalUpdaterTpeTests {
         Assert.Equal([6], batch.Select(p => p.PlayerId));
     }
 
+    // ---- RecentEarnedTpeSeasons ----
+
     [Fact]
-    public void SelectTpeBackfillBatch_OrdersByPlayerIdAndRespectsBatchSize() {
-        var players = new[] {
-            Player(30, PlayerStatus.Retired, retired: Now.AddDays(-200)),
-            Player(10, PlayerStatus.Retired, retired: Now.AddDays(-200)),
-            Player(20, PlayerStatus.Retired, retired: Now.AddDays(-200)),
-        };
+    public void RecentEarnedTpeSeasons_ReturnsCurrentAndPrevious_NewestFirst() {
+        Assert.Equal([67, 66], PortalUpdater.RecentEarnedTpeSeasons(67));
+    }
 
-        var batch = PortalUpdater.SelectTpeBackfillBatch(players, Now, new HashSet<int>(), batchSize: 2);
+    [Fact]
+    public void RecentEarnedTpeSeasons_ClampsToSeasonOne() {
+        Assert.Equal([1], PortalUpdater.RecentEarnedTpeSeasons(1));
+        Assert.Equal([2, 1], PortalUpdater.RecentEarnedTpeSeasons(2));
+    }
 
-        // Deterministic PlayerId ordering guarantees forward progress across runs.
-        Assert.Equal([10, 20], batch.Select(p => p.PlayerId));
+    // ---- EarnedTpeHistoryProbeSeason ----
+
+    [Fact]
+    public void EarnedTpeHistoryProbeSeason_ReturnsSeasonBelowWindow() {
+        // Window covers current + previous (67, 66); the probe is the season just below it.
+        Assert.Equal(65, PortalUpdater.EarnedTpeHistoryProbeSeason(67));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void EarnedTpeHistoryProbeSeason_NullWhenLeagueTooYoung(int currentSeason) {
+        // No season older than the refresh window exists, so there is nothing to backfill.
+        Assert.Null(PortalUpdater.EarnedTpeHistoryProbeSeason(currentSeason));
+    }
+
+    [Fact]
+    public void EarnedTpeHistoryProbeSeason_BoundaryAtSeasonThree() {
+        Assert.Equal(1, PortalUpdater.EarnedTpeHistoryProbeSeason(3));
     }
 }

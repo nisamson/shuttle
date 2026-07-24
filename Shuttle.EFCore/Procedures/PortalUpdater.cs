@@ -142,6 +142,11 @@ public class PortalUpdater {
     // them in one statement exceeds the SQL command timeout, so we merge in batches of this size.
     private const int EarnedTpeMergeBatchSize = 2000;
 
+    // Number of trailing seasons (current + preceding ones) whose earned-TPE totals we re-fetch on
+    // every run. Only these can still be revised; older seasons are treated as immutable and are
+    // fetched once (see UpdatePlayerEarnedTpe) rather than re-merged every run.
+    private const int EarnedTpeRefreshSeasons = 2;
+
     // When re-ingesting an already-tracked player's timeline, only the most recent points can
     // realistically change (late-applied tasks or retroactive corrections, including TPE decreases
     // from penalties). We therefore rebuild the merge source from just the entries within this
@@ -366,9 +371,7 @@ public class PortalUpdater {
         using var activity = ActivitySources.ShuttleEfCore.StartActivity();
         logger.LogInformation("Updating player earned TPE");
 
-        // A single unfiltered call returns every player's per-season earned-TPE summary across all
-        // seasons, so we ingest the full history in one pass.
-        var entries = await portalClient.GetEarnedTpe(token: token);
+        var entries = await FetchEarnedTpeEntries(token);
         logger.LogInformation("Got {Count} earned TPE entries from portal", entries.Count);
         activity?.SetTag("earnedTpeCount", entries.Count);
 
@@ -379,7 +382,7 @@ public class PortalUpdater {
             .Select(g => g.Last())
             .ToList();
 
-        // Merge in batches: a single merge over all ~11k rows exceeds the SQL command timeout, so we
+        // Merge in batches: a single merge over all rows exceeds the SQL command timeout, so we
         // chunk the source to keep each merge statement small enough to complete comfortably.
         var totalChanged = 0;
         foreach (var batch in earnedTpe.Chunk(EarnedTpeMergeBatchSize)) {
@@ -402,5 +405,68 @@ public class PortalUpdater {
                 .MergeAsync(token);
         }
         logger.LogInformation("Changed {Count} player earned TPE entries", totalChanged);
+    }
+
+    // Chooses the cheapest correct earned-TPE fetch. Completed seasons are immutable, so in steady
+    // state we only pull the current + previous season(s) instead of the full ~11k-row history. We
+    // fall back to a full-history fetch when either (a) there is no season data yet, or (b) the
+    // season just below the refresh window is missing from the DB (indicating older seasons were
+    // never ingested), so history is backfilled at least once and then kept incrementally.
+    private async Task<IList<EarnedTpeEntry>> FetchEarnedTpeEntries(CancellationToken token) {
+        var currentSeason = await dbContext.Seasons
+            .Select(s => (int?)s.Season)
+            .MaxAsync(token);
+
+        if (currentSeason is not { } season) {
+            logger.LogInformation("No season data available; fetching full earned-TPE history");
+            return await portalClient.GetEarnedTpe(token: token);
+        }
+
+        if (!await IsEarnedTpeHistoryComplete(season, token)) {
+            logger.LogInformation(
+                "Older earned-TPE seasons missing; fetching full history to backfill");
+            return await portalClient.GetEarnedTpe(token: token);
+        }
+
+        var recentSeasons = RecentEarnedTpeSeasons(season);
+        logger.LogInformation(
+            "Refreshing earned TPE for recent seasons {Seasons}",
+            string.Join(", ", recentSeasons));
+
+        var entries = new List<EarnedTpeEntry>();
+        foreach (var recent in recentSeasons) {
+            entries.AddRange(await portalClient.GetEarnedTpe(season: recent, token: token));
+        }
+
+        return entries;
+    }
+
+    // True when older earned-TPE history is already stored and can be skipped. We probe the single
+    // season just below the refresh window: because every season is refreshed while inside the
+    // window before it ages out, that season's presence implies all older seasons were captured on
+    // earlier runs. A young league with no such season needs no backfill.
+    private async Task<bool> IsEarnedTpeHistoryComplete(int currentSeason, CancellationToken token) {
+        if (EarnedTpeHistoryProbeSeason(currentSeason) is not { } probe) {
+            return true;
+        }
+
+        return await dbContext.PlayerEarnedTpe.AnyAsync(e => e.Season == probe, token);
+    }
+
+    // The trailing seasons whose earned-TPE totals can still change (current back through
+    // EarnedTpeRefreshSeasons - 1), clamped to season >= 1, newest first.
+    internal static IReadOnlyList<int> RecentEarnedTpeSeasons(int currentSeason) {
+        return Enumerable.Range(0, EarnedTpeRefreshSeasons)
+            .Select(offset => currentSeason - offset)
+            .Where(s => s >= 1)
+            .ToList();
+    }
+
+    // The season immediately below the refresh window, used to probe whether older history is
+    // present. Null when the league is too young to have a season older than the window (nothing to
+    // backfill).
+    internal static int? EarnedTpeHistoryProbeSeason(int currentSeason) {
+        var probe = currentSeason - EarnedTpeRefreshSeasons;
+        return probe >= 1 ? probe : null;
     }
 }
