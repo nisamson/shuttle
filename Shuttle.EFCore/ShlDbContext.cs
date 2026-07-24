@@ -43,6 +43,8 @@ public class ShlDbContext : DbContext {
     
     public DbSet<TpeEvent> TpeEvents { get; set; }
     
+    public DbSet<PlayerEarnedTpe> PlayerEarnedTpe { get; set; }
+    
     public DbSet<Team> Teams { get; set; }
 
     public DbSet<ScoutingTeam> ScoutingTeams { get; set; }

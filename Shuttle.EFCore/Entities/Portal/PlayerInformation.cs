@@ -86,6 +86,9 @@ public class PlayerInformation {
     // not part of update check
     public IList<TpeEvent> TpeEvents { get; set; } = null!;
 
+    // not part of update check
+    public IList<PlayerEarnedTpe> EarnedTpe { get; set; } = null!;
+
     public SkaterAttributes? SkaterAttributes { get; set; }
     public GoaltenderAttributes? GoaltenderAttributes { get; set; }
 
