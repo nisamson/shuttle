@@ -142,6 +142,18 @@ public class PortalUpdater {
     // them in one statement exceeds the SQL command timeout, so we merge in batches of this size.
     private const int EarnedTpeMergeBatchSize = 2000;
 
+    // When re-ingesting an already-tracked player's timeline, only the most recent points can
+    // realistically change (late-applied tasks or retroactive corrections, including TPE decreases
+    // from penalties). We therefore rebuild the merge source from just the entries within this
+    // window back from the player's stored latest TaskDate (plus anything newer), skipping the
+    // long, static history. The merge keys on TaskDate, so decreases within the window still apply.
+    private static readonly TimeSpan TpeOverlapWindow = TimeSpan.FromDays(30);
+
+    // Number of never-backfilled retired players to process per run in the rolling backfill. Bounds
+    // the extra per-run fan-out while the historical catch-up works through the cold (long-retired)
+    // population; once every retired player is marked, the steady-state backfill cost is zero.
+    private const int BackfillBatchSize = 200;
+
     // Only ingest TPE timelines for players who are still progressing: active players, plus players
     // who retired recently enough that late-arriving TPE could still land. Long-retired, pending, and
     // denied players have static (or non-existent) timelines, so skipping them avoids wasted calls.
@@ -162,11 +174,104 @@ public class PortalUpdater {
             eligible.Count,
             playerInfo.Count);
 
+        // Pre-fetch each eligible player's latest stored TaskDate in one round trip so the per-player
+        // merge can be trimmed to just the recent overlap window instead of re-merging the whole
+        // history. Players with no rows yet are absent here and fall through to a full merge.
+        var eligibleIds = eligible.Select(p => p.PlayerId).ToHashSet();
+        var lastTaskDates = await dbContext.TpeEvents
+            .Where(e => eligibleIds.Contains(e.PlayerId))
+            .GroupBy(e => e.PlayerId)
+            .Select(g => new { PlayerId = g.Key, LastTaskDate = g.Max(e => e.TaskDate) })
+            .ToDictionaryAsync(x => x.PlayerId, x => x.LastTaskDate, token);
+
+        var totalChanged = await IngestTpeTimelines(
+            eligible,
+            playerId => lastTaskDates.TryGetValue(playerId, out var last) ? last - TpeOverlapWindow : null,
+            onProcessed: null,
+            logLabel: "TPE timelines",
+            token: token);
+
+        logger.LogInformation("Changed {Count} player TPE events", totalChanged);
+
+        await BackfillRetiredPlayerTpeEvents(playerInfo, nowUtc, token);
+    }
+
+    // Rolling one-time catch-up for retired players who aged out of the hot path's grace window
+    // before their timeline was ever ingested. Each run processes a bounded batch of retired players
+    // not yet recorded in TpeTimelineBackfills, ordered by PlayerId, and marks every processed player
+    // (even those with empty timelines) so the batch always advances and never re-fetches them.
+    private async Task BackfillRetiredPlayerTpeEvents(IList<PlayerInfo> playerInfo, DateTime nowUtc, CancellationToken token = default) {
+        using var activity = ActivitySources.ShuttleEfCore.StartActivity();
+
+        // Retired players not already covered by the hot path (i.e. outside the grace window).
+        var coldRetired = playerInfo
+            .Where(p => p.Status == PlayerStatus.Retired && !ShouldIngestTpeEvents(p, nowUtc))
+            .Select(p => p.PlayerId)
+            .ToHashSet();
+
+        if (coldRetired.Count == 0) {
+            return;
+        }
+
+        var alreadyBackfilled = await dbContext.TpeTimelineBackfills
+            .Where(b => coldRetired.Contains(b.PlayerId))
+            .Select(b => b.PlayerId)
+            .ToHashSetAsync(token);
+
+        var batch = SelectTpeBackfillBatch(playerInfo, nowUtc, alreadyBackfilled, BackfillBatchSize);
+
+        if (batch.Count == 0) {
+            logger.LogInformation("No retired players pending TPE backfill");
+            return;
+        }
+
+        activity?.SetTag("backfillBatch", batch.Count);
+        logger.LogInformation("Backfilling TPE timelines for {Count} retired players", batch.Count);
+
+        // Full merge for these players (first ingest); collect every processed id so all get marked.
+        var processedIds = new List<int>(batch.Count);
+        var totalChanged = await IngestTpeTimelines(
+            batch,
+            _ => null,
+            onProcessed: processedIds.Add,
+            logLabel: "TPE backfill",
+            token: token);
+
+        var markedAt = DateTime.UtcNow;
+        var markers = processedIds
+            .Select(id => new TpeTimelineBackfill { PlayerId = id, BackfilledAt = markedAt })
+            .ToList();
+
+        var marked = await dbContext.TpeTimelineBackfills.Merge()
+            .Using(markers)
+            .OnTargetKey()
+            .InsertWhenNotMatched()
+            .MergeAsync(token);
+
+        logger.LogInformation(
+            "Backfilled {Players} retired players ({Changed} TPE events, {Marked} new markers)",
+            processedIds.Count,
+            totalChanged,
+            marked);
+    }
+
+    // Shared pipeline: fetch each player's timeline concurrently, then merge one player at a time (a
+    // single merge over everyone is large enough to time out, and the shared DbContext isn't
+    // thread-safe). mergeFrom returns the per-player overlap cutoff (null = full merge); onProcessed,
+    // if supplied, is invoked on the serialized merge worker with each processed player id.
+    private async Task<int> IngestTpeTimelines(
+        IReadOnlyList<PlayerInfo> players,
+        Func<int, DateTime?> mergeFrom,
+        Action<int>? onProcessed,
+        string logLabel,
+        CancellationToken token) {
+        if (players.Count == 0) {
+            return 0;
+        }
+
         var totalChanged = 0;
         var processed = 0;
 
-        // Fetch timelines concurrently but merge them one player at a time: a single merge over every
-        // player's events is large enough to time out, and the shared DbContext isn't thread-safe.
         var fetchBlock = new TransformBlock<PlayerInfo, (int PlayerId, IList<TpeTimelineEntry> Timeline)>(
             async player => (player.PlayerId, await portalClient.GetTpeTimeline(player.PlayerId, token)),
             new ExecutionDataflowBlockOptions {
@@ -177,9 +282,10 @@ public class PortalUpdater {
 
         var mergeBlock = new ActionBlock<(int PlayerId, IList<TpeTimelineEntry> Timeline)>(
             async item => {
-                totalChanged += await MergePlayerTpeEvents(item.PlayerId, item.Timeline, token);
+                totalChanged += await MergePlayerTpeEvents(item.PlayerId, item.Timeline, mergeFrom(item.PlayerId), token);
+                onProcessed?.Invoke(item.PlayerId);
                 if (++processed % 100 == 0) {
-                    logger.LogInformation("Ingested TPE timelines for {Processed}/{Total} players", processed, eligible.Count);
+                    logger.LogInformation("Ingested {Label} for {Processed}/{Total} players", logLabel, processed, players.Count);
                 }
             },
             new ExecutionDataflowBlockOptions {
@@ -191,31 +297,65 @@ public class PortalUpdater {
 
         fetchBlock.LinkTo(mergeBlock, new DataflowLinkOptions { PropagateCompletion = true });
 
-        foreach (var player in eligible) {
+        foreach (var player in players) {
             await fetchBlock.SendAsync(player, token);
         }
 
         fetchBlock.Complete();
         await mergeBlock.Completion;
 
-        logger.LogInformation("Changed {Count} player TPE events", totalChanged);
+        return totalChanged;
     }
 
-    private async Task<int> MergePlayerTpeEvents(int playerId, IList<TpeTimelineEntry> timeline, CancellationToken token) {
+    // Selects the next bounded batch of retired players still needing a TPE backfill: retired,
+    // outside the hot path's grace window, and not yet marked in TpeTimelineBackfills. Ordered by
+    // PlayerId so the rolling backfill advances deterministically across runs.
+    internal static IReadOnlyList<PlayerInfo> SelectTpeBackfillBatch(
+        IEnumerable<PlayerInfo> players,
+        DateTime nowUtc,
+        ISet<int> alreadyBackfilled,
+        int batchSize) {
+        return players
+            .Where(p => p.Status == PlayerStatus.Retired
+                        && !ShouldIngestTpeEvents(p, nowUtc)
+                        && !alreadyBackfilled.Contains(p.PlayerId))
+            .OrderBy(p => p.PlayerId)
+            .Take(batchSize)
+            .ToList();
+    }
+
+    // Builds the key-unique merge source for a player's timeline. Collapses duplicate TaskDates
+    // (keeping the last), and, when mergeFrom is supplied, trims to just entries at/after the cutoff
+    // so an already-tracked player's static history isn't re-merged. Keyed on TaskDate, so a within-
+    // window TotalTpe change (including a decrease) is still surfaced to the merge.
+    internal static IReadOnlyList<TpeEvent> BuildTpeMergeSource(
+        int playerId,
+        IEnumerable<TpeTimelineEntry> timeline,
+        DateTime? mergeFrom) {
+        var events = timeline
+            .Select(entry => TpeEvent.FromShlApi(playerId, entry))
+            .GroupBy(e => e.TaskDate)
+            .Select(g => g.Last());
+
+        if (mergeFrom is { } cutoff) {
+            events = events.Where(e => e.TaskDate >= cutoff);
+        }
+
+        return events.ToList();
+    }
+
+    private async Task<int> MergePlayerTpeEvents(int playerId, IList<TpeTimelineEntry> timeline, DateTime? mergeFrom, CancellationToken token) {
         if (timeline.Count == 0) {
             return 0;
         }
 
-        // The portal can, in principle, return more than one entry for the same timestamp; collapse
-        // on TaskDate (playerId is fixed here) so this player's merge source stays key-unique.
-        var events = timeline
-            .Select(entry => TpeEvent.FromShlApi(playerId, entry))
-            .GroupBy(e => e.TaskDate)
-            .Select(g => g.Last())
-            .ToList();
+        var source = BuildTpeMergeSource(playerId, timeline, mergeFrom);
+        if (source.Count == 0) {
+            return 0;
+        }
 
         return await dbContext.TpeEvents.Merge()
-            .Using(events)
+            .Using(source)
             .OnTargetKey()
             .InsertWhenNotMatched()
             .UpdateWhenMatchedAnd((t, s) => t.TotalTpe != s.TotalTpe)

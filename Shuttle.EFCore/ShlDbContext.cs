@@ -45,6 +45,8 @@ public class ShlDbContext : DbContext {
     
     public DbSet<PlayerEarnedTpe> PlayerEarnedTpe { get; set; }
     
+    public DbSet<TpeTimelineBackfill> TpeTimelineBackfills { get; set; }
+    
     public DbSet<Team> Teams { get; set; }
 
     public DbSet<ScoutingTeam> ScoutingTeams { get; set; }
