@@ -129,7 +129,7 @@ public class PortalUpdater {
             .Using(indexEntries)
             .OnTargetKey()
             .InsertWhenNotMatched()
-            .UpdateWhenMatched()
+            .UpdateWhenMatchedAnd((t, s) => t.UserId != s.UserId || t.IndexId != s.IndexId)
             .MergeAsync(token);
         logger.LogInformation("Changed {Count} player index entries", changed);
     }
