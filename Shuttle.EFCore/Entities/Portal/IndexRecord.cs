@@ -29,6 +29,5 @@ public class IndexRecordConfiguration : IEntityTypeConfiguration<IndexRecord> {
             .OnDelete(DeleteBehavior.Cascade);
         builder.HasIndex(r => r.UserId);
         builder.HasIndex(r => r.IndexId);
-        builder.AddTemporalTableSupport();
     }
 }
