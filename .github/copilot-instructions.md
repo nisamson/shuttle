@@ -72,7 +72,9 @@ Prefer purpose-built tooling over raw shell commands:
   hierarchy, rename, symbol search) instead of `grep`/text search for symbols.
 - **Installed skills** — use any available skill (repository `.github/skills` and plugin/user
   skills, e.g. testing, coverage/CRAP, MSBuild, EF Core, performance, testability) for its
-  specialized workflow instead of ad-hoc commands.
+  specialized workflow instead of ad-hoc commands. In particular, use the **`querying-json`**
+  skill when manipulating or analyzing JSON data (querying, filtering, or extracting fields)
+  rather than reading whole JSON files.
 - **Relevant MCP servers** — Fluent UI Blazor, NuGet, Microsoft Learn, MSBuild binlog, GitHub —
   when they fit the task, before falling back to raw `dotnet`/`git`/HTTP commands.
 
