@@ -96,7 +96,7 @@ public class PortalUpdater {
             .ToDictionaryAsync(p => p.PlayerId, token);
 
         foreach (var playerEntity in playerEntities) {
-            logger.LogInformation("Updating player information for {PlayerId}", playerEntity.PlayerId);
+            logger.LogDebug("Updating player information for {PlayerId}", playerEntity.PlayerId);
             if (dbEntities.TryGetValue(playerEntity.PlayerId, out var dbEntity)) {
                 if (dbEntity.UpdateFrom(playerEntity)) {
                     dbContext.PlayerInformation.Update(dbEntity);
