@@ -31,6 +31,15 @@ public class AnalysisFlowRegistryTests {
     }
 
     [Fact]
+    public void CreateDefault_RegistersRecruitmentDatabaseFlow() {
+        var registry = AnalysisFlowRegistry.CreateDefault();
+
+        Assert.True(registry.TryGet("recruitment", out var flow));
+        Assert.NotNull(flow);
+        Assert.Equal(FlowDataSource.Database, flow!.DataSource);
+    }
+
+    [Fact]
     public void TryGet_ResolvesRegisteredFlowCaseInsensitively() {
         var flow = new StubFlow("draft-success");
         var registry = new AnalysisFlowRegistry([flow]);

@@ -170,6 +170,41 @@ dotnet run --project Shuttle.Analysis -- analyze --flow player-summary [-d <db>]
 Needs the DB env vars + `az login` (see Prerequisites); it resolves `ShlDbContext` from
 `context.GetRequiredService<ShlDbContext>()`.
 
+## 3c. Built-in flow: `recruitment` (database)
+
+A **database-backed** flow that studies the `PlayerInformation.Recruiter` free-text field. Each
+recruiter value is classified as **Player** (matches an `ShlUser.Name`, case-insensitive; casing
+normalized to the member's canonical name), **Self** (`"Myself"`), **None** (blank/whitespace),
+or **External** (anything else, e.g. Google/Reddit). Recruitment is **consolidated by recruited
+member** — a member's recruiter comes from their earliest-created player — and each recruiter
+reports the members recruited plus those members' combined **career TPE** (sum, over each
+recruited member's players, of each player's latest timeline `TotalTpe`).
+
+```
+dotnet run --project Shuttle.Analysis -- analyze --flow recruitment [-d <db>] [-o <dir>] [--arg top=20] [--arg format=svg]
+```
+
+- Arguments: `top` (optional, integer ≥ 1, default 20) limits the bar graphs to the top N
+  recruiters; `format` (optional, `png` | `svg`, default `png`) selects the bar-graph format.
+- Outputs (into the output dir):
+  - `recruiter-counts.csv` — `recruiter, category, recruitedUsers, totalCareerTpe, lineageUsers, lineageCareerTpe`
+  - `recruitment-edges.csv` — `recruiter, category, userId, username, careerTpe`
+  - `recruiter-category-summary.csv` — `category, distinctRecruiters, recruitedUsers, totalCareerTpe`
+  - `recruitment-full.dot` — GraphViz recruiter→member graph, colored by category
+  - `player-recruiter-network.dot` — GraphViz member→member network (Player-category recruiters)
+  - `top-recruiters.<ext>` / `top-recruiters-tpe.<ext>` / `top-recruiters-lineage-tpe.<ext>` — top-N
+    bar graphs by members recruited, by direct-recruit career TPE, and by full-lineage career TPE
+  - `recruiter-category-breakdown.<ext>` — recruited members per category
+
+`totalCareerTpe`/`recruitedUsers` count only **direct** recruits; `lineageCareerTpe`/`lineageUsers`
+roll up the recruiter's **full transitive lineage** (every member reachable through the recruit-of
+chain, counted once).
+
+The query, classification, and aggregation live in `Shuttle.EFCore`
+(`Recruitment/`: `IRecruitmentAnalysisService`, `RecruitmentAnalyzer`, result records) so the
+API server can reuse them; the flow only renders CSV/DOT/bar-graph output. Bar graphs use
+**ScottPlot** (SkiaSharp, no system dependencies). Needs the DB env vars + `az login`.
+
 ## 4. Add a new scenario
 
 1. Create a class deriving from `AnalysisFlowBase` in `Shuttle.Analysis/Flows/` with a
@@ -206,4 +241,4 @@ dotnet test Shuttle.Tests/Shuttle.Tests.csproj --filter "FullyQualifiedName~Shut
 
 Framework/flow tests: `Shuttle.Tests/Analysis/CsvDataIngestorTests.cs`,
 `AnalysisFlowRegistryTests.cs`, `AnalysisFlowContextTests.cs`, `FlowArgumentsTests.cs`,
-`KMeansCentroidFlowTests.cs`.
+`KMeansCentroidFlowTests.cs`, `RecruitmentAnalyzerTests.cs`, `RecruitmentDotWriterTests.cs`.

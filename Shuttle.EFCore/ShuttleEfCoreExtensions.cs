@@ -30,6 +30,7 @@ public static class ShuttleEfCoreExtensions {
             }
         );
         builder.Services.AddScoped<IDbConnectionResilienceService<ShlDbContext>, ShlDbConnectionResilienceService>();
+        builder.Services.AddScoped<Recruitment.IRecruitmentAnalysisService, Recruitment.RecruitmentAnalysisService>();
         builder.ConfigureEfCoreLogging();
         return builder;
     }

@@ -5,6 +5,7 @@
     <MicrosoftIdentityWebVersion>4.12.0</MicrosoftIdentityWebVersion>
     <FluentUIVersion>5.0.0-rc.4-26180.1</FluentUIVersion>
     <OpenTelemetryVersion>1.15.3</OpenTelemetryVersion>
+    <ScottPlotVersion>5.1.59</ScottPlotVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="AccessibleColors" Version="1.0.10" />
@@ -42,6 +43,7 @@
     <PackageVersion Include="Microsoft.Authentication.WebAssembly.Msal" Version="10.0.3" />
     <PackageVersion Include="Microsoft.Azure.Functions.Worker" Version="2.51.0" />
     <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.2.3" />
+    <PackageVersion Include="ScottPlot" Version="$(ScottPlotVersion)" />
     <PackageVersion Include="Microsoft.Azure.Functions.Worker.ApplicationInsights" Version="2.50.0" />
     <PackageVersion Include="Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore" Version="2.1.0" />
     <PackageVersion Include="Microsoft.Azure.Functions.Worker.Sdk" Version="2.0.7" />
