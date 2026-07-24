@@ -142,6 +142,12 @@ public class PortalUpdater {
     // them in one statement exceeds the SQL command timeout, so we merge in batches of this size.
     private const int EarnedTpeMergeBatchSize = 2000;
 
+    // Rows per TPE-timeline merge batch. The timeline ingest is bound by the serialized MERGE round
+    // trips to SQL, not by the HTTP fetch, so we accumulate many players' (windowed) sources and
+    // merge them together instead of one round trip per player. Bounded by row count to keep each
+    // MERGE statement well under the command timeout (mirrors EarnedTpeMergeBatchSize).
+    private const int TpeMergeBatchSize = 2000;
+
     // Number of trailing seasons (current + preceding ones) whose earned-TPE totals we re-fetch on
     // every run. Only these can still be revised; older seasons are treated as immutable and are
     // fetched once (see UpdatePlayerEarnedTpe) rather than re-merged every run.
@@ -260,10 +266,13 @@ public class PortalUpdater {
             marked);
     }
 
-    // Shared pipeline: fetch each player's timeline concurrently, then merge one player at a time (a
-    // single merge over everyone is large enough to time out, and the shared DbContext isn't
-    // thread-safe). mergeFrom returns the per-player overlap cutoff (null = full merge); onProcessed,
-    // if supplied, is invoked on the serialized merge worker with each processed player id.
+    // Shared pipeline: fetch each player's timeline concurrently and build its (windowed, key-unique)
+    // merge source off the shared portal client, then accumulate those sources and merge them in
+    // row-bounded batches on a single serialized worker. The phase is bound by the MERGE round trips
+    // to SQL rather than the HTTP fetch, so batching many players per MERGE (instead of one merge per
+    // player) is the dominant win; a single worker also keeps the shared DbContext access serialized.
+    // mergeFrom returns the per-player overlap cutoff (null = full merge); onProcessed, if supplied,
+    // is invoked on the serialized worker with each processed player id (regardless of event count).
     private async Task<int> IngestTpeTimelines(
         IReadOnlyList<PlayerInfo> players,
         Func<int, DateTime?> mergeFrom,
@@ -277,20 +286,29 @@ public class PortalUpdater {
         var totalChanged = 0;
         var processed = 0;
 
-        var fetchBlock = new TransformBlock<PlayerInfo, (int PlayerId, IList<TpeTimelineEntry> Timeline)>(
-            async player => (player.PlayerId, await portalClient.GetTpeTimeline(player.PlayerId, token)),
+        var fetchBlock = new TransformBlock<PlayerInfo, (int PlayerId, IReadOnlyList<TpeEvent> Source)>(
+            async player => {
+                var timeline = await portalClient.GetTpeTimeline(player.PlayerId, token);
+                var source = BuildTpeMergeSource(player.PlayerId, timeline, mergeFrom(player.PlayerId));
+                return (player.PlayerId, source);
+            },
             new ExecutionDataflowBlockOptions {
                 MaxDegreeOfParallelism = TpeTimelineConcurrency,
                 BoundedCapacity = TpeTimelineConcurrency * 2,
                 CancellationToken = token,
             });
 
-        var mergeBlock = new ActionBlock<(int PlayerId, IList<TpeTimelineEntry> Timeline)>(
+        var buffer = new List<TpeEvent>(TpeMergeBatchSize + 128);
+        var mergeBlock = new ActionBlock<(int PlayerId, IReadOnlyList<TpeEvent> Source)>(
             async item => {
-                totalChanged += await MergePlayerTpeEvents(item.PlayerId, item.Timeline, mergeFrom(item.PlayerId), token);
                 onProcessed?.Invoke(item.PlayerId);
+                buffer.AddRange(item.Source);
                 if (++processed % 100 == 0) {
                     logger.LogInformation("Ingested {Label} for {Processed}/{Total} players", logLabel, processed, players.Count);
+                }
+                if (buffer.Count >= TpeMergeBatchSize) {
+                    totalChanged += await MergeTpeEventBatch(buffer, token);
+                    buffer.Clear();
                 }
             },
             new ExecutionDataflowBlockOptions {
@@ -308,6 +326,13 @@ public class PortalUpdater {
 
         fetchBlock.Complete();
         await mergeBlock.Completion;
+
+        // Flush the trailing partial batch. The merge worker has completed, so the buffer is no
+        // longer being mutated and is safe to read here.
+        if (buffer.Count > 0) {
+            totalChanged += await MergeTpeEventBatch(buffer, token);
+            buffer.Clear();
+        }
 
         return totalChanged;
     }
@@ -349,12 +374,11 @@ public class PortalUpdater {
         return events.ToList();
     }
 
-    private async Task<int> MergePlayerTpeEvents(int playerId, IList<TpeTimelineEntry> timeline, DateTime? mergeFrom, CancellationToken token) {
-        if (timeline.Count == 0) {
-            return 0;
-        }
-
-        var source = BuildTpeMergeSource(playerId, timeline, mergeFrom);
+    // Merges a batch of TPE events spanning many players in a single statement. The source is keyed
+    // on the target's composite (PlayerId, TaskDate) key, so combining players is safe; each source
+    // is already de-duplicated per player by BuildTpeMergeSource. Insert new points and only update
+    // an existing point when its TotalTpe actually changed (covers late corrections, incl. decreases).
+    private async Task<int> MergeTpeEventBatch(IReadOnlyList<TpeEvent> source, CancellationToken token) {
         if (source.Count == 0) {
             return 0;
         }
