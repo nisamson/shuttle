@@ -91,7 +91,12 @@ var flowOption = new Option<string?>("--flow", "-f") {
 };
 
 var flowInputOption = new Option<FileInfo?>("--input", "-i") {
-    Description = "Path of the CSV data file (produced by download-players) to ingest and analyze.",
+    Description = "Path of the CSV data file (produced by download-players) to ingest and analyze. "
+                  + "Required for CSV-based flows; ignored by database-backed flows.",
+};
+
+var flowDatabaseOption = new Option<string?>("--database", "-d") {
+    Description = "Overrides the SHUTTLESQLSERVER_DATABASE database (catalog) name for database-backed flows.",
 };
 
 var flowOutputOption = new Option<DirectoryInfo?>("--output", "-o") {
@@ -114,6 +119,7 @@ var analyzeCommand = new Command(
 ) {
     flowOption,
     flowInputOption,
+    flowDatabaseOption,
     flowOutputOption,
     listFlowsOption,
     flowArgOption,
@@ -140,11 +146,7 @@ analyzeCommand.SetAction((parseResult, cancellationToken) => {
     }
 
     var input = parseResult.GetValue(flowInputOption);
-    if (input is null) {
-        Console.Error.WriteLine("An input file is required. Pass --input <file>.");
-        return Task.FromResult(1);
-    }
-
+    var database = parseResult.GetValue(flowDatabaseOption);
     var output = parseResult.GetValue(flowOutputOption) ?? new DirectoryInfo("analysis-output");
 
     IReadOnlyDictionary<string, string> arguments;
@@ -155,7 +157,7 @@ analyzeCommand.SetAction((parseResult, cancellationToken) => {
         return Task.FromResult(1);
     }
 
-    return AnalysisFlowRunner.RunAsync(flow, input, output, analysisRegistry, arguments, cancellationToken);
+    return AnalysisFlowRunner.RunAsync(flow, input, output, analysisRegistry, arguments, database, cancellationToken);
 });
 
 rootCommand.Subcommands.Add(analyzeCommand);

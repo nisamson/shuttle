@@ -33,20 +33,22 @@ namespace Shuttle.Analysis.Flows;
 /// <c>{group}-centroids.csv</c> (<c>clusterId, clusterSize, &lt;stats…&gt;</c>).
 /// </para>
 /// </remarks>
-public sealed class KMeansCentroidFlow : IDataAnalysisFlow {
+public sealed class KMeansCentroidFlow : AnalysisFlowBase {
 
     private const string SkaterPrefix = "skaterAttributes.";
     private const string GoaltenderPrefix = "goaltenderAttributes.";
     private const string PlayerIdColumn = "playerId";
     private const string NameColumn = "name";
 
-    public string Name => "kmeans-centroids";
+    public override string Name => "kmeans-centroids";
 
-    public string Description =>
+    public override string Description =>
         "K-means clustering of players by stat vector; reports each cluster's centroid and medoid player.";
 
-    public async Task<AnalysisFlowResult> RunAsync(AnalysisContext context, CancellationToken cancellationToken) {
+    public override async Task<AnalysisFlowResult> RunAsync(AnalysisContext context, CancellationToken cancellationToken) {
         ArgumentNullException.ThrowIfNull(context);
+
+        var data = context.RequireData();
 
         int k;
         try {
@@ -62,11 +64,11 @@ public sealed class KMeansCentroidFlow : IDataAnalysisFlow {
         var seed = context.TryGetArgument("seed", out _) ? context.GetOptionalInt("seed", 0) : (int?)null;
         var mlContext = seed is { } s ? new MLContext(s) : context.MLContext;
 
-        var skaterFeatures = FeatureColumns(context.Data, SkaterPrefix);
-        var goaltenderFeatures = FeatureColumns(context.Data, GoaltenderPrefix);
+        var skaterFeatures = FeatureColumns(data, SkaterPrefix);
+        var goaltenderFeatures = FeatureColumns(data, GoaltenderPrefix);
 
-        var skaterRows = Partition(context.Data, skaterFeatures);
-        var goaltenderRows = Partition(context.Data, goaltenderFeatures);
+        var skaterRows = Partition(data, skaterFeatures);
+        var goaltenderRows = Partition(data, goaltenderFeatures);
 
         var processed = new List<string>();
 

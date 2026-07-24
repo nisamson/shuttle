@@ -51,5 +51,6 @@ public sealed class AnalysisFlowRegistry {
     public static AnalysisFlowRegistry CreateDefault() =>
         new([
             new KMeansCentroidFlow(),
+            new PlayerSummaryFlow(),
         ]);
 }
