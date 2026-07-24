@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Quartz;
 using Shuttle.EFCore.Procedures;
 
@@ -27,7 +28,11 @@ public class DbUpdateJob : ISelfRegisteringJob {
 
     public async Task Execute(IJobExecutionContext context) {
         var token = context.CancellationToken;
-        using var activity = ActivitySources.ShuttleApi.StartActivity();
+        // Server kind so Azure Monitor maps this to a request/operation that anchors the
+        // background job's child spans (index/portal updates); background jobs have no
+        // incoming HTTP request to otherwise anchor the trace. Explicit name keeps the
+        // operation stable regardless of the method name.
+        using var activity = ActivitySources.ShuttleApi.StartActivity("ExecuteDbUpdate", ActivityKind.Server);
         logger.LogInformation("Starting database update");
         await indexUpdater.UpdateIndex(token);
         logger.LogInformation("Finished index update");
