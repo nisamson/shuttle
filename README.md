@@ -33,7 +33,7 @@ or a recreate — so scouts can evaluate draftees at a glance.
 
 - **`Shuttle.Api`** — ASP.NET Core Web API that serves the backend and hosts scheduled
   background ingestion jobs (Quartz.NET, persistent SQL job store).
-- **`Shuttle.WebClient`** — Blazor WebAssembly (standalone) front end built with MudBlazor.
+- **`Shuttle.WebClient`** — Blazor WebAssembly (standalone) front end built with Fluent UI Blazor.
 
 **Shared libraries**
 
