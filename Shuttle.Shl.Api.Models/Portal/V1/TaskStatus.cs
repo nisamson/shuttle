@@ -12,12 +12,17 @@ public enum TaskStatus {
     [JsonStringEnumMemberName("SHL/Send-down")]
     ShlOrSendDown,
     [JsonStringEnumMemberName("Retired")]
-    Retired
+    Retired,
+    // Appended (not reordered): TaskStatus is persisted as an int on PlayerInformation,
+    // so existing ordinal values (0-3) must stay stable. JSON maps by name, not ordinal.
+    [JsonStringEnumMemberName("Pending Approval")]
+    PendingApproval
 }
 
 public static class TaskStatusExtensions {
     extension(TaskStatus @this) {
         public string ToValueString() => @this switch {
+            TaskStatus.PendingApproval => "Pending Approval",
             TaskStatus.DrafteeFreeAgent => "Draftee Free Agent",
             TaskStatus.SmjhlRookie => "SMJHL Rookie",
             TaskStatus.ShlOrSendDown => "SHL/Send-down",
@@ -26,6 +31,7 @@ public static class TaskStatusExtensions {
         };
         
         public static TaskStatus FromString(string status) => status.ToLower() switch {
+            "pending approval" => TaskStatus.PendingApproval,
             "draftee free agent" => TaskStatus.DrafteeFreeAgent,
             "smjhl rookie" => TaskStatus.SmjhlRookie,
             "shl/send-down" => TaskStatus.ShlOrSendDown,

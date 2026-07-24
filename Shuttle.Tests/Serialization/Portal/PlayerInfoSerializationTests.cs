@@ -2,6 +2,7 @@
 using System.Text.Json.Serialization;
 using Shuttle.Shl.Api.Models.Portal.V1;
 using Shuttle.Tests.Utilites;
+using TaskStatus = Shuttle.Shl.Api.Models.Portal.V1.TaskStatus;
 
 namespace Shuttle.Tests.Serialization.Portal;
 
@@ -75,6 +76,19 @@ public class PlayerInfoSerializationTests {
         Assert.NotNull(deserializedAgain);
         Assert.Equivalent(playerInfoList, deserializedAgain);
     }
-    
-    
+
+    [Theory]
+    [InlineData("Draftee Free Agent", TaskStatus.DrafteeFreeAgent)]
+    [InlineData("SMJHL Rookie", TaskStatus.SmjhlRookie)]
+    [InlineData("SHL/Send-down", TaskStatus.ShlOrSendDown)]
+    [InlineData("Retired", TaskStatus.Retired)]
+    [InlineData("Pending Approval", TaskStatus.PendingApproval)]
+    public void DeserializeTaskStatusValues(string wireValue, TaskStatus expected) {
+        var json = $"\"{wireValue}\"";
+        var deserialized = JsonSerializer.Deserialize<TaskStatus>(json);
+        Assert.Equal(expected, deserialized);
+        Assert.Equal(json, JsonSerializer.Serialize(deserialized));
+    }
+
+
 }

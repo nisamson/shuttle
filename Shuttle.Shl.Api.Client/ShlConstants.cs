@@ -33,11 +33,17 @@ public static class ShlConstants {
             BackoffType = DelayBackoffType.Exponential,
             Delay = TimeSpan.FromSeconds(1),
         };
+        // Throttles outbound calls to the upstream SHL APIs to stay a polite client. ~30 req/s
+        // sustained (30 tokens/s) with a burst of up to 100; QueueLimit lets the per-player fan-out
+        // (e.g. the TPE-timeline ingest) wait its turn in the limiter and pace smoothly instead of
+        // being rejected and retried. Raised from the original ~10 req/s to speed up the batch
+        // updaters; can be dialed back if the upstream operators ask.
         var rateLimiterOptions = new TokenBucketRateLimiterOptions() {
             AutoReplenishment = true,
             TokenLimit = 100,
-            TokensPerPeriod = 100,
-            ReplenishmentPeriod = TimeSpan.FromSeconds(10)
+            TokensPerPeriod = 30,
+            ReplenishmentPeriod = TimeSpan.FromSeconds(1),
+            QueueLimit = 64,
         };
 
         var rateLimiter = new TokenBucketRateLimiter(rateLimiterOptions);

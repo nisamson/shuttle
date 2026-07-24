@@ -43,4 +43,8 @@
       <Folder Include="Instrumentation\" />
     </ItemGroup>
 
+    <ItemGroup>
+        <InternalsVisibleTo Include="Shuttle.Tests" />
+    </ItemGroup>
+
 </Project>
