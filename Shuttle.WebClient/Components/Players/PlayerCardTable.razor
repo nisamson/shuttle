@@ -29,7 +29,7 @@
             } else {
                 @foreach (var p in Players) {
                     <tr>
-                        <td><a class="player-link" href="@PlayerRoute(p.PlayerId)">@p.Name</a></td>
+                        <td><a class="emphasized-link" href="@PlayerRoute(p.PlayerId)">@p.Name</a></td>
                         <td>
                             @if (p.UserId == SuppressUserLinkFor) {
                                 @p.Username
@@ -47,7 +47,7 @@
                             @if (p.Recreate) {
                                 <FluentBadge Appearance="BadgeAppearance.Outline" Color="BadgeColor.Informative" title="Recreate — not the member's first player">Recreate</FluentBadge>
                             } else {
-                                <FluentBadge Appearance="BadgeAppearance.Filled" Color="BadgeColor.Success" title="First-gen — the member's first player">First-gen</FluentBadge>
+                                <FluentBadge Appearance="BadgeAppearance.Filled" Color="BadgeColor.Success" title="Portal First-gen — the member's first player on the portal (they may have had players before the portal existed)">Portal First-gen</FluentBadge>
                             }
                             @if (p.Inactive) {
                                 <FluentBadge Appearance="BadgeAppearance.Filled" Color="BadgeColor.Severe" title="Inactive on-site">Inactive</FluentBadge>

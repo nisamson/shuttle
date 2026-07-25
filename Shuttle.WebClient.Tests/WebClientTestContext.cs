@@ -24,6 +24,7 @@ public abstract class WebClientTestContext : BunitContext {
         Services.AddFluentUIComponents();
         Services.AddSingleton<IShuttlePlayerClient>(new InMemoryShuttlePlayerClient());
         Services.AddSingleton<IShuttleLeagueClient>(new InMemoryShuttleLeagueClient());
+        Services.AddSingleton<IShuttleRecruitmentClient>(new InMemoryShuttleRecruitmentClient());
         Services.AddSingleton<IShuttleUserClient>(new InMemoryShuttleUserClient());
         Services.AddSingleton<IShuttleDebugClient>(new InMemoryShuttleDebugClient());
         Services.AddSingleton<IShuttleScoutingClient>(

@@ -1,5 +1,6 @@
 @page "/users/{Id}"
 @using Shuttle.WebClient.Components.Players
+@using Shuttle.WebClient.Components.Users
 
 <PageTitle>@(card?.Username ?? $"User {Id}")</PageTitle>
 
@@ -28,28 +29,8 @@
             <a id="portal-user-link" class="portal-link" href="https://portal.simulationhockey.com/user/@card.UserId" target="_blank" rel="noopener noreferrer">
                 <FluentIcon Value="@(new Icons.Regular.Size16.Open())"/>
             </a>
-            <FluentTooltip Anchor="portal-user-link">View user #@card.UserId on the SHL portal</FluentTooltip>
+            <FluentTooltip Anchor="portal-user-link">View user #@card?.UserId on the SHL portal</FluentTooltip>
         </FluentStack>
-
-        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" HorizontalGap="32" VerticalGap="16">
-            <div class="stat-group">
-                <FluentText Weight="TextWeight.Bold" Block="true">Identity</FluentText>
-                <div class="kv"><span class="k">Username</span><span class="v">@card.Username</span></div>
-                <div class="kv"><span class="k">User ID</span><span class="v">@card.UserId</span></div>
-                <div class="kv">
-                    <span class="k">Discord</span>
-                    @if (!isAuthenticated) {
-                        <span class="v muted" title="Sign in to view Discord names.">Log in as a Shuttle user to view the Discord username.</span>
-                    } else if (string.IsNullOrWhiteSpace(card.DiscordName)) {
-                        <span class="v muted">Discord name not known.</span>
-                    } else {
-                        <span class="v">@card.DiscordName</span>
-                    }
-                </div>
-            </div>
-        </FluentStack>
-
-        <FluentDivider/>
 
         <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
             <FluentText Size="TextSize.Size500" Weight="TextWeight.Bold">Players</FluentText>
@@ -67,5 +48,9 @@
                              SuppressUserLinkFor="card.UserId"
                              SortChanged="OnSortChanged"/>
         }
+
+        <FluentDivider/>
+
+        <UserRecruitmentPanel UserId="@card.UserId" Username="@card.Username"/>
     }
 </FluentStack>

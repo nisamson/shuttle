@@ -147,7 +147,13 @@ public sealed class RecruitmentFlow : AnalysisFlowBase {
         int top,
         string extension
     ) {
-        var topByUsers = analysis.Tallies
+        // The top-N recruiter charts rank identifiable recruiters, so the "(none)" bucket (players
+        // with no recorded recruiter) is excluded. The per-category breakdown below still counts it.
+        var rankable = analysis.Tallies
+            .Where(t => t.Category != RecruiterCategory.None)
+            .ToList();
+
+        var topByUsers = rankable
             .Take(top)
             .Select(t => new RecruitmentChartWriter.BarItem(RecruiterLabel(t.Recruiter, t.Category), t.RecruitedUsers))
             .ToList();
@@ -158,7 +164,7 @@ public sealed class RecruitmentFlow : AnalysisFlowBase {
             topByUsers,
             ScottPlot.Colors.SteelBlue);
 
-        var topByTpe = analysis.Tallies
+        var topByTpe = rankable
             .OrderByDescending(t => t.TotalCareerTpe)
             .ThenBy(t => t.Recruiter, StringComparer.OrdinalIgnoreCase)
             .Take(top)
@@ -171,7 +177,7 @@ public sealed class RecruitmentFlow : AnalysisFlowBase {
             topByTpe,
             ScottPlot.Colors.MediumPurple);
 
-        var topByLineageTpe = analysis.Tallies
+        var topByLineageTpe = rankable
             .OrderByDescending(t => t.LineageCareerTpe)
             .ThenBy(t => t.Recruiter, StringComparer.OrdinalIgnoreCase)
             .Take(top)

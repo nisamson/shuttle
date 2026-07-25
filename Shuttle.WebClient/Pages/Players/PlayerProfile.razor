@@ -50,12 +50,12 @@
             <a id="portal-player-link" class="portal-link" href="https://portal.simulationhockey.com/player/@card.PlayerId" target="_blank" rel="noopener noreferrer">
                 <FluentIcon Value="@(new Icons.Regular.Size16.Open())"/>
             </a>
-            <FluentTooltip Anchor="portal-player-link">View player #@card.PlayerId on the SHL portal</FluentTooltip>
+            <FluentTooltip Anchor="portal-player-link">View player #@card?.PlayerId on the SHL portal</FluentTooltip>
             <FluentText Size="TextSize.Size200">· User #@card.UserId</FluentText>
             <a id="portal-user-link" class="portal-link" href="https://portal.simulationhockey.com/user/@card.UserId" target="_blank" rel="noopener noreferrer">
                 <FluentIcon Value="@(new Icons.Regular.Size16.Open())"/>
             </a>
-            <FluentTooltip Anchor="portal-user-link">View user #@card.UserId on the SHL portal</FluentTooltip>
+            <FluentTooltip Anchor="portal-user-link">View user #@card?.UserId on the SHL portal</FluentTooltip>
         </FluentStack>
 
         <FluentStack Orientation="Orientation.Horizontal" Wrap="true" HorizontalGap="32" VerticalGap="16">

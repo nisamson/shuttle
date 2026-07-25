@@ -44,7 +44,7 @@ public class PlayerCardTableTests : WebClientTestContext {
 
         var cut = Render<PlayerCardTable>(p => p.Add(c => c.Players, new List<PlayerCard> { player }));
 
-        var link = cut.Find("a.player-link");
+        var link = cut.Find("a.emphasized-link");
         Assert.Equal($"/players/{player.PlayerId}", link.GetAttribute("href"));
     }
 

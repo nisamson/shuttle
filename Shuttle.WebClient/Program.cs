@@ -37,6 +37,10 @@ if (useFakeBackend) {
     builder.Services.AddShuttleLeagueClient(new Uri(apiBaseAddress))
         .AddHttpMessageHandler<PendingRequestHandler>();
 
+    // The recruitment endpoints are public (anonymous) too, so no access-token handler is attached.
+    builder.Services.AddShuttleRecruitmentClient(new Uri(apiBaseAddress))
+        .AddHttpMessageHandler<PendingRequestHandler>();
+
     // The user client is attached to the access-token handler so authenticated callers receive the
     // richer (Discord-bearing) projection; anonymous callers fall through without a token.
     builder.Services.AddScoped<ApiAccessTokenHandler>();

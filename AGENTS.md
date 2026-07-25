@@ -155,45 +155,72 @@ orchestration host.
 The front end is a **standalone Blazor WebAssembly** app — there is no server-side host;
 everything runs in the browser and talks to `Shuttle.Api` over HTTP. Component code lives
 in `.razor` files, most with a matching `.razor.cs` code-behind and (where needed) a scoped
-`.razor.css`.
+`.razor.css` or a collocated `.razor.js` interop module.
 
 - **`Program.cs`** — WebAssembly host bootstrap. Reads the API base URL from `Api:BaseUrl`
-  (supplied by `wwwroot/appsettings*.json`), registers a base-address `HttpClient`, the
-  typed Refit API client (`AddShuttleApiClient`), MSAL authentication
-  (`AddMsalAuthentication`, roles from the `roles` claim via `ArrayClaimsPrincipalFactory`),
-  Fluent UI (`AddFluentUIComponents`), local-storage services, and the singleton app
-  services (`IBlogService`, `IShuttleOptionsStorage`, `IPlayerDirectoryService`).
+  (supplied by `wwwroot/appsettings*.json`) and registers a base-address `HttpClient`. It has
+  two mutually-exclusive run modes, gated on the `Testing:FakeBackend` flag:
+    - **Fake-backend mode** (environment `Testing`): `AddShuttleFakeBackend()` swaps the real
+    Refit clients and MSAL for an in-memory fake client + fake auth, so the app runs with no
+    Azure / network dependency (see the WebClient testing section).
+    - **Normal mode**: registers the shared typed Refit clients — `AddShuttleApiClient`
+    (player endpoints), `AddShuttleUserClient`, `AddShuttleLeagueClient`,
+    `AddShuttleDebugClient`, `AddShuttleScoutingClient` — each wrapped with the
+    `PendingRequestHandler`; the auth-requiring clients (user, debug, scouting) additionally
+    chain `ApiAccessTokenHandler`. MSAL is wired via `AddMsalAuthentication` (roles from the
+    `roles` claim via `ArrayClaimsPrincipalFactory`, API access-token scopes from `Api:Scopes`).
+    - **Always**: Fluent UI (`AddFluentUIComponents`), local-storage services, and the app
+    services `IPendingRequestTracker`, `IBlogService`, `IShuttleOptionsStorage`,
+    `IPlayerDirectoryService`, `IUserDirectoryService`, and the scoped `ICurrentUserService`.
 - **`App.razor`** — root router wrapped in `CascadingAuthenticationState`. Uses
   `AuthorizeRouteView` with `MainLayout`; unauthenticated users hit `RedirectToLogin`, and
-  authenticated-but-unauthorized users get an alert. `NotFoundPage` routes to `Pages/NotFound`.
+  authenticated-but-unauthorized users get an alert. `NotFound` handles unmatched routes.
 - **`Pages/`** — routable page components (each with an `@page` route). Top level:
   `Home`, `Blogs`/`BlogPost`, `Privacy`, `Authentication` (MSAL callback handling),
-  `Claims`/`Roles` (auth debug), `NotFound`. Subfolders: `Pages/Players/`
-  (`PlayerProfile`, `PlayerSearch`) and `Pages/Admin/` (`HelloApi`).
+  `Claims`/`Roles` (auth debug), `NotFound`. Subfolders: `Players/`
+  (`PlayerProfile`, `PlayerSearch`, `PlayerComparison`), `Users/` (`UserProfile`,
+  `UserSearch`), `Scouting/` (`ScoutingDashboard`, `ScoutingTeam`, `ScoutingBoard`),
+  `Admin/` (`HelloApi`), and `Account/` (`Settings`).
 - **`Components/`** — reusable, non-routable UI. Top level: `RoleBadge`, `SeasonNumber`,
-  `ShuttleLogo`, `BackToTopButton` (with a collocated `.razor.js` interop module).
-  Subfolders: `Options/` (the `ShuttleOptions*` dialog/button/context for user preferences),
-  `Players/` (`PlayerCardTable`, `PlayerSearchFilters`), and `Dev/` (`AccountView`,
-  `HelloApiView`).
+  `ShuttleLogo`, `BackToTopButton` (collocated `.razor.js`), `PendingRequestIndicator`,
+  `FeedbackButton`, `GitHubButton`. Subfolders: `Options/` (the `ShuttleOptions*`
+  dialog/button/context for user preferences), `Players/` (`PlayerCardTable`,
+  `PlayerSearchFilters`, `TeamBadge`), `Users/` (`UserCardTable`, `UserSearchFilters`),
+  `Scouting/` (bulk add/edit dialogs, comment thread + comments dialog, entry edit dialog),
+  and `Dev/` (`AccountView`, `HelloApiView`).
 - **`Layout/`** — app shell: `MainLayout`, `ShuttleNavMenu`, `LoginDisplay`, and
   `RedirectToLogin`.
-- **`Services/`** — client-side services and state. `PlayerDirectoryService` fetches the slim
-  player suggestion directory once and caches it in memory + `localStorage` for local
-  autocomplete; `ShuttleOptionsLocalStorage`/`IShuttleOptionsStorage` persist user options;
-  `ArrayClaimsPrincipalFactory` expands the array-valued `roles` claim. (The blog engine —
-  `IBlogService`/`BlogService`, `BlogEntry`, and the `BlogEntries/*.md` articles — lives in the
-  shared `Shuttle.WebClient.Shared` library so the API can render blog meta too.)
+- **`Services/`** — client-side services and state:
+    - **Directories** (fetched once, cached in memory + `localStorage` with a TTL, then
+    filtered locally to power autocomplete): `PlayerDirectoryService`, `UserDirectoryService`.
+    - `CurrentUserService` — resolves and caches the caller's own `ShuttleUser` account
+    (`GET /users/me`); scouting UI needs the account id (not just Entra claims) to attribute
+    ownership/comments.
+    - `ShuttleOptionsLocalStorage` / `IShuttleOptionsStorage` — persist user options.
+    - **Pending-request indicator**: `PendingRequestHandler` (a `DelegatingHandler` attached as
+    the outermost handler on every client) reports in-flight requests to `PendingRequestTracker`;
+    `PendingRequestDescriber` maps method+path to human-readable wording.
+    - `ApiAccessTokenHandler` — attaches the signed-in user's API access token to cross-origin
+    backend requests (the built-in base-address handler won't, since the API is another origin).
+    - `ArrayClaimsPrincipalFactory` — expands the array-valued `roles` claim.
+    - `PlayerAttributeCharts` — radar/bar attribute chart models (Plotly), shared by the player
+    profile (single series) and comparison page (overlaid series).
+    - (The blog engine — `IBlogService`/`BlogService`, `BlogEntry`, and the `BlogEntries/*.md`
+    articles — lives in the shared `Shuttle.WebClient.Shared` library so the API can render blog
+    meta too.)
 - **`Models/`** — client-side models and constants: `Routes` (typed route/URL constants —
-  prefer these over hard-coded paths), `KnownRoles`, and `Options/`
-  (`IShuttleOptions`, `ShuttleOptions`, `ShuttleOptionsModel`).
+  prefer these over hard-coded paths), `KnownRoles` (plus the `RoleNames` string constants and
+  `KnownRolesExtensions`), and `Options/` (`IShuttleOptions`, `ShuttleOptions`,
+  `ShuttleOptionsModel`).
 - **`Extensions/`** — `ClaimsPrincipalExtensions` and other small helpers.
 - **`wwwroot/`** — static web assets: `index.html`, `appsettings.json` +
-  `appsettings.Development.json` (the latter points `Api:BaseUrl` at the local dev API),
-  `css/`, `js/`, and icons.
+  `appsettings.Development.json` (points `Api:BaseUrl` at the local dev API) +
+  `appsettings.Testing.json` (sets `Testing:FakeBackend`), `css/`, `js/`, and icons.
 
 **Data access** goes exclusively through the shared `Shuttle.Api.Client` project's typed
-Refit `IShuttlePlayerClient` (registered in `Program.cs`); the WebClient does not build
-requests by hand. DTOs are the shared `Shuttle.Models` types.
+Refit clients (`IShuttlePlayerClient`, `IShuttleUserClient`, `IShuttleLeagueClient`,
+`IShuttleScoutingClient`, `IShuttleDebugClient`), registered in `Program.cs`; the WebClient
+does not build requests by hand. DTOs are the shared `Shuttle.Models` types.
 
 ## Build
 

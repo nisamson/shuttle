@@ -1,0 +1,70 @@
+@using Shuttle.Models.Recruitment
+@using Shuttle.WebClient.Models
+
+<FluentText Size="TextSize.Size500" Weight="TextWeight.Bold">Recruitment</FluentText>
+
+@if (loading) {
+    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
+        <FluentSpinner/>
+        <FluentText>Loading recruitment…</FluentText>
+    </FluentStack>
+} else if (error is not null) {
+    <FluentMessageBar Intent="MessageBarIntent.Error" Title="Failed to load recruitment">
+        @error
+    </FluentMessageBar>
+} else if (root is null) {
+    <FluentText>@Username hasn't recruited anyone.</FluentText>
+} else {
+    <FluentGrid Spacing="3">
+        @foreach (var (label, value, tooltip) in Stats()) {
+            <FluentGridItem Xs="6" Md="3">
+                <FluentCard Appearance="CardAppearance.Filled" Style="height: 100%;">
+                    <FluentStack Orientation="Orientation.Vertical" VerticalGap="4">
+                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="4" VerticalAlignment="VerticalAlignment.Center">
+                            <FluentText Size="TextSize.Size200" Tooltip="@tooltip">@label</FluentText>
+                            @if (tooltip is not null) {
+                                <FluentIcon Value="@(new Icons.Regular.Size12.Info())" Color="Color.Default" Tooltip="@tooltip"/>
+                            }
+                        </FluentStack>
+                        <FluentText Size="TextSize.Size600" Weight="TextWeight.Bold">@value</FluentText>
+                    </FluentStack>
+                </FluentCard>
+            </FluentGridItem>
+        }
+    </FluentGrid>
+
+    <FluentCard>
+        <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" HorizontalGap="8">
+                <FluentText Weight="TextWeight.Bold">Recruit lineage</FluentText>
+                <FluentSpacer/>
+                <FluentButton Appearance="ButtonAppearance.Subtle" IconStart="@(new Icons.Regular.Size16.ArrowExpandAll())"
+                              OnClick="@(() => SetAllExpanded(true))">Expand all</FluentButton>
+                <FluentButton Appearance="ButtonAppearance.Subtle" IconStart="@(new Icons.Regular.Size16.ArrowCollapseAll())"
+                              OnClick="@(() => SetAllExpanded(false))">Collapse all</FluentButton>
+            </FluentStack>
+            <FluentTreeView @key="treeRenderKey" Items="treeItems" Style="width: 100%; min-width: max-content;">
+                <ItemTemplate>
+                    @{
+                        var node = NodeFor(context);
+                    }
+                    @if (node is not null) {
+                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center" Wrap="true">
+                            @if (node.UserId is { } uid) {
+                                <a class="emphasized-link" href="@Routes.Users.User(uid)">@node.Name</a>
+                            } else {
+                                <span>@node.Name</span>
+                            }
+                            <FluentText Size="TextSize.Size200">@node.CareerTpe.ToString("N0") TPE</FluentText>
+                            @if (node.SubtreeUsers > 0) {
+                                <FluentText Size="TextSize.Size200">
+                                    · +@node.SubtreeUsers.ToString("N0") in lineage · @node.SubtreeCareerTpe.ToString("N0") TPE
+                                </FluentText>
+                            }
+                        </FluentStack>
+                    }
+                </ItemTemplate>
+            </FluentTreeView>
+        </FluentStack>
+    </FluentCard>
+}

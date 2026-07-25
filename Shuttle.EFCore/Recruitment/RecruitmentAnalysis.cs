@@ -64,3 +64,31 @@ public sealed record RecruitmentAnalysis(
     IReadOnlyList<RecruiterTally> Tallies,
     IReadOnlyList<RecruiterCategoryCount> CategorySummary,
     IReadOnlyList<RecruitmentEdge> Edges);
+
+/// <summary>
+/// A single node in a recruiter's downstream lineage tree. The root node represents the recruiter
+/// itself (with <see cref="UserId"/> <c>null</c> and <see cref="CareerTpe"/> <c>0</c>, since the
+/// recruiter's own career is not part of their lineage); every other node is a recruited member.
+/// </summary>
+/// <param name="UserId">The member's user id, or <c>null</c> for the recruiter root.</param>
+/// <param name="Name">The member's username, or the recruiter key for the root.</param>
+/// <param name="Category">For the root, the recruiter's own category; for a member node, the
+/// category of the recruiter relationship that brought them in (their direct recruiter's category,
+/// which is always <see cref="RecruiterCategory.Player"/> below the first level).</param>
+/// <param name="CareerTpe">This member's own full-career TPE; <c>0</c> for the recruiter root.</param>
+/// <param name="SubtreeUsers">The number of distinct members in this node's subtree, excluding the
+/// node itself. At the root this equals <see cref="RecruiterTally.LineageUsers"/> when the tree is
+/// not depth-capped.</param>
+/// <param name="SubtreeCareerTpe">The combined full-career TPE of every member in this node's
+/// subtree, excluding the node itself. At the root this equals
+/// <see cref="RecruiterTally.LineageCareerTpe"/> when the tree is not depth-capped.</param>
+/// <param name="Recruited">This node's directly-recruited members, ordered by career TPE (desc)
+/// then username. Empty at a leaf or where a depth cap stops traversal.</param>
+public sealed record RecruitmentLineageNode(
+    int? UserId,
+    string Name,
+    RecruiterCategory Category,
+    long CareerTpe,
+    int SubtreeUsers,
+    long SubtreeCareerTpe,
+    IReadOnlyList<RecruitmentLineageNode> Recruited);

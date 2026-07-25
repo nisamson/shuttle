@@ -31,6 +31,9 @@ public static class FakeBackendServiceCollectionExtensions {
         services.RemoveAll<IShuttleLeagueClient>();
         services.AddSingleton<IShuttleLeagueClient>(_ => new InMemoryShuttleLeagueClient());
 
+        services.RemoveAll<IShuttleRecruitmentClient>();
+        services.AddSingleton<IShuttleRecruitmentClient>(_ => new InMemoryShuttleRecruitmentClient());
+
         services.AddSingleton(authOptions);
         services.AddSingleton<FakeAuthenticationStateProvider>();
         services.AddSingleton<AuthenticationStateProvider>(

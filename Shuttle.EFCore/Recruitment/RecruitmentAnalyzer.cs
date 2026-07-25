@@ -210,4 +210,113 @@ public static class RecruitmentAnalyzer {
 
         return new RecruitmentAnalysis(tallies, summary, allEdges);
     }
+
+    /// <summary>
+    /// Builds the child-adjacency lookup for lineage traversal from a completed
+    /// <see cref="RecruitmentAnalysis"/>: maps each <see cref="RecruiterCategory.Player"/> recruiter's
+    /// username (case-insensitive) to the members they directly recruited. Only Player recruiters can
+    /// have descendants, so external/self/none recruiters are absent.
+    /// </summary>
+    public static IReadOnlyDictionary<string, IReadOnlyList<RecruitmentEdge>> BuildChildLookup(
+        RecruitmentAnalysis analysis
+    ) {
+        ArgumentNullException.ThrowIfNull(analysis);
+
+        var lookup = new Dictionary<string, IReadOnlyList<RecruitmentEdge>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var tally in analysis.Tallies) {
+            if (tally.Category == RecruiterCategory.Player) {
+                lookup[tally.Recruiter] = tally.Edges;
+            }
+        }
+
+        return lookup;
+    }
+
+    /// <summary>
+    /// Builds the nested downstream lineage tree for a single recruiter. The returned root represents
+    /// the recruiter (<see cref="RecruitmentLineageNode.UserId"/> <c>null</c>,
+    /// <see cref="RecruitmentLineageNode.CareerTpe"/> <c>0</c>); its descendants are the members the
+    /// recruiter recruited transitively. Per-subtree roll-up totals count each member once and exclude
+    /// the node itself. A visited set guards against cycles in the (normally forest-shaped) data.
+    /// </summary>
+    /// <param name="root">The recruiter tally whose lineage to expand.</param>
+    /// <param name="childrenByUsername">The child adjacency from <see cref="BuildChildLookup"/>.</param>
+    /// <param name="maxDepth">
+    /// Optional cap on traversal depth (direct recruits are depth 1). When set, the subtree roll-up
+    /// totals reflect only the returned (depth-capped) nodes; when omitted the root totals equal the
+    /// tally's <see cref="RecruiterTally.LineageUsers"/> / <see cref="RecruiterTally.LineageCareerTpe"/>.
+    /// </param>
+    public static RecruitmentLineageNode BuildLineageTree(
+        RecruiterTally root,
+        IReadOnlyDictionary<string, IReadOnlyList<RecruitmentEdge>> childrenByUsername,
+        int? maxDepth = null
+    ) {
+        ArgumentNullException.ThrowIfNull(root);
+        ArgumentNullException.ThrowIfNull(childrenByUsername);
+        if (maxDepth is < 1) {
+            throw new ArgumentOutOfRangeException(nameof(maxDepth), maxDepth, "maxDepth must be at least 1.");
+        }
+
+        var visited = new HashSet<int>();
+
+        // Builds the node for a recruited member. Returns null when the member was already visited
+        // (cycle / duplicate), so the caller skips it. Its children are the members it recruited.
+        RecruitmentLineageNode? BuildMember(RecruitmentEdge edge, int depth) {
+            if (!visited.Add(edge.UserId)) {
+                return null;
+            }
+
+            var kids = childrenByUsername.TryGetValue(edge.Username, out var e) ? e : [];
+            var (children, subtreeUsers, subtreeTpe) = ExpandEdges(kids, depth);
+            return new RecruitmentLineageNode(
+                edge.UserId,
+                edge.Username,
+                edge.Category,
+                edge.CareerTpe,
+                subtreeUsers,
+                subtreeTpe,
+                children);
+        }
+
+        // Expands a parent's direct-recruit edges into child nodes, rolling up per-subtree totals.
+        // <paramref name="parentDepth"/> is the depth of the parent (the recruiter root is depth 0),
+        // so traversal stops once the parent sits at the depth cap.
+        (IReadOnlyList<RecruitmentLineageNode> Children, int SubtreeUsers, long SubtreeTpe) ExpandEdges(
+            IReadOnlyList<RecruitmentEdge> edges,
+            int parentDepth
+        ) {
+            if (maxDepth is { } cap && parentDepth >= cap) {
+                return ([], 0, 0);
+            }
+
+            var children = new List<RecruitmentLineageNode>();
+            var subtreeUsers = 0;
+            long subtreeTpe = 0;
+            foreach (var kid in edges) {
+                var child = BuildMember(kid, parentDepth + 1);
+                if (child is null) {
+                    continue;
+                }
+
+                children.Add(child);
+                subtreeUsers += 1 + child.SubtreeUsers;
+                subtreeTpe += child.CareerTpe + child.SubtreeCareerTpe;
+            }
+
+            return (children, subtreeUsers, subtreeTpe);
+        }
+
+        // The root represents the recruiter itself; its direct children are the recruiter's own edges
+        // (which, for a Player recruiter, also appear in childrenByUsername, but an External recruiter
+        // is not a member username and so is only addressable through its tally edges).
+        var (rootChildren, rootUsers, rootTpe) = ExpandEdges(root.Edges, parentDepth: 0);
+        return new RecruitmentLineageNode(
+            UserId: null,
+            root.Recruiter,
+            root.Category,
+            CareerTpe: 0,
+            rootUsers,
+            rootTpe,
+            rootChildren);
+    }
 }
