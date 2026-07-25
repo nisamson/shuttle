@@ -289,14 +289,14 @@ Example:
 <PropertyGroup>
   <EntityFrameworkVersion>10.0.9</EntityFrameworkVersion>
   <MicrosoftIdentityWebVersion>4.12.0</MicrosoftIdentityWebVersion>
-  <MudBlazorVersion>9.5.0</MudBlazorVersion>
+  <FluentUIVersion>5.0.0-rc.4-26180.1</FluentUIVersion>
 </PropertyGroup>
 <ItemGroup>
   <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="$(EntityFrameworkVersion)" />
   <PackageVersion Include="Microsoft.Identity.Web" Version="$(MicrosoftIdentityWebVersion)" />
   <PackageVersion Include="Microsoft.Identity.Web.UI" Version="$(MicrosoftIdentityWebVersion)" />
-  <PackageVersion Include="MudBlazor" Version="$(MudBlazorVersion)" />
-  <PackageVersion Include="MudBlazor.Extensions" Version="$(MudBlazorVersion)" />
+  <PackageVersion Include="Microsoft.FluentUI.AspNetCore.Components" Version="$(FluentUIVersion)" />
+  <PackageVersion Include="Microsoft.FluentUI.AspNetCore.Components.Icons" Version="$(FluentUIVersion)" />
 </ItemGroup>
 ```
 

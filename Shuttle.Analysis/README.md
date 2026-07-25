@@ -87,6 +87,42 @@ dotnet run --project Shuttle.Analysis -- analyze --flow kmeans-centroids -i play
   (`clusterId, clusterSize, playerId, name, <stats…>`) and `{group}-centroids.csv`
   (`clusterId, clusterSize, <stats…>`).
 
+#### Built-in flow: `recruitment` (database)
+
+Analyzes the `PlayerInformation.Recruiter` free-text field. Each recruiter is classified as a
+**Player** (matches an `ShlUser.Name`, case-insensitive), **Self** (`"Myself"`), **None**
+(blank), or **External** (anything else, e.g. Google/Reddit). Recruitment is **consolidated by
+recruited member** (a member's recruiter comes from their earliest-created player), and each
+recruiter reports the number of members they recruited plus those members' combined
+**career TPE** — the sum, over each recruited member's players, of each player's latest
+timeline `TotalTpe`.
+
+```
+dotnet run --project Shuttle.Analysis -- analyze --flow recruitment [-d <db>] [-o <dir>] [--arg top=20] [--arg format=svg]
+```
+
+- Arguments: `top` (optional, integer ≥ 1, default 20) limits the bar graphs to the top N
+  recruiters; `format` (optional, `png` | `svg`, default `png`) selects the bar-graph image
+  format.
+- Outputs (into the output dir):
+  - `recruiter-counts.csv` — `recruiter, category, recruitedUsers, totalCareerTpe, lineageUsers, lineageCareerTpe`
+  - `recruitment-edges.csv` — `recruiter, category, userId, username, careerTpe`
+  - `recruiter-category-summary.csv` — `category, distinctRecruiters, recruitedUsers, totalCareerTpe`
+  - `recruitment-full.dot` — GraphViz recruiter→member graph, nodes colored by category
+  - `player-recruiter-network.dot` — GraphViz member→member network (Player-category recruiters)
+  - `top-recruiters.<ext>` — top-N recruiters by members recruited
+  - `top-recruiters-tpe.<ext>` — top-N recruiters by recruited members' combined career TPE
+  - `top-recruiters-lineage-tpe.<ext>` — top-N recruiters by full downstream lineage career TPE
+  - `recruiter-category-breakdown.<ext>` — recruited members per category
+
+The `totalCareerTpe`/`recruitedUsers` columns count only a recruiter's **direct** recruits, while
+`lineageCareerTpe`/`lineageUsers` roll up the recruiter's **full transitive lineage** — every member
+reachable through the recruit-of chain (each member counted once).
+
+Needs the DB env vars + `az login` (see Prerequisites). The query, classification, and
+aggregation live in `Shuttle.EFCore` (`IRecruitmentAnalysisService`) so the API can reuse them;
+bar graphs are rendered in-process with **ScottPlot** (no system dependencies).
+
 ## Analysis-flow framework (`Flows/`)
 
 - `CsvDataIngestor` — parses the exported CSV into `IngestedData` (a schema-flexible table).

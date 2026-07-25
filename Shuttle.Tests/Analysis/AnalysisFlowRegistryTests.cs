@@ -7,6 +7,7 @@ public class AnalysisFlowRegistryTests {
     private sealed class StubFlow(string name, string description = "stub") : IDataAnalysisFlow {
         public string Name { get; } = name;
         public string Description { get; } = description;
+        public FlowDataSource DataSource => FlowDataSource.Csv;
 
         public Task<AnalysisFlowResult> RunAsync(AnalysisContext context, CancellationToken cancellationToken) =>
             Task.FromResult(AnalysisFlowResult.Success());
@@ -18,6 +19,24 @@ public class AnalysisFlowRegistryTests {
 
         Assert.True(registry.TryGet("kmeans-centroids", out var flow));
         Assert.NotNull(flow);
+    }
+
+    [Fact]
+    public void CreateDefault_RegistersPlayerSummaryDatabaseFlow() {
+        var registry = AnalysisFlowRegistry.CreateDefault();
+
+        Assert.True(registry.TryGet("player-summary", out var flow));
+        Assert.NotNull(flow);
+        Assert.Equal(FlowDataSource.Database, flow!.DataSource);
+    }
+
+    [Fact]
+    public void CreateDefault_RegistersRecruitmentDatabaseFlow() {
+        var registry = AnalysisFlowRegistry.CreateDefault();
+
+        Assert.True(registry.TryGet("recruitment", out var flow));
+        Assert.NotNull(flow);
+        Assert.Equal(FlowDataSource.Database, flow!.DataSource);
     }
 
     [Fact]

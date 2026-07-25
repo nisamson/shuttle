@@ -11,6 +11,7 @@
         <PackageReference Include="CsvHelper" />
         <PackageReference Include="Microsoft.Extensions.Hosting" />
         <PackageReference Include="Microsoft.ML" />
+        <PackageReference Include="ScottPlot" />
         <PackageReference Include="dotenv.net" />
         <PackageReference Include="linq2db.EntityFrameworkCore" />
         <PackageReference Include="System.Commandline" />
