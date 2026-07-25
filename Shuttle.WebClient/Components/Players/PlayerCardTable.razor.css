@@ -53,16 +53,6 @@
     background: var(--neutral-fill-stealth-hover);
 }
 
-.player-table .player-link {
-    color: var(--accent-fill-rest);
-    text-decoration: none;
-    font-weight: 600;
-}
-
-.player-table .player-link:hover {
-    text-decoration: underline;
-}
-
 .player-table .user-link {
     color: var(--accent-fill-rest);
     text-decoration: none;

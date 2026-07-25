@@ -1,31 +1,3 @@
-.stat-group {
-    min-width: 220px;
-}
-
-.kv {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 2px 0;
-    border-bottom: 1px solid var(--neutral-stroke-divider-rest);
-}
-
-.kv .k {
-    color: var(--neutral-foreground-hint);
-}
-
-.kv .v {
-    font-variant-numeric: tabular-nums;
-    font-weight: 600;
-    text-align: right;
-}
-
-.kv .v.muted {
-    color: var(--neutral-foreground-hint);
-    font-weight: 400;
-    font-style: italic;
-}
-
 .portal-link {
     display: inline-flex;
     align-items: center;

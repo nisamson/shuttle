@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using Microsoft.Extensions.Caching.Hybrid;
 using Quartz;
+using Shuttle.Api.Services;
 using Shuttle.EFCore.Procedures;
 
 namespace Shuttle.Api.Jobs;
@@ -9,6 +11,7 @@ public class DbUpdateJob : ISelfRegisteringJob {
     private readonly ILogger<DbUpdateJob> logger;
     private readonly IndexUpdater indexUpdater;
     private readonly PortalUpdater portalUpdater;
+    private readonly HybridCache cache;
     public static readonly JobKey JobKey = JobKey.Create(nameof(DbUpdateJob), "data");
     public static readonly TriggerKey TriggerKey = new($"{nameof(DbUpdateJob)}Trigger", "data");
 
@@ -20,10 +23,15 @@ public class DbUpdateJob : ISelfRegisteringJob {
     public const string LastUpdatedKey = "LastUpdatedUtc";
 
     
-    public DbUpdateJob(ILogger<DbUpdateJob> logger, IndexUpdater indexUpdater, PortalUpdater portalUpdater) {
+    public DbUpdateJob(
+        ILogger<DbUpdateJob> logger,
+        IndexUpdater indexUpdater,
+        PortalUpdater portalUpdater,
+        HybridCache cache) {
         this.logger = logger;
         this.indexUpdater = indexUpdater;
         this.portalUpdater = portalUpdater;
+        this.cache = cache;
     }
 
     public async Task Execute(IJobExecutionContext context) {
@@ -39,6 +47,9 @@ public class DbUpdateJob : ISelfRegisteringJob {
         await portalUpdater.UpdatePortal(token);
         logger.LogInformation("Finished portal update");
         context.JobDetail.JobDataMap.Put(LastUpdatedKey, DateTimeOffset.UtcNow.ToString("o"));
+        // Purge every cache entry derived from the database now that it has changed, so consumers
+        // (e.g. the recruitment analysis) recompute against the fresh data on their next request.
+        await cache.RemoveByTagAsync(CacheTags.DatabaseData, token);
         logger.LogInformation("Finished updating the database");
     }
     public static IServiceCollectionQuartzConfigurator RegisterJob(IServiceCollectionQuartzConfigurator qc) {

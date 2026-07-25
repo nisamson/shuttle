@@ -1,6 +1,5 @@
 using System.Net;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Authorization;
 using Refit;
 using Shuttle.Api.Client;
 using Shuttle.Models.Players;
@@ -16,12 +15,10 @@ public partial class UserProfile : ComponentBase {
 
     [Inject] private IShuttleUserClient UserClient { get; set; } = null!;
     [Inject] private NavigationManager Navigation { get; set; } = null!;
-    [Inject] private AuthenticationStateProvider AuthState { get; set; } = null!;
 
     private UserCard? card;
     private bool loading;
     private bool notFound;
-    private bool isAuthenticated;
     private string? error;
 
     // Locally-sorted copy of the user's players (the profile sorts in-memory, no server round trip).
@@ -30,11 +27,6 @@ public partial class UserProfile : ComponentBase {
     private bool sortDescending = true;
 
     private void GoToSearch() => Navigation.NavigateTo(Routes.Users.Root);
-
-    protected override async Task OnInitializedAsync() {
-        var authState = await AuthState.GetAuthenticationStateAsync();
-        isAuthenticated = authState.User.Identity?.IsAuthenticated == true;
-    }
 
     protected override async Task OnParametersSetAsync() => await LoadAsync();
 

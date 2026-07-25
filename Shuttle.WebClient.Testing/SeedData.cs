@@ -1,5 +1,6 @@
 using Shuttle.Models.Leagues;
 using Shuttle.Models.Players;
+using Shuttle.Models.Recruitment;
 using Shuttle.Models.Users;
 using Shuttle.Shl.Api.Models.Common;
 using Shuttle.Shl.Api.Models.Portal.V1;
@@ -59,6 +60,37 @@ public static class SeedData {
     public static IReadOnlyList<UserSuggestion> UserSuggestions() => Users()
         .Select(u => new UserSuggestion { UserId = u.UserId, Username = u.Username })
         .ToList();
+
+    /// <summary>
+    /// A user's full-career TPE (summed across every one of their seeded players), keyed by user id.
+    /// This mirrors how the server computes recruitment career TPE, so the fake recruitment client's
+    /// totals line up with the seeded players.
+    /// </summary>
+    public static IReadOnlyDictionary<int, long> UserCareerTpe() => Players()
+        .GroupBy(p => p.UserId)
+        .ToDictionary(g => g.Key, g => g.Sum(p => (long)p.TotalTpe));
+
+    /// <summary>
+    /// Deterministic recruiter → recruited-member edges over the seeded users, backing the fake
+    /// recruitment client. Models one multi-level Player lineage
+    /// (<c>frostbite → dmarsh → fnolan → jquinn</c>, plus <c>frostbite → cvance → hvega</c> and
+    /// <c>ipope → kalder</c>) and a couple of External recruiters (Reddit/Google). Many seeded users
+    /// recruited nobody, so the empty-state path is exercised too. Each recruited user appears at most
+    /// once (recruitment is a forest), and every Player recruiter key is an existing seed username so
+    /// the recruiter is addressable by that username.
+    /// </summary>
+    public static IReadOnlyList<SeedRecruitmentEdge> RecruitmentEdges() => new SeedRecruitmentEdge[] {
+        new("frostbite", RecruiterCategory.Player, 5004),
+        new("frostbite", RecruiterCategory.Player, 5003),
+        new("dmarsh", RecruiterCategory.Player, 5006),
+        new("dmarsh", RecruiterCategory.Player, 5007),
+        new("fnolan", RecruiterCategory.Player, 5010),
+        new("cvance", RecruiterCategory.Player, 5008),
+        new("ipope", RecruiterCategory.Player, 5011),
+        new("Reddit", RecruiterCategory.External, 5012),
+        new("Reddit", RecruiterCategory.External, 5013),
+        new("Google", RecruiterCategory.External, 5014),
+    };
 
     // The (fixed) season all seeded teams belong to; the seed models a single current season.
     private const int TeamSeason = 72;
@@ -217,3 +249,10 @@ public static class SeedData {
 
 /// <summary>A seeded SHL user: their id, username, and Discord name when one is on file.</summary>
 public sealed record SeedUser(int UserId, string Username, string? DiscordName);
+
+/// <summary>
+/// A single seeded recruitment relationship: the recruiter key (a member username for a
+/// <see cref="RecruiterCategory.Player"/>, or an external source name), its category, and the user id
+/// of the recruited member.
+/// </summary>
+public sealed record SeedRecruitmentEdge(string Recruiter, RecruiterCategory Category, int RecruitedUserId);
