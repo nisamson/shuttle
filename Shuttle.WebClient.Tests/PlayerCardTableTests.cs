@@ -1,4 +1,5 @@
 using Bunit;
+using System.Linq;
 using Shuttle.Models.Players;
 using Shuttle.WebClient.Components.Players;
 using Shuttle.WebClient.Testing;
@@ -89,5 +90,34 @@ public class PlayerCardTableTests : WebClientTestContext {
 
         Assert.Empty(cut.FindAll("a.user-link"));
         Assert.Contains(player.Username, cut.Markup);
+    }
+
+    [Fact]
+    public void Clicking_a_sortable_header_raises_sort_changed_and_flips_direction() {
+        var players = SeedData.Players().Take(2).ToList();
+        PlayerCardTable.PlayerTableSort? captured = null;
+
+        var cut = Render<PlayerCardTable>(p => p
+            .Add(c => c.Players, players)
+            .Add(c => c.SortField, PlayerSortField.Name)
+            .Add(c => c.SortDescending, false)
+            .Add(c => c.SortChanged, (PlayerCardTable.PlayerTableSort s) => captured = s));
+
+        var header = cut.FindAll("thead [role=button]").First(e => e.TextContent.Contains("Name"));
+        header.Click();
+
+        Assert.NotNull(captured);
+        Assert.Equal(PlayerSortField.Name, captured!.Value.Field);
+        // Clicking the already-active ascending column flips it to descending.
+        Assert.True(captured.Value.Descending);
+    }
+
+    [Fact]
+    public void Headers_are_not_clickable_when_sort_is_disabled() {
+        var players = SeedData.Players().Take(2).ToList();
+
+        var cut = Render<PlayerCardTable>(p => p.Add(c => c.Players, players));
+
+        Assert.Empty(cut.FindAll("thead [role=button]"));
     }
 }

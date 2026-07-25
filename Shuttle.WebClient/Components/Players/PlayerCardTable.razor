@@ -2,63 +2,67 @@
 @using Shuttle.Shl.Api.Models.Common
 @using Shuttle.Shl.Api.Models.Portal.V1
 
-<div class="player-table-wrapper">
-    <table class="player-table">
-        <thead>
-            <tr>
-                <th class="@ThClass(PlayerSortField.Name)" @onclick="() => ToggleSort(PlayerSortField.Name)">Name<span class="sort-ind">@SortIndicator(PlayerSortField.Name)</span></th>
-                <th class="@ThClass(PlayerSortField.Username)" @onclick="() => ToggleSort(PlayerSortField.Username)">Username<span class="sort-ind">@SortIndicator(PlayerSortField.Username)</span></th>
-                <th class="@ThClass(PlayerSortField.Position)" @onclick="() => ToggleSort(PlayerSortField.Position)">Pos<span class="sort-ind">@SortIndicator(PlayerSortField.Position)</span></th>
-                <th class="@ThClass(PlayerSortField.Status)" @onclick="() => ToggleSort(PlayerSortField.Status)">Status<span class="sort-ind">@SortIndicator(PlayerSortField.Status)</span></th>
-                <th class="@ThClass(PlayerSortField.League)" @onclick="() => ToggleSort(PlayerSortField.League)">League<span class="sort-ind">@SortIndicator(PlayerSortField.League)</span></th>
-                <th class="@ThClass(PlayerSortField.DraftSeason)" @onclick="() => ToggleSort(PlayerSortField.DraftSeason)">Draft<span class="sort-ind">@SortIndicator(PlayerSortField.DraftSeason)</span></th>
-                <th class="@ThClass(PlayerSortField.Created)" @onclick="() => ToggleSort(PlayerSortField.Created)">Created<span class="sort-ind">@SortIndicator(PlayerSortField.Created)</span></th>
-                <th class="num @ThClass(PlayerSortField.TotalTpe)" @onclick="() => ToggleSort(PlayerSortField.TotalTpe)">Total TPE<span class="sort-ind">@SortIndicator(PlayerSortField.TotalTpe)</span></th>
-                <th>Flags</th>
-            </tr>
-        </thead>
-        <tbody>
-            @if (Loading) {
-                <tr>
-                    <td colspan="9" class="player-table-msg"><FluentSpinner/> Loading players…</td>
-                </tr>
-            } else if (Players is null || Players.Count == 0) {
-                <tr>
-                    <td colspan="9" class="player-table-msg">No players match your filters.</td>
-                </tr>
-            } else {
-                @foreach (var p in Players) {
-                    <tr>
-                        <td><a class="emphasized-link" href="@PlayerRoute(p.PlayerId)">@p.Name</a></td>
-                        <td>
-                            @if (p.UserId == SuppressUserLinkFor) {
-                                @p.Username
-                            } else {
-                                <a class="user-link" href="@UserRoute(p.UserId)">@p.Username</a>
-                            }
-                        </td>
-                        <td>@p.Position.ToShortString()</td>
-                        <td><FluentBadge Color="StatusColor(p.Status)">@StatusText(p.Status)</FluentBadge></td>
-                        <td>@(p.CurrentLeague?.Abbreviation ?? "—")</td>
-                        <td><SeasonNumber Season="p.DraftSeason"/></td>
-                        <td>@p.CreationDate.ToString("yyyy-MM-dd")</td>
-                        <td class="num">@p.TotalTpe.ToString("N0")</td>
-                        <td>
-                            @if (p.Recreate) {
-                                <FluentBadge Appearance="BadgeAppearance.Outline" Color="BadgeColor.Informative" title="Recreate — not the member's first player">Recreate</FluentBadge>
-                            } else {
-                                <FluentBadge Appearance="BadgeAppearance.Filled" Color="BadgeColor.Success" title="Portal First-gen — the member's first player on the portal (they may have had players before the portal existed)">Portal First-gen</FluentBadge>
-                            }
-                            @if (p.Inactive) {
-                                <FluentBadge Appearance="BadgeAppearance.Filled" Color="BadgeColor.Severe" title="Inactive on-site">Inactive</FluentBadge>
-                            }
-                            @if (p.IsSuspended) {
-                                <FluentBadge Appearance="BadgeAppearance.Outline" Color="BadgeColor.Danger" title="Suspended">Suspended</FluentBadge>
-                            }
-                        </td>
-                    </tr>
-                }
-            }
-        </tbody>
-    </table>
-</div>
+@{
+    // Fully controlled sort header: the indicator reflects the SortField/SortDescending parameters
+    // (so it stays correct when sort changes via URL/back-navigation, not just header clicks), and a
+    // click raises SortChanged to the parent. No local grid sorting — Items are rendered as given.
+    RenderFragment<(string Title, PlayerSortField Field)> SortHeader = spec =>
+        @<span role="@(Sortable ? "button" : null)"
+               style="@(Sortable ? "cursor: pointer; user-select: none;" : null); @(SortField == spec.Field ? "color: var(--accent-fill-rest);" : null)"
+               @onclick="() => ToggleSort(spec.Field)">@spec.Title<span style="font-size: 0.85em;">@SortIndicator(spec.Field)</span></span>;
+}
+
+<FluentDataGrid Items="@Rows" TGridItem="PlayerCard" Loading="Loading"
+                GridTemplateColumns="1.5fr 1.5fr 0.6fr 0.9fr 0.8fr 0.8fr 1fr 0.9fr 2fr">
+    <ChildContent>
+    <TemplateColumn Title="Name" HeaderCellItemTemplate="@(_ => SortHeader(("Name", PlayerSortField.Name)))">
+        <a class="emphasized-link" href="@PlayerRoute(context.PlayerId)">@context.Name</a>
+    </TemplateColumn>
+    <TemplateColumn Title="Username" HeaderCellItemTemplate="@(_ => SortHeader(("Username", PlayerSortField.Username)))">
+        @if (context.UserId == SuppressUserLinkFor) {
+            @context.Username
+        } else {
+            <a class="user-link" href="@UserRoute(context.UserId)">@context.Username</a>
+        }
+    </TemplateColumn>
+    <TemplateColumn Title="Pos" HeaderCellItemTemplate="@(_ => SortHeader(("Pos", PlayerSortField.Position)))">
+        @context.Position.ToShortString()
+    </TemplateColumn>
+    <TemplateColumn Title="Status" HeaderCellItemTemplate="@(_ => SortHeader(("Status", PlayerSortField.Status)))">
+        <FluentBadge Color="StatusColor(context.Status)">@StatusText(context.Status)</FluentBadge>
+    </TemplateColumn>
+    <TemplateColumn Title="League" HeaderCellItemTemplate="@(_ => SortHeader(("League", PlayerSortField.League)))">
+        @(context.CurrentLeague?.Abbreviation ?? "—")
+    </TemplateColumn>
+    <TemplateColumn Title="Draft" HeaderCellItemTemplate="@(_ => SortHeader(("Draft", PlayerSortField.DraftSeason)))">
+        <SeasonNumber Season="context.DraftSeason"/>
+    </TemplateColumn>
+    <TemplateColumn Title="Created" HeaderCellItemTemplate="@(_ => SortHeader(("Created", PlayerSortField.Created)))">
+        @context.CreationDate.ToString("yyyy-MM-dd")
+    </TemplateColumn>
+    <TemplateColumn Title="Total TPE" Align="DataGridCellAlignment.End"
+                    HeaderCellItemTemplate="@(_ => SortHeader(("Total TPE", PlayerSortField.TotalTpe)))">
+        <span style="font-variant-numeric: tabular-nums;">@context.TotalTpe.ToString("N0")</span>
+    </TemplateColumn>
+    <TemplateColumn Title="Flags">
+        @if (context.Recreate) {
+            <FluentBadge Appearance="BadgeAppearance.Outline" Color="BadgeColor.Informative" title="Recreate — not the member's first player">Recreate</FluentBadge>
+        } else {
+            <FluentBadge Appearance="BadgeAppearance.Filled" Color="BadgeColor.Success" title="Portal First-gen — the member's first player on the portal (they may have had players before the portal existed)">Portal First-gen</FluentBadge>
+        }
+        @if (context.Inactive) {
+            <FluentBadge Appearance="BadgeAppearance.Filled" Color="BadgeColor.Severe" title="Inactive on-site">Inactive</FluentBadge>
+        }
+        @if (context.IsSuspended) {
+            <FluentBadge Appearance="BadgeAppearance.Outline" Color="BadgeColor.Danger" title="Suspended">Suspended</FluentBadge>
+        }
+    </TemplateColumn>
+    </ChildContent>
+
+    <LoadingContent>
+        <FluentSpinner/> Loading players…
+    </LoadingContent>
+    <EmptyContent>
+        No players match your filters.
+    </EmptyContent>
+</FluentDataGrid>

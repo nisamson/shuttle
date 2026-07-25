@@ -36,6 +36,9 @@ public partial class PlayerCardTable : ComponentBase {
 
     private bool Sortable => SortChanged.HasDelegate;
 
+    /// <summary>The rows rendered by the grid, in the order supplied by the parent (no local sorting).</summary>
+    private IQueryable<PlayerCard> Rows => (Players ?? []).AsQueryable();
+
     private async Task ToggleSort(PlayerSortField field) {
         if (!Sortable) {
             return;
@@ -44,14 +47,6 @@ public partial class PlayerCardTable : ComponentBase {
         // Same column flips direction; a new column starts ascending.
         var descending = SortField == field && !SortDescending;
         await SortChanged.InvokeAsync(new PlayerTableSort(field, descending));
-    }
-
-    private string ThClass(PlayerSortField field) {
-        if (!Sortable) {
-            return string.Empty;
-        }
-
-        return SortField == field ? "th-sort active" : "th-sort";
     }
 
     private string SortIndicator(PlayerSortField field) =>
