@@ -51,16 +51,7 @@ var api = builder.AddProject<Shuttle_Api>("shuttle-api")
     .WaitFor(sqlServer)
     .WithAzureUserAssignedIdentity(umi)
     .WithEnvironment("SHUTTLESQLSERVER_DATABASE", databaseName)
-    .WithUrlForEndpoint("https",
-        c => {
-            c.DisplayText = "OpenAPI Spec";
-            c.Url = "/openapi.json";
-        })
-    .WithUrlForEndpoint("https",
-        c => {
-            c.DisplayText = "Job Dashboard";
-            c.Url = "/quartz";
-        })
+    .WithUrl("/quartz", "Job Dashboard")
     .WithExternalHttpEndpoints()
     .WithHttpProbe(ProbeType.Liveness, "/alive", initialDelaySeconds: 5)
     .PublishAsAzureAppServiceWebsite((infra, site) => {

@@ -73,20 +73,26 @@ builder.Services.AddControllersWithViews()
     .AddMicrosoftIdentityUI();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options => {
+    // Exclude the Microsoft.Identity.Web.UI sign-in controller (the "MicrosoftIdentity" area,
+    // /MicrosoftIdentity/Account/...) from the OpenAPI document — it's interactive auth UI, not
+    // part of the public API surface.
+    var includeByDefault = options.ShouldInclude;
+    options.ShouldInclude = description =>
+        includeByDefault(description)
+        && !(description.RelativePath?.StartsWith("MicrosoftIdentity", StringComparison.OrdinalIgnoreCase) ?? false);
+});
 
 var app = builder.Build();
 
 LinqToDBForEFTools.Initialize();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment()) {
-    app.MapOpenApi();
-    // Swagger UI served at /swagger, backed by the built-in OpenAPI document.
-    app.UseSwaggerUI(options => {
-        options.SwaggerEndpoint("/openapi/v1.json", "Shuttle API v1");
-    });
-}
+// OpenAPI document and Swagger UI are exposed in all environments (including production).
+app.MapOpenApi();
+// Swagger UI served at /swagger, backed by the built-in OpenAPI document.
+app.UseSwaggerUI(options => {
+    options.SwaggerEndpoint("/openapi/v1.json", "Shuttle API v1");
+});
 
 app.UseHttpsRedirection();
 

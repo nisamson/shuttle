@@ -1,0 +1,11 @@
+@using Shuttle.WebClient.Components
+@using Shuttle.WebClient.Models
+
+<footer class="app-footer @Class">
+    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="16"
+                 HorizontalAlignment="HorizontalAlignment.Center"
+                 VerticalAlignment="VerticalAlignment.Center" Wrap="true">
+        <ShuttleLink IsAnchor="true" Href="@SwaggerUrl" target="_blank" rel="noopener noreferrer">API documentation</ShuttleLink>
+        <ShuttleLink IsAnchor="true" Href="@Routes.External.License" target="_blank" rel="noopener noreferrer">AGPL-3.0 License</ShuttleLink>
+    </FluentStack>
+</footer>

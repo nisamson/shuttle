@@ -56,4 +56,10 @@ public static class Routes {
 
         public static string Board(Guid boardId) => $"{Root}/boards/{boardId}";
     }
+
+    /// <summary>Off-site links (project source, license, and the backend API surface).</summary>
+    public static class External {
+        public const string Repository = "https://github.com/nisamson/shuttle/";
+        public const string License = "https://github.com/nisamson/shuttle/blob/main/LICENSE";
+    }
 }

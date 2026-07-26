@@ -32,6 +32,42 @@ public partial class PlayerSearch : ComponentBase, IDisposable {
 
     private PlayerSuggestion? jumpSelection;
 
+    // Multi-select for starting a comparison. Selections persist across searches/pages (keyed by
+    // player id) so a comparison list can be built from several searches; "Clear" resets it.
+    private readonly Dictionary<int, PlayerCard> selectedById = [];
+
+    // The subset of the current page that is selected. The grid binds to this (using the current row
+    // instances) so its checkboxes reflect the persistent selection regardless of instance identity.
+    private IEnumerable<PlayerCard> SelectedOnPage =>
+        results.Where(p => selectedById.ContainsKey(p.PlayerId));
+
+    private int SelectedCount => selectedById.Count;
+
+    private bool CanCompare => SelectedCount >= 2;
+
+    private string CompareSelectedUrl => Routes.Players.CompareWith(selectedById.Keys);
+
+    private void CompareSelected() {
+        if (CanCompare) {
+            Navigation.NavigateTo(CompareSelectedUrl);
+        }
+    }
+
+    private void ClearSelection() => selectedById.Clear();
+
+    // Reconcile the persistent selection against the current page: rows that became selected are
+    // added, rows that became deselected are removed; selections from other pages are untouched.
+    private void OnSelectedPlayersChanged(IEnumerable<PlayerCard> selection) {
+        var selectedIds = selection.Select(p => p.PlayerId).ToHashSet();
+        foreach (var player in results) {
+            if (selectedIds.Contains(player.PlayerId)) {
+                selectedById[player.PlayerId] = player;
+            } else {
+                selectedById.Remove(player.PlayerId);
+            }
+        }
+    }
+
     protected override async Task OnInitializedAsync() {
         pagination.TotalItemCountChanged += OnPaginationTotalChanged;
         Navigation.LocationChanged += OnLocationChanged;

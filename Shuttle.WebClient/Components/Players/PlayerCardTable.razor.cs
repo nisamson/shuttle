@@ -34,7 +34,28 @@ public partial class PlayerCardTable : ComponentBase {
     /// </summary>
     [Parameter] public int? SuppressUserLinkFor { get; set; }
 
+    /// <summary>When <c>true</c>, renders a leading multi-select checkbox column.</summary>
+    [Parameter] public bool Selectable { get; set; }
+
+    /// <summary>The currently selected players (two-way bindable via <c>@bind-SelectedPlayers</c>).</summary>
+    [Parameter] public IEnumerable<PlayerCard> SelectedPlayers { get; set; } = [];
+
+    /// <summary>Raised when the selection changes.</summary>
+    [Parameter] public EventCallback<IEnumerable<PlayerCard>> SelectedPlayersChanged { get; set; }
+
     private bool Sortable => SortChanged.HasDelegate;
+
+    // Per-column pixel minimums keep the table readable on mobile; fr shares expand it when there's room.
+    private const string BaseColumns =
+        "minmax(140px, 1.5fr) minmax(130px, 1.5fr) minmax(60px, 0.6fr) minmax(90px, 0.9fr) " +
+        "minmax(80px, 0.8fr) minmax(70px, 0.8fr) minmax(110px, 1fr) minmax(90px, 0.9fr) minmax(180px, 2fr)";
+
+    private string GridColumns => Selectable ? $"auto {BaseColumns}" : BaseColumns;
+
+    private string GridStyle => Selectable ? "min-width: 990px;" : "min-width: 950px;";
+
+    /// <summary>The rows rendered by the grid, in the order supplied by the parent (no local sorting).</summary>
+    private IQueryable<PlayerCard> Rows => (Players ?? []).AsQueryable();
 
     private async Task ToggleSort(PlayerSortField field) {
         if (!Sortable) {
@@ -44,14 +65,6 @@ public partial class PlayerCardTable : ComponentBase {
         // Same column flips direction; a new column starts ascending.
         var descending = SortField == field && !SortDescending;
         await SortChanged.InvokeAsync(new PlayerTableSort(field, descending));
-    }
-
-    private string ThClass(PlayerSortField field) {
-        if (!Sortable) {
-            return string.Empty;
-        }
-
-        return SortField == field ? "th-sort active" : "th-sort";
     }
 
     private string SortIndicator(PlayerSortField field) =>

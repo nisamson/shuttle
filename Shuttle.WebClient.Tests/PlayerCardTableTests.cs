@@ -1,4 +1,5 @@
 using Bunit;
+using System.Linq;
 using Shuttle.Models.Players;
 using Shuttle.WebClient.Components.Players;
 using Shuttle.WebClient.Testing;
@@ -44,7 +45,7 @@ public class PlayerCardTableTests : WebClientTestContext {
 
         var cut = Render<PlayerCardTable>(p => p.Add(c => c.Players, new List<PlayerCard> { player }));
 
-        var link = cut.Find("a.emphasized-link");
+        var link = cut.Find(".emphasized-link");
         Assert.Equal($"/players/{player.PlayerId}", link.GetAttribute("href"));
     }
 
@@ -54,7 +55,7 @@ public class PlayerCardTableTests : WebClientTestContext {
 
         var cut = Render<PlayerCardTable>(p => p.Add(c => c.Players, new List<PlayerCard> { player }));
 
-        var link = cut.Find("a.user-link");
+        var link = cut.Find(".normal-link");
         Assert.Equal($"/users/{player.UserId}", link.GetAttribute("href"));
         Assert.Equal(player.Username, link.TextContent);
     }
@@ -87,7 +88,73 @@ public class PlayerCardTableTests : WebClientTestContext {
             .Add(c => c.Players, new List<PlayerCard> { player })
             .Add(c => c.SuppressUserLinkFor, player.UserId));
 
-        Assert.Empty(cut.FindAll("a.user-link"));
+        Assert.Empty(cut.FindAll(".normal-link"));
         Assert.Contains(player.Username, cut.Markup);
+    }
+
+    [Fact]
+    public void Clicking_a_sortable_header_raises_sort_changed_and_flips_direction() {
+        var players = SeedData.Players().Take(2).ToList();
+        PlayerCardTable.PlayerTableSort? captured = null;
+
+        var cut = Render<PlayerCardTable>(p => p
+            .Add(c => c.Players, players)
+            .Add(c => c.SortField, PlayerSortField.Name)
+            .Add(c => c.SortDescending, false)
+            .Add(c => c.SortChanged, (PlayerCardTable.PlayerTableSort s) => captured = s));
+
+        var header = cut.FindAll("thead [role=button]").First(e => e.TextContent.Contains("Name"));
+        header.Click();
+
+        Assert.NotNull(captured);
+        Assert.Equal(PlayerSortField.Name, captured!.Value.Field);
+        // Clicking the already-active ascending column flips it to descending.
+        Assert.True(captured.Value.Descending);
+    }
+
+    [Fact]
+    public void Headers_are_not_clickable_when_sort_is_disabled() {
+        var players = SeedData.Players().Take(2).ToList();
+
+        var cut = Render<PlayerCardTable>(p => p.Add(c => c.Players, players));
+
+        Assert.Empty(cut.FindAll("thead [role=button]"));
+    }
+
+    [Fact]
+    public void Renders_a_select_column_when_selectable() {
+        var players = SeedData.Players().Take(3).ToList();
+
+        var cut = Render<PlayerCardTable>(p => p
+            .Add(c => c.Players, players)
+            .Add(c => c.Selectable, true));
+
+        Assert.Single(cut.FindAll("th.select-all"));
+        Assert.Equal(players.Count, cut.FindAll("td.col-select").Count);
+    }
+
+    [Fact]
+    public void Has_no_select_column_by_default() {
+        var players = SeedData.Players().Take(3).ToList();
+
+        var cut = Render<PlayerCardTable>(p => p.Add(c => c.Players, players));
+
+        Assert.Empty(cut.FindAll(".col-select"));
+    }
+
+    [Fact]
+    public void Selecting_a_row_raises_selected_players_changed() {
+        var players = SeedData.Players().Take(2).ToList();
+        IEnumerable<PlayerCard>? captured = null;
+
+        var cut = Render<PlayerCardTable>(p => p
+            .Add(c => c.Players, players)
+            .Add(c => c.Selectable, true)
+            .Add(c => c.SelectedPlayersChanged, (IEnumerable<PlayerCard> s) => captured = s));
+
+        cut.FindAll("td.col-select")[0].Click();
+
+        Assert.NotNull(captured);
+        Assert.Equal(players[0].PlayerId, Assert.Single(captured!).PlayerId);
     }
 }

@@ -29,8 +29,21 @@
         <FluentPaginator State="pagination" CurrentPageIndexChanged="OnPageChanged"/>
     </div>
 
+    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center" Wrap="true">
+        <FluentButton Appearance="ButtonAppearance.Primary" OnClick="CompareSelected"
+                      Disabled="@(!CanCompare)"
+                      IconStart="@(new Icons.Regular.Size16.ArrowSwap())">Compare selected</FluentButton>
+        @if (SelectedCount > 0) {
+            <FluentButton Appearance="ButtonAppearance.Subtle" OnClick="ClearSelection">Clear selection</FluentButton>
+            <FluentText Size="TextSize.Size200">@SelectedCount selected@(CanCompare ? "" : " (select at least 2 to compare)")</FluentText>
+        }
+    </FluentStack>
+
     <PlayerCardTable Players="results"
                      Loading="loading"
+                     Selectable="true"
+                     SelectedPlayers="SelectedOnPage"
+                     SelectedPlayersChanged="OnSelectedPlayersChanged"
                      SortField="query.SortBy"
                      SortDescending="query.SortDescending"
                      SortChanged="OnSortChanged"/>

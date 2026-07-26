@@ -21,6 +21,16 @@ a, .btn-link {
     text-decoration: underline;
 }
 
+/* Standard link styling (accent colored, underline on hover). */
+.normal-link {
+    color: var(--accent-fill-rest);
+    text-decoration: none;
+}
+
+.normal-link:hover {
+    text-decoration: underline;
+}
+
 .btn-primary {
     color: #fff;
     background-color: #1b6ec2;
@@ -36,6 +46,53 @@ a, .btn-link {
     width: 100%;
     max-width: 80rem;
     margin-inline: auto;
+}
+
+.app-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1rem;
+    border-top: var(--strokeWidthThin, 1px) solid var(--colorNeutralStroke2, rgba(0, 0, 0, 0.1));
+}
+
+/* Give the footer bar a comfortable height and let the inner footer fill it, so the links sit at
+   the vertical center of the bar. Height/centering live on the layout item (not the inner element)
+   because the FluentLayout footer cell clips overflow — an over-tall child would be cut off. */
+.fluent-layout-item.app-footer-bar {
+    display: flex;
+    min-height: 3.25rem;
+    padding: 0;
+}
+
+.fluent-layout-item.app-footer-bar > .app-footer {
+    flex: 1 1 auto;
+}
+
+/* The inline footer (rendered at the end of the content) is hidden by default; the fixed footer
+   bar is used instead. On short viewports the bar is dropped and the inline copy is shown so the
+   links flow after the content rather than pinning to the bottom of a cramped screen. */
+.app-footer-inline {
+    display: none;
+}
+
+@media (max-height: 640px) {
+    .fluent-layout-item.app-footer-bar {
+        display: none;
+    }
+
+    /* Subtler than the bar: smaller text and muted link color, separated from the content above by
+       the top divider. */
+    .app-footer-inline {
+        display: flex;
+        margin-top: 1.5rem;
+        padding-block: 0.5rem;
+        font-size: var(--fontSizeBase200, 0.75rem);
+    }
+
+    .app-footer-inline .normal-link {
+        color: var(--colorNeutralForeground3);
+    }
 }
 
 /* Collapsible desktop navigation rail: icons only when collapsed.
