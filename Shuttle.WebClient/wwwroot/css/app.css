@@ -21,6 +21,16 @@ a, .btn-link {
     text-decoration: underline;
 }
 
+/* Standard link styling (accent colored, underline on hover). */
+.normal-link {
+    color: var(--accent-fill-rest);
+    text-decoration: none;
+}
+
+.normal-link:hover {
+    text-decoration: underline;
+}
+
 .btn-primary {
     color: #fff;
     background-color: #1b6ec2;

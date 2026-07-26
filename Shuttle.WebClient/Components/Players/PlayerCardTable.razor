@@ -12,17 +12,25 @@
                @onclick="() => ToggleSort(spec.Field)">@spec.Title<span style="font-size: 0.85em;">@SortIndicator(spec.Field)</span></span>;
 }
 
-<FluentDataGrid Items="@Rows" TGridItem="PlayerCard" Loading="Loading"
-                GridTemplateColumns="1.5fr 1.5fr 0.6fr 0.9fr 0.8fr 0.8fr 1fr 0.9fr 2fr">
+<div style="overflow-x: auto;">
+<FluentDataGrid Items="@Rows" TGridItem="PlayerCard" Loading="Loading" Style="@GridStyle"
+                GridTemplateColumns="@GridColumns">
     <ChildContent>
+    @if (Selectable) {
+        <SelectColumn TGridItem="PlayerCard"
+                      SelectMode="DataGridSelectMode.Multiple"
+                      SelectFromEntireRow="false"
+                      SelectedItems="SelectedPlayers"
+                      SelectedItemsChanged="SelectedPlayersChanged"/>
+    }
     <TemplateColumn Title="Name" HeaderCellItemTemplate="@(_ => SortHeader(("Name", PlayerSortField.Name)))">
-        <a class="emphasized-link" href="@PlayerRoute(context.PlayerId)">@context.Name</a>
+        <ShuttleLink Emphasized="true" Href="@PlayerRoute(context.PlayerId)">@context.Name</ShuttleLink>
     </TemplateColumn>
     <TemplateColumn Title="Username" HeaderCellItemTemplate="@(_ => SortHeader(("Username", PlayerSortField.Username)))">
         @if (context.UserId == SuppressUserLinkFor) {
             @context.Username
         } else {
-            <a class="user-link" href="@UserRoute(context.UserId)">@context.Username</a>
+            <ShuttleLink Href="@UserRoute(context.UserId)">@context.Username</ShuttleLink>
         }
     </TemplateColumn>
     <TemplateColumn Title="Pos" HeaderCellItemTemplate="@(_ => SortHeader(("Pos", PlayerSortField.Position)))">
@@ -46,9 +54,9 @@
     </TemplateColumn>
     <TemplateColumn Title="Flags">
         @if (context.Recreate) {
-            <FluentBadge Appearance="BadgeAppearance.Outline" Color="BadgeColor.Informative" title="Recreate — not the member's first player">Recreate</FluentBadge>
+            <FluentBadge Appearance="BadgeAppearance.Filled" Color="BadgeColor.Success" title="Recreate — not the member's first player">Recreate</FluentBadge>
         } else {
-            <FluentBadge Appearance="BadgeAppearance.Filled" Color="BadgeColor.Success" title="Portal First-gen — the member's first player on the portal (they may have had players before the portal existed)">Portal First-gen</FluentBadge>
+            <FluentBadge Appearance="BadgeAppearance.Outline" Color="BadgeColor.Informative" title="Portal First-gen — the member's first player on the portal (they may have had players before the portal existed)">Portal First-gen</FluentBadge>
         }
         @if (context.Inactive) {
             <FluentBadge Appearance="BadgeAppearance.Filled" Color="BadgeColor.Severe" title="Inactive on-site">Inactive</FluentBadge>
@@ -66,3 +74,4 @@
         No players match your filters.
     </EmptyContent>
 </FluentDataGrid>
+</div>
