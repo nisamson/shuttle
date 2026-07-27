@@ -31,7 +31,15 @@ public partial class UserCardTable : ComponentBase {
 
     private bool Sortable => SortChanged.HasDelegate;
 
-    private int ColumnCount => ShowDiscord ? 3 : 2;
+    /// <summary>The rows rendered by the grid, in the order supplied by the parent (no local sorting).</summary>
+    private IQueryable<UserCard> Rows => (Users ?? []).AsQueryable();
+
+    // Per-column pixel minimums keep the table readable on mobile; fr shares expand it when there's room.
+    private const string BaseColumns = "minmax(160px, 2fr) minmax(90px, 0.8fr)";
+
+    private string GridColumns => ShowDiscord ? $"{BaseColumns} minmax(140px, 1.5fr)" : BaseColumns;
+
+    private string GridStyle => ShowDiscord ? "min-width: 420px;" : "min-width: 260px;";
 
     private async Task ToggleSort(UserSortField field) {
         if (!Sortable) {
@@ -41,14 +49,6 @@ public partial class UserCardTable : ComponentBase {
         // Same column flips direction; a new column starts ascending.
         var descending = SortField == field && !SortDescending;
         await SortChanged.InvokeAsync(new UserTableSort(field, descending));
-    }
-
-    private string ThClass(UserSortField field) {
-        if (!Sortable) {
-            return string.Empty;
-        }
-
-        return SortField == field ? "th-sort active" : "th-sort";
     }
 
     private string SortIndicator(UserSortField field) =>
