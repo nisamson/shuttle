@@ -38,11 +38,23 @@ jobs:
       - name: Build
         run: dotnet build SHLAnalytics.sln -c Release --no-restore
 
+      # `--` forwards args to the Microsoft Testing Platform runner. `--output Detailed`
+      # prints each failing test's name, assertion message and stack trace to the console
+      # (by default only a summary is shown, with details hidden in a per-run .log file).
       - name: Test (Shuttle.Tests)
-        run: dotnet test Shuttle.Tests/Shuttle.Tests.csproj -c Release --no-build
+        run: dotnet test Shuttle.Tests/Shuttle.Tests.csproj -c Release --no-build -- --output Detailed --show-live-output on
 
       - name: Test (Shuttle.WebClient.Tests)
-        run: dotnet test Shuttle.WebClient.Tests/Shuttle.WebClient.Tests.csproj -c Release --no-build
+        run: dotnet test Shuttle.WebClient.Tests/Shuttle.WebClient.Tests.csproj -c Release --no-build -- --output Detailed --show-live-output on
+
+      # Fallback: surface the runner's diagnostic logs inline if a test step failed.
+      - name: Print test logs on failure
+        if: failure()
+        shell: bash
+        run: |
+          echo "::group::Test runner logs"
+          find . -type f \( -path '*/TestResults/*.log' -o -name '*.diag' \) -print -exec cat {} \; || true
+          echo "::endgroup::"
 
   e2e:
     name: WebClient E2E
