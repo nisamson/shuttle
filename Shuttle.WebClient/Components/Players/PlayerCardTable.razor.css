@@ -1,0 +1,15 @@
+/* Flags column: show full labels by default, collapse to short labels on narrow screens
+   so the badges stay compact. The full text is always kept in each badge's tooltip. */
+.flag-short {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .flag-full {
+        display: none;
+    }
+
+    .flag-short {
+        display: inline;
+    }
+}

@@ -231,17 +231,14 @@ public partial class ScoutingBoard : ComponentBase {
         row.Tpe is { } tpe ? tpe.ToString("N0", CultureInfo.InvariantCulture) : "—";
 
     private static string BankText(BoardRow row) =>
-        row.Bank is { } bank ? bank.ToString("C0", UsdCulture) : "—";
+        row.Bank is { } bank ? FormatMillions(bank) : "—";
 
-    // Renders bank balances as USD ($12,500) regardless of the browser's locale, matching PlayerProfile.
-    private static readonly CultureInfo UsdCulture = CreateUsdCulture();
-
-    private static CultureInfo CreateUsdCulture() {
-        var culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
-        culture.NumberFormat.CurrencySymbol = "$";
-        culture.NumberFormat.CurrencyPositivePattern = 0;
-        culture.NumberFormat.CurrencyNegativePattern = 1;
-        return culture;
+    // Abbreviates a bank balance to millions with one decimal place ($26.6M, $0.6M, -$1.2M),
+    // rendering as USD regardless of the browser's locale.
+    private static string FormatMillions(int bank) {
+        var millions = bank / 1_000_000m;
+        var sign = millions < 0 ? "-" : string.Empty;
+        return $"{sign}${Math.Abs(millions).ToString("0.0", CultureInfo.InvariantCulture)}M";
     }
 
     private async Task OnPlayerSearch(OptionsSearchEventArgs<PlayerSuggestion> e) {
