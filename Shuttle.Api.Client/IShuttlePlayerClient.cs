@@ -39,7 +39,7 @@ public interface IShuttlePlayerClient {
     /// </summary>
     /// <param name="playerId">The SHL player id.</param>
     /// <param name="token">A cancellation token.</param>
-    [Get("/player/{playerId}")]
+    [Get("/players/{playerId}")]
     Task<PlayerCard?> GetPlayer(int playerId, CancellationToken token = default);
 
     /// <summary>
@@ -49,7 +49,7 @@ public interface IShuttlePlayerClient {
     /// </summary>
     /// <param name="playerId">The SHL player id.</param>
     /// <param name="token">A cancellation token.</param>
-    [Get("/player/{playerId}/tpe-timeline")]
+    [Get("/players/{playerId}/tpe-timeline")]
     Task<IReadOnlyList<TpeTimelinePoint>?> GetPlayerTpeTimeline(int playerId, CancellationToken token = default);
 
     /// <summary>

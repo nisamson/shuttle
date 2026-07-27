@@ -10,7 +10,7 @@ using Shuttle.Models.Users;
 
 namespace Shuttle.Tests.Api;
 
-public class UsersControllerTests {
+public class ShuttleUserControllerTests {
     private static readonly Guid ObjectId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
     [Fact]
@@ -89,7 +89,7 @@ public class UsersControllerTests {
         Username = username,
     };
 
-    private static UsersController CreateController(IUserService service, ClaimsPrincipal user) => new(service) {
+    private static ShuttleUserController CreateController(IUserService service, ClaimsPrincipal user) => new(service) {
         ControllerContext = new ControllerContext {
             HttpContext = new DefaultHttpContext { User = user },
         },

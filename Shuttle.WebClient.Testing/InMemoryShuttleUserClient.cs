@@ -10,7 +10,7 @@ namespace Shuttle.WebClient.Testing;
 
 /// <summary>
 /// In-memory <see cref="IShuttleUserClient"/> that serves <see cref="SeedData"/> users without any
-/// HTTP, backend, or Azure dependency. Mirrors the server's <c>UserController</c> semantics closely
+/// HTTP, backend, or Azure dependency. Mirrors the server's <c>UsersController</c> semantics closely
 /// enough that the WebClient behaves identically against it: Discord names are only surfaced when the
 /// (fake) caller is authenticated, and player cards follow the same null-vs-empty contract.
 /// </summary>

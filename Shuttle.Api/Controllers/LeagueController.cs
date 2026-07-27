@@ -17,7 +17,6 @@ namespace Shuttle.Api.Controllers;
 [AllowAnonymous]
 [ApiController]
 [Route("leagues")]
-[Route("league")]
 public class LeagueController : ControllerBase {
     private static readonly TimeSpan CacheMaxAge = TimeSpan.FromHours(1);
 

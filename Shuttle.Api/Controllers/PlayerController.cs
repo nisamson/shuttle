@@ -17,7 +17,6 @@ namespace Shuttle.Api.Controllers;
 [AllowAnonymous]
 [ApiController]
 [Route("players")]
-[Route("player")]
 public class PlayerController : ControllerBase {
     /// <summary>Cache lifetime for card/search/timeline responses before revalidation.</summary>
     private static readonly TimeSpan CacheMaxAge = TimeSpan.FromMinutes(5);

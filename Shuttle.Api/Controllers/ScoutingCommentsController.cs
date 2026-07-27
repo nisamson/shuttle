@@ -12,7 +12,6 @@ namespace Shuttle.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("scouting/comments")]
-[Route("scouting/comment")]
 public class ScoutingCommentsController : ControllerBase {
     private readonly IScoutingService scouting;
 

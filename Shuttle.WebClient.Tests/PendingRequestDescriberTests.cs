@@ -29,7 +29,7 @@ public class PendingRequestDescriberTests {
 
     [Fact]
     public void Get_a_player_falls_back_to_loading_the_resource() {
-        Assert.Equal("Loading players…", Describe(HttpMethod.Get, "/player/1042"));
+        Assert.Equal("Loading players…", Describe(HttpMethod.Get, "/players/1042"));
     }
 
     [Fact]
