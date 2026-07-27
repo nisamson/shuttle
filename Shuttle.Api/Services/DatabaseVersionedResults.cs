@@ -12,6 +12,14 @@ namespace Shuttle.Api.Services;
 /// freshness signal (see <see cref="IDatabaseFreshnessProvider"/>), and requests carrying a matching
 /// <c>If-None-Match</c> short-circuit to <c>304 Not Modified</c> so unchanged data is not re-sent.
 /// </summary>
+/// <remarks>
+/// NOTE: Any <b>new</b> endpoint whose response is fed from the <see cref="Jobs.DbUpdateJob"/>
+/// database refresh (i.e. its body only changes when that job runs) should be ETagged through this
+/// helper: fetch the freshness signal via <see cref="IDatabaseFreshnessProvider"/> and return the
+/// body with <see cref="DbVersionedOk{T}"/>. Do <b>not</b> use it for responses that also vary by
+/// caller (e.g. auth-dependent bodies) or for body-carrying <c>QUERY</c>/non-<c>GET</c> endpoints,
+/// where an ETag keyed only on path + query string would be incorrect.
+/// </remarks>
 public static class DatabaseVersionedResults {
     /// <summary>
     /// Sets the freshness-derived cache headers on the response and returns <c>200</c> with

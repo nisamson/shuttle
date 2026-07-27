@@ -86,13 +86,15 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
                 .ToList();
 
             if (toFetch.Count > 0) {
-                var results = await Task.WhenAll(toFetch.Select(FetchAsync));
-                foreach (var (id, card) in results) {
-                    if (card is null) {
-                        missing.Add(id);
-                    } else {
-                        cards[id] = card;
-                    }
+                // One bulk round trip for all newly requested players; ids the server doesn't return
+                // are recorded as missing so they're not re-fetched on the next navigation.
+                var fetched = await PlayerClient.GetPlayerCardsBatched(toFetch);
+                foreach (var card in fetched) {
+                    cards[card.PlayerId] = card;
+                }
+
+                foreach (var id in toFetch.Where(id => !cards.ContainsKey(id))) {
+                    missing.Add(id);
                 }
             }
 
@@ -108,14 +110,6 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
             loadError = ex.Message;
         } finally {
             loading = false;
-        }
-    }
-
-    private async Task<(int Id, PlayerCard? Card)> FetchAsync(int id) {
-        try {
-            return (id, await PlayerClient.GetPlayer(id));
-        } catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound) {
-            return (id, null);
         }
     }
 

@@ -46,6 +46,17 @@ public sealed class InMemoryShuttlePlayerClient : IShuttlePlayerClient {
     public Task<PlayerCard?> GetPlayer(int playerId, CancellationToken token = default) =>
         Task.FromResult(players.FirstOrDefault(p => p.PlayerId == playerId));
 
+    // Mirrors the server's QUERY /players/cards semantics against the seed set: returns the card for
+    // each known id (unknown ids omitted), ordered by name.
+    public Task<IReadOnlyList<PlayerCard>> GetPlayerCards(PlayerCardsRequest request, CancellationToken token = default) {
+        var ids = (request.PlayerIds ?? []).Distinct().ToHashSet();
+        IReadOnlyList<PlayerCard> cards = players
+            .Where(p => ids.Contains(p.PlayerId))
+            .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return Task.FromResult(cards);
+    }
+
     public Task<IReadOnlyList<TpeTimelinePoint>?> GetPlayerTpeTimeline(int playerId, CancellationToken token = default) {
         var player = players.FirstOrDefault(p => p.PlayerId == playerId);
         return Task.FromResult(player is null ? null : BuildTimeline(player));

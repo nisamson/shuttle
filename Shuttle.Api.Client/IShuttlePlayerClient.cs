@@ -53,6 +53,17 @@ public interface IShuttlePlayerClient {
     Task<IReadOnlyList<TpeTimelinePoint>?> GetPlayerTpeTimeline(int playerId, CancellationToken token = default);
 
     /// <summary>
+    /// Fetches the "at a glance" <see cref="PlayerCard"/> for a batch of player ids in a single
+    /// request, ordered by name. Unknown ids are omitted from the result. Uses the HTTP <c>QUERY</c>
+    /// verb so large id sets aren't constrained by URL length. Prefer this over issuing one
+    /// <see cref="GetPlayer"/> per id when resolving many cards at once.
+    /// </summary>
+    /// <param name="request">The player ids to fetch cards for.</param>
+    /// <param name="token">A cancellation token.</param>
+    [HttpQuery("/players/cards")]
+    Task<IReadOnlyList<PlayerCard>> GetPlayerCards([Body] PlayerCardsRequest request, CancellationToken token = default);
+
+    /// <summary>
     /// Looks up a batch of player ids and/or names, resolving them to concrete players (reporting
     /// unknown and ambiguous inputs) without mutating anything. Uses the HTTP <c>QUERY</c> verb. Backs
     /// the bulk-add preview.

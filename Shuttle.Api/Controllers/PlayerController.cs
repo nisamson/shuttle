@@ -289,6 +289,47 @@ public class PlayerController : ControllerBase {
 
     private const int MaxResolveInputs = 200;
 
+    /// <summary>Upper bound on the number of ids accepted by the batch card lookup.</summary>
+    private const int MaxCardIds = 500;
+
+    /// <summary>
+    /// Fetches the "at a glance" <see cref="PlayerCard"/> for a batch of player ids in a single round
+    /// trip, ordered by name. Unknown ids are simply omitted from the result. Uses the HTTP
+    /// <c>QUERY</c> method (a safe, idempotent read that carries a request body) so large id sets are
+    /// not constrained by URL length. Backs the scouting board and player comparison, which resolve
+    /// many cards at once. Not ETagged: the id set lives in the request body, so a path+query
+    /// validator could not distinguish distinct batches.
+    /// </summary>
+    [AcceptVerbs("QUERY", Route = "cards")]
+    [ProducesResponseType<IReadOnlyList<PlayerCard>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<IReadOnlyList<PlayerCard>>> GetPlayerCards(
+        [FromBody] PlayerCardsRequest request,
+        CancellationToken cancellationToken) {
+        var ids = (request.PlayerIds ?? []).Distinct().ToList();
+
+        if (ids.Count == 0) {
+            return Ok(Array.Empty<PlayerCard>());
+        }
+
+        if (ids.Count > MaxCardIds) {
+            return BadRequest(new ProblemDetails {
+                Detail = $"Too many ids; request at most {MaxCardIds} player cards at a time.",
+                Status = StatusCodes.Status400BadRequest,
+            });
+        }
+
+        var rows = await db.PlayerInformation
+            .AsNoTracking()
+            .IgnoreAutoIncludes()
+            .Where(p => ids.Contains(p.PlayerId))
+            .OrderBy(p => p.Name)
+            .SelectCardRows(db.PlayerInformation)
+            .ToListAsync(cancellationToken);
+
+        return Ok(rows.ToPlayerCards());
+    }
+
     private sealed record NameMatch(int PlayerId, string LoweredName);
 
     /// <summary>
