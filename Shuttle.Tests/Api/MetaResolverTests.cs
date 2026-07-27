@@ -70,15 +70,6 @@ public class MetaResolverTests {
     }
 
     [Fact]
-    public async Task Supports_the_singular_player_route() {
-        var resolver = await SetupAsync(seed: db => db.PlayerInformation.Add(Player(1001, "Alice Skater")));
-
-        var meta = await resolver.ResolveAsync("/player/1001", null, Origin, Ct);
-
-        Assert.Contains("Alice Skater", meta.Title);
-    }
-
-    [Fact]
     public async Task Falls_back_to_site_default_for_an_unknown_player() {
         var resolver = await SetupAsync();
 

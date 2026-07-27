@@ -70,9 +70,9 @@ public sealed class MetaResolver : IMetaResolver {
         // Entity routes.
         if (segments.Length == 2) {
             switch (segments[0].ToLowerInvariant()) {
-                case "players" or "player" when int.TryParse(segments[1], out var playerId):
+                case "players" when int.TryParse(segments[1], out var playerId):
                     return await ResolvePlayerAsync(playerId, Make, defaultMetadata, cancellationToken);
-                case "users" or "user":
+                case "users":
                     return await ResolveUserAsync(segments[1], Make, defaultMetadata, cancellationToken);
                 case "blogs":
                     return ResolveBlog(segments[1], Make, defaultMetadata);

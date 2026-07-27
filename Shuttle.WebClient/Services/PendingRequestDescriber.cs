@@ -18,7 +18,7 @@ public static class PendingRequestDescriber {
         if (segments.Length >= 2) {
             var resource = segments[0].ToLowerInvariant();
             var sub = segments[1].ToLowerInvariant();
-            if (resource is "players" or "player") {
+            if (resource is "players") {
                 switch (sub) {
                     case "lookup":
                         return "Looking up players…";
@@ -47,9 +47,9 @@ public static class PendingRequestDescriber {
         }
 
         return segments[0].ToLowerInvariant() switch {
-            "players" or "player" => "players",
-            "users" or "user" => "users",
-            "leagues" or "league" or "seasons" => "league",
+            "players" => "players",
+            "users" or "shuttle-users" => "users",
+            "leagues" or "seasons" => "league",
             "scouting" => "scouting board",
             _ => "data",
         };
