@@ -79,6 +79,29 @@ ALTER ROLE db_datawriter ADD MEMBER [<APP_REGISTRATION_NAME>];
 > `db_ddladmin` covers standard migration DDL. If a future migration needs ownership-level
 > operations (e.g. certain temporal-table changes), promote the user to `db_owner`.
 
+### 5. One-time role-assignment bootstrap (`FIRST_RUN`)
+
+The Aspire infrastructure defines three RBAC role assignments (ACR `AcrPull` for the pull
+identity, the dashboard identity's RG-scoped `Contributor`, and the web app's `Website
+Contributor`). Creating them needs `Microsoft.Authorization/roleAssignments/write`, which the CI
+deploy principal intentionally **does not** have. `Shuttle.Backend.Aspire/AppHost.cs` therefore
+strips them from the generated template unless `FIRST_RUN=true`.
+
+**Run this once**, locally, from an identity with `Owner` or `User Access Administrator` on RG
+`shlanalyticswest`, **before the first CI release** (and again only if the set of role assignments
+changes):
+
+```powershell
+$env:FIRST_RUN = "true"
+./scripts/Deploy-BackendAspire.ps1     # aspire deploy — emits + creates the role assignments
+Remove-Item Env:FIRST_RUN
+```
+
+Thereafter every deploy — including CI — leaves `FIRST_RUN` unset, so the role assignments are
+stripped and the deploy needs no `roleAssignments/write`. Azure incremental deployments never
+delete resources absent from the template, so the bootstrapped assignments persist. See
+[Known caveats](#known-caveats) for the rationale.
+
 ## GitHub configuration
 
 ### Secrets (repo-level)
@@ -132,22 +155,31 @@ artifact for review before a real deployment.
 
 ## Known caveats
 
-- **Aspire role-assignment provisioning may need RBAC write on first CI run.** A fresh runner
-  has none of the cached provisioning state that lives in the local AppHost user secrets, so
-  `aspire deploy` re-evaluates every provisioning deployment — including the `*-roles`
-  deployments that assign the managed identity DB access. Creating role assignments needs
-  `Microsoft.Authorization/roleAssignments/write`, which **Contributor does not grant**.
+- **Role assignments are created once via a `FIRST_RUN` bootstrap, then stripped in CI.** The
+  generated Azure infrastructure includes three RBAC role assignments (ACR `AcrPull` for the
+  pull identity, the Aspire dashboard identity's RG-scoped `Contributor`, and the web app's
+  `Website Contributor`). Creating them needs `Microsoft.Authorization/roleAssignments/write`,
+  which **`Contributor` does not grant** and which the CI deploy principal intentionally lacks.
 
-  **Preferred fix — pre-provision the role assignments out-of-band.** Have an owner/admin apply
-  the managed-identity role assignments once (locally, or from an already-provisioned
-  environment), so steady-state CI runs are pure `aspire deploy` with no RBAC-write need. This
-  keeps the deploy principal least-privileged.
+  `Shuttle.Backend.Aspire/AppHost.cs` reads a `FIRST_RUN` config flag:
+  - **Bootstrap (one time):** run `aspire deploy` **locally** from an identity that can assign
+    roles (Owner or User Access Administrator on the RG) with `FIRST_RUN=true`. This emits the
+    role assignments and creates them:
+
+    ```pwsh
+    $env:FIRST_RUN = "true"
+    ./scripts/Deploy-BackendAspire.ps1   # or: aspire deploy from Shuttle.Backend.Aspire
+    Remove-Item Env:FIRST_RUN
+    ```
+  - **Steady state (every later deploy, incl. CI):** `FIRST_RUN` is unset, so the role
+    assignments are stripped from the template and the deploy needs no `roleAssignments/write`.
+    Azure incremental deployments never delete resources absent from the template, so the
+    role assignments created during bootstrap remain in place and the app keeps working.
 
   Avoid the tempting shortcut of granting the deploy service principal
   `User Access Administrator` (or `Owner`): combined with its existing `Contributor`, that would
-  let a compromised CI run grant itself any role and establish persistence. If a one-off
-  role-assignment write is genuinely unavoidable, prefer an interactive, human-run
-  `az role assignment create` under an admin identity over widening the CI principal.
+  let a compromised CI run grant itself any role and establish persistence. The `FIRST_RUN`
+  bootstrap keeps the CI principal least-privileged.
 
 - **`db_ddladmin` scope.** Covers standard migration DDL; promote the DB user to `db_owner` if a
   future migration needs ownership-level operations (e.g. certain temporal-table changes).
