@@ -1,6 +1,5 @@
 using System.Globalization;
 using Microsoft.Extensions.Caching.Hybrid;
-using Quartz;
 using Shuttle.Api.Jobs;
 using Shuttle.EFCore.Recruitment;
 
@@ -62,20 +61,20 @@ public sealed class RecruitmentAnalysisCache : IRecruitmentAnalysisCache {
     };
 
     private readonly HybridCache cache;
-    private readonly ISchedulerFactory schedulerFactory;
+    private readonly IDatabaseFreshnessProvider freshness;
     private readonly IServiceScopeFactory scopeFactory;
 
     public RecruitmentAnalysisCache(
         HybridCache cache,
-        ISchedulerFactory schedulerFactory,
+        IDatabaseFreshnessProvider freshness,
         IServiceScopeFactory scopeFactory) {
         this.cache = cache;
-        this.schedulerFactory = schedulerFactory;
+        this.freshness = freshness;
         this.scopeFactory = scopeFactory;
     }
 
     public async ValueTask<RecruitmentAnalysisSnapshot> GetAsync(CancellationToken cancellationToken = default) {
-        var lastUpdated = await GetLastUpdatedAsync(cancellationToken);
+        var lastUpdated = await freshness.GetLastUpdatedAsync(cancellationToken);
         var key = CacheKeyPrefix + (lastUpdated?.ToString("o", CultureInfo.InvariantCulture) ?? "none");
 
         var analysis = await cache.GetOrCreateAsync(
@@ -91,20 +90,6 @@ public sealed class RecruitmentAnalysisCache : IRecruitmentAnalysisCache {
             cancellationToken);
 
         return new RecruitmentAnalysisSnapshot(analysis, lastUpdated);
-    }
-
-    private async Task<DateTimeOffset?> GetLastUpdatedAsync(CancellationToken cancellationToken) {
-        var scheduler = await schedulerFactory.GetScheduler(cancellationToken);
-        var jobDetail = await scheduler.GetJobDetail(DbUpdateJob.JobKey, cancellationToken);
-        var raw = jobDetail?.JobDataMap.GetString(DbUpdateJob.LastUpdatedKey);
-
-        return DateTimeOffset.TryParse(
-            raw,
-            CultureInfo.InvariantCulture,
-            DateTimeStyles.RoundtripKind,
-            out var parsed)
-            ? parsed
-            : null;
     }
 }
 

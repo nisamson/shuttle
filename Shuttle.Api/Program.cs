@@ -5,6 +5,7 @@ using Microsoft.Identity.Web.TokenCacheProviders.InMemory;
 using Microsoft.Identity.Web.UI;
 using Shuttle.Api;
 using Shuttle.Api.Meta;
+using Shuttle.Api.Services;
 using Shuttle.Api.Services.Recruitment;
 using Shuttle.Api.Services.Scouting;
 using Shuttle.Api.Services.Users;
@@ -65,6 +66,7 @@ builder.Services.AddUserService();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoutingAccessService();
 builder.Services.AddScoutingService();
+builder.Services.AddSingleton<IDatabaseFreshnessProvider, DatabaseFreshnessProvider>();
 builder.Services.AddRecruitmentAnalysisCache();
 
 builder.Services.AddMetaEndpoint(builder.Configuration);

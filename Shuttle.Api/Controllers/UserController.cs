@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Net.Http.Headers;
 using Shuttle.Api.Contracts;
+using Shuttle.Api.Services;
 using Shuttle.EFCore;
 using Shuttle.EFCore.Entities;
 using Shuttle.Models.Players;
@@ -18,11 +18,19 @@ namespace Shuttle.Api.Controllers;
 [ApiController]
 [Route("[controller]")]
 public class UserController : ControllerBase {
+    /// <summary>Cache lifetime for the slim autocomplete directory (fetched once, filtered locally).</summary>
+    private static readonly TimeSpan DirectoryCacheMaxAge = TimeSpan.FromHours(1);
+
     private readonly ShlDbContext db;
+    private readonly IDatabaseFreshnessProvider freshness;
     private readonly ILogger<UserController> logger;
 
-    public UserController(ShlDbContext db, ILogger<UserController> logger) {
+    public UserController(
+        ShlDbContext db,
+        IDatabaseFreshnessProvider freshness,
+        ILogger<UserController> logger) {
         this.db = db;
+        this.freshness = freshness;
         this.logger = logger;
     }
 
@@ -137,8 +145,11 @@ public class UserController : ControllerBase {
     /// </summary>
     [HttpGet("~/users/suggestions")]
     [ProducesResponseType<IReadOnlyList<UserSuggestion>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status304NotModified)]
     public async Task<ActionResult<IReadOnlyList<UserSuggestion>>> GetUserSuggestions(
         CancellationToken cancellationToken) {
+        var lastUpdated = await freshness.GetLastUpdatedAsync(cancellationToken);
+
         var suggestions = await db.Users
             .AsNoTracking()
             .IgnoreAutoIncludes()
@@ -149,12 +160,7 @@ public class UserController : ControllerBase {
             })
             .ToListAsync(cancellationToken);
 
-        Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue {
-            Public = true,
-            MaxAge = TimeSpan.FromHours(1),
-        };
-
-        return Ok(suggestions);
+        return this.DbVersionedOk(suggestions, lastUpdated, DirectoryCacheMaxAge);
     }
 
     private static IOrderedQueryable<ShlUser> ApplySort(IQueryable<ShlUser> source, UserSearchQuery query) {

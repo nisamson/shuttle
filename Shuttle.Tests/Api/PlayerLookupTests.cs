@@ -47,7 +47,12 @@ public class PlayerLookupTests {
         var db = CreateContext();
         db.PlayerInformation.AddRange(players);
         await db.SaveChangesAsync(Ct);
-        return new PlayerController(db, NullLogger<PlayerController>.Instance);
+        return new PlayerController(db, new StubFreshnessProvider(), NullLogger<PlayerController>.Instance);
+    }
+
+    private sealed class StubFreshnessProvider : Shuttle.Api.Services.IDatabaseFreshnessProvider {
+        public Task<DateTimeOffset?> GetLastUpdatedAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<DateTimeOffset?>(null);
     }
 
     private static async Task<PlayerLookupResult> LookupAsync(PlayerController controller, PlayerLookupRequest request) {
