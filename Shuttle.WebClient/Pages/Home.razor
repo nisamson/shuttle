@@ -21,7 +21,7 @@
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); grid-auto-rows: 1fr; gap: 1rem; width: 100%;">
         @foreach (var feature in Features)
         {
-            <a href="@feature.Href" style="text-decoration: none; color: inherit; display: flex;">
+            <ShuttleLink Class="" Href="@feature.Href" style="text-decoration: none; color: inherit; display: flex;">
                 <FluentCard Style="height: 100%; text-align: start;">
                     <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
                         <FluentStack VerticalAlignment="VerticalAlignment.Center" HorizontalGap="8">
@@ -31,7 +31,7 @@
                         <p style="margin: 0;">@feature.Description</p>
                     </FluentStack>
                 </FluentCard>
-            </a>
+            </ShuttleLink>
         }
     </div>
 </FluentStack>

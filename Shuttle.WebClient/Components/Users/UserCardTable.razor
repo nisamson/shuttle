@@ -23,7 +23,7 @@
             } else {
                 @foreach (var u in Users) {
                     <tr>
-                        <td><a class="user-link" href="@UserRoute(u.UserId)">@u.Username</a></td>
+                        <td><ShuttleLink Emphasized="true" Href="@UserRoute(u.UserId)">@u.Username</ShuttleLink></td>
                         <td class="num">@u.UserId</td>
                         @if (ShowDiscord) {
                             <td>@(string.IsNullOrWhiteSpace(u.DiscordName) ? "—" : u.DiscordName)</td>

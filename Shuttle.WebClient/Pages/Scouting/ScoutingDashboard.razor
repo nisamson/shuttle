@@ -45,7 +45,7 @@
     } else {
         <FluentDataGrid Items="@myTeams.AsQueryable()" TGridItem="ScoutingTeamSummary" GridTemplateColumns="2fr 1fr 1fr 1fr 1.5fr">
             <TemplateColumn Title="Name" Sortable="true" SortBy="@nameSort">
-                <a href="@Routes.Scouting.Team(context.Id)">@context.Name</a>
+                <ShuttleLink Href="@Routes.Scouting.Team(context.Id)">@context.Name</ShuttleLink>
             </TemplateColumn>
             <TemplateColumn Title="My role">@RoleLabel(context.MyRole)</TemplateColumn>
             <PropertyColumn Property="@(t => t.MemberCount)" Title="Members" Sortable="true"/>
@@ -65,7 +65,7 @@
             } else {
                 <FluentDataGrid Items="@allTeams.AsQueryable()" TGridItem="ScoutingTeamSummary" GridTemplateColumns="2fr 1fr 1fr 1.5fr">
                     <TemplateColumn Title="Name" Sortable="true" SortBy="@nameSort">
-                        <a href="@Routes.Scouting.Team(context.Id)">@context.Name</a>
+                        <ShuttleLink Href="@Routes.Scouting.Team(context.Id)">@context.Name</ShuttleLink>
                     </TemplateColumn>
                     <PropertyColumn Property="@(t => t.MemberCount)" Title="Members" Sortable="true"/>
                     <PropertyColumn Property="@(t => t.BoardCount)" Title="Boards" Sortable="true"/>

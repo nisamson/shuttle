@@ -18,8 +18,16 @@ public partial class ShuttleLink : ComponentBase {
 
     /// <summary>
     /// When <c>true</c>, uses the emphasized style (accent color, bold); otherwise the normal style.
+    /// Ignored when <see cref="Class"/> is set.
     /// </summary>
     [Parameter] public bool Emphasized { get; set; }
+
+    /// <summary>
+    /// Overrides the CSS class applied to the rendered anchor. When non-<c>null</c> (including an
+    /// empty string, to render an unstyled wrapper link), this replaces the default
+    /// <c>emphasized-link</c> / <c>normal-link</c> styling.
+    /// </summary>
+    [Parameter] public string? Class { get; set; }
 
     /// <summary>The link content.</summary>
     [Parameter] public RenderFragment? ChildContent { get; set; }
@@ -28,5 +36,5 @@ public partial class ShuttleLink : ComponentBase {
     [Parameter(CaptureUnmatchedValues = true)]
     public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
 
-    private string CssClass => Emphasized ? "emphasized-link" : "normal-link";
+    private string CssClass => Class ?? (Emphasized ? "emphasized-link" : "normal-link");
 }

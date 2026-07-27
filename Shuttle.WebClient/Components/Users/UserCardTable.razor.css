@@ -53,16 +53,6 @@
     background: var(--neutral-fill-stealth-hover);
 }
 
-.user-table .user-link {
-    color: var(--accent-fill-rest);
-    text-decoration: none;
-    font-weight: 600;
-}
-
-.user-table .user-link:hover {
-    text-decoration: underline;
-}
-
 .user-table .user-table-msg {
     text-align: center;
     padding: 1.5rem;

@@ -25,7 +25,7 @@ public class UserCardTableTests : WebClientTestContext {
     public void Links_each_row_to_the_user_profile() {
         var cut = Render<UserCardTable>(p => p.Add(c => c.Users, new List<UserCard> { User(42, "scout") }));
 
-        var link = cut.Find("a.user-link");
+        var link = cut.Find("a.emphasized-link");
         Assert.Equal("/users/42", link.GetAttribute("href"));
     }
 
