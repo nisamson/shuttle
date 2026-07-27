@@ -79,6 +79,29 @@ ALTER ROLE db_datawriter ADD MEMBER [<APP_REGISTRATION_NAME>];
 > `db_ddladmin` covers standard migration DDL. If a future migration needs ownership-level
 > operations (e.g. certain temporal-table changes), promote the user to `db_owner`.
 
+### 5. One-time role-assignment bootstrap (`FIRST_RUN`)
+
+The Aspire infrastructure defines three RBAC role assignments (ACR `AcrPull` for the pull
+identity, the dashboard identity's RG-scoped `Contributor`, and the web app's `Website
+Contributor`). Creating them needs `Microsoft.Authorization/roleAssignments/write`, which the CI
+deploy principal intentionally **does not** have. `Shuttle.Backend.Aspire/AppHost.cs` therefore
+strips them from the generated template unless `FIRST_RUN=true`.
+
+**Run this once**, locally, from an identity with `Owner` or `User Access Administrator` on RG
+`shlanalyticswest`, **before the first CI release** (and again only if the set of role assignments
+changes):
+
+```powershell
+$env:FIRST_RUN = "true"
+./scripts/Deploy-BackendAspire.ps1     # aspire deploy — emits + creates the role assignments
+Remove-Item Env:FIRST_RUN
+```
+
+Thereafter every deploy — including CI — leaves `FIRST_RUN` unset, so the role assignments are
+stripped and the deploy needs no `roleAssignments/write`. Azure incremental deployments never
+delete resources absent from the template, so the bootstrapped assignments persist. See
+[Known caveats](#known-caveats) for the rationale.
+
 ## GitHub configuration
 
 ### Secrets (repo-level)
