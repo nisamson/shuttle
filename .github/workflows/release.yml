@@ -104,6 +104,11 @@ jobs:
       - name: Install pinned Node tooling (SWA CLI)
         run: npm ci
 
+      # dotnet ef / aspire build the projects but do not restore first, so restore the whole
+      # solution once up front (also runs NuGetAudit, failing fast on vulnerable packages).
+      - name: Restore solution
+        run: dotnet restore
+
       # ── Step 1: Database migrations (prod Shuttle DB) ────────────────────────────────
       # DesignTimeContextFactory builds the connection from SHUTTLESQLSERVER_DATABASE/HOST
       # (set above) and authenticates with ActiveDirectoryDefault, which resolves the OIDC
