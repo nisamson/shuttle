@@ -5,6 +5,13 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+        <!--
+          Drop the ICU globalization payload from the WASM boot set: the app formats every
+          user-facing date/number with InvariantCulture (see DateDisplayExtensions and the USD
+          currency culture in PlayerProfile), so it needs no culture-specific data. This also makes
+          output identical for every visitor instead of varying with the browser's culture.
+        -->
+        <InvariantGlobalization>true</InvariantGlobalization>
     </PropertyGroup>
 
     <!--

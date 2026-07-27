@@ -50,7 +50,7 @@
             <TemplateColumn Title="My role">@RoleLabel(context.MyRole)</TemplateColumn>
             <PropertyColumn Property="@(t => t.MemberCount)" Title="Members" Sortable="true"/>
             <PropertyColumn Property="@(t => t.BoardCount)" Title="Boards" Sortable="true"/>
-            <TemplateColumn Title="Updated">@context.UpdatedAt.LocalDateTime.ToString("g")</TemplateColumn>
+            <TemplateColumn Title="Updated">@context.UpdatedAt.ToShortDateTime()</TemplateColumn>
         </FluentDataGrid>
     }
 
@@ -69,7 +69,7 @@
                     </TemplateColumn>
                     <PropertyColumn Property="@(t => t.MemberCount)" Title="Members" Sortable="true"/>
                     <PropertyColumn Property="@(t => t.BoardCount)" Title="Boards" Sortable="true"/>
-                    <TemplateColumn Title="Updated">@context.UpdatedAt.LocalDateTime.ToString("g")</TemplateColumn>
+                    <TemplateColumn Title="Updated">@context.UpdatedAt.ToShortDateTime()</TemplateColumn>
                 </FluentDataGrid>
             }
         </Authorized>

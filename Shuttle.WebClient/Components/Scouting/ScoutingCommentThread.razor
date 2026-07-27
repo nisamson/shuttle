@@ -15,7 +15,7 @@
                              VerticalAlignment="VerticalAlignment.Center">
                     <FluentText Weight="TextWeight.Bold">@comment.AuthorUsername</FluentText>
                     <FluentText Style="color: var(--colorNeutralForeground2);" Size="TextSize.Size200">
-                        @comment.CreatedAt.LocalDateTime.ToString("g")@(comment.EditedAt is not null ? " (edited)" : "")
+                        @comment.CreatedAt.ToShortDateTime()@(comment.EditedAt is not null ? " (edited)" : "")
                     </FluentText>
                     <FluentSpacer/>
                     @if (CanEdit(comment)) {

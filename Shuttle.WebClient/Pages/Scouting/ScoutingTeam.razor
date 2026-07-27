@@ -79,7 +79,7 @@
                     }
                 </div>
             </TemplateColumn>
-            <TemplateColumn Title="Joined">@context.CreatedAt.LocalDateTime.ToString("g")</TemplateColumn>
+            <TemplateColumn Title="Joined">@context.CreatedAt.ToShortDateTime()</TemplateColumn>
             <TemplateColumn Title="">
                 @if (CanManage && context.UserId != currentUserId) {
                     <FluentButton Appearance="ButtonAppearance.Subtle" Title="Remove member" IconOnly="true"
@@ -158,7 +158,7 @@
                 </TemplateColumn>
                 <TemplateColumn Title="Season">@(context.DraftSeason?.ToString() ?? "—")</TemplateColumn>
                 <PropertyColumn Property="@(b => b.EntryCount)" Title="Players"/>
-                <TemplateColumn Title="Updated">@context.UpdatedAt.LocalDateTime.ToString("g")</TemplateColumn>
+                <TemplateColumn Title="Updated">@context.UpdatedAt.ToShortDateTime()</TemplateColumn>
                 <TemplateColumn Title="">
                     @if (CanEditBoards) {
                         <FluentButton Appearance="ButtonAppearance.Subtle" Title="Delete board" IconOnly="true"
