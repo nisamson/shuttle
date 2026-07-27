@@ -16,8 +16,10 @@
     You can also get the token from the Azure Portal
     (Static Web App resource -> Overview -> "Manage deployment token").
 
-    The SWA CLI is invoked through `npx @azure/static-web-apps-cli`, so no global install is required
-    (Node.js/npx must be available on PATH).
+    The SWA CLI is pinned via the repo-root package.json / package-lock.json. In CI the workflow
+    runs `npm ci`, and this script invokes the locally-installed binary (node_modules/.bin/swa).
+    When no local install is present (e.g. an ad-hoc local run), it falls back to a version-pinned
+    `npx @azure/static-web-apps-cli@<pinned>` (Node.js/npx must be available on PATH).
 
 .PARAMETER DeploymentToken
     The Static Web Apps deployment token. Falls back to $env:SWA_CLI_DEPLOYMENT_TOKEN, then to the
@@ -95,8 +97,26 @@ if ([string]::IsNullOrWhiteSpace($DeploymentToken)) {
     throw "No deployment token available. Pass -DeploymentToken, set `$env:SWA_CLI_DEPLOYMENT_TOKEN, or provide -AppName (with -ResourceGroup if needed) to fetch it via the Azure CLI."
 }
 
-if (-not (Get-Command npx -ErrorAction SilentlyContinue)) {
-    throw "npx (Node.js) was not found on PATH. Install Node.js so the SWA CLI can run via 'npx @azure/static-web-apps-cli'."
+# When running under GitHub Actions, register the token as a masked value so it can never be
+# printed in the (public) build log. Guarded so a local run never echoes the token to the console.
+if ($env:GITHUB_ACTIONS -eq 'true') {
+    Write-Host "::add-mask::$DeploymentToken"
+}
+
+# Resolve the SWA CLI: prefer the version pinned in the repo's package-lock.json (installed via
+# `npm ci` into node_modules/.bin), and fall back to a version-pinned npx for ad-hoc local runs.
+$SwaVersion = "2.0.10"
+$onWindows = ($null -eq $IsWindows) -or $IsWindows
+$localSwa = Join-Path $repoRoot ("node_modules/.bin/" + ($(if ($onWindows) { "swa.cmd" } else { "swa" })))
+
+if (Test-Path $localSwa) {
+    $swaCommand = { param($deployArgs) & $localSwa @deployArgs }
+}
+else {
+    if (-not (Get-Command npx -ErrorAction SilentlyContinue)) {
+        throw "The pinned SWA CLI is not installed (run 'npm ci') and npx (Node.js) was not found on PATH."
+    }
+    $swaCommand = { param($deployArgs) npx --yes "@azure/static-web-apps-cli@$SwaVersion" @deployArgs }
 }
 
 if (-not $SkipPublish) {
@@ -114,9 +134,7 @@ if (-not (Test-Path $appArtifacts)) {
 Write-Host "Deploying '$appArtifacts' to Azure Static Web Apps (environment: $Environment)..." -ForegroundColor Cyan
 
 # Deploy pre-built static assets. --deployment-token authenticates; --env selects the target environment.
-npx --yes @azure/static-web-apps-cli deploy $appArtifacts `
-    --deployment-token $DeploymentToken `
-    --env $Environment
+& $swaCommand @("deploy", $appArtifacts, "--deployment-token", $DeploymentToken, "--env", $Environment)
 
 if ($LASTEXITCODE -ne 0) {
     throw "SWA deploy failed with exit code $LASTEXITCODE."
