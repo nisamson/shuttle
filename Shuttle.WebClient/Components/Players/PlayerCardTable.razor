@@ -10,6 +10,13 @@
         @<span role="@(Sortable ? "button" : null)"
                style="@(Sortable ? "cursor: pointer; user-select: none;" : null); @(SortField == spec.Field ? "color: var(--accent-fill-rest);" : null)"
                @onclick="() => ToggleSort(spec.Field)">@spec.Title<span style="font-size: 0.85em;">@SortIndicator(spec.Field)</span></span>;
+
+    // Flag badge with a full label (wide screens) and a short label (narrow screens); the media query in
+    // the scoped stylesheet swaps which span is visible. The full text always stays in the tooltip.
+    RenderFragment<(string Full, string Short, BadgeAppearance Appearance, BadgeColor Color, string Title)> FlagBadge = spec =>
+        @<FluentBadge Appearance="spec.Appearance" Color="spec.Color" title="@spec.Title">
+            <span class="flag-full">@spec.Full</span><span class="flag-short">@spec.Short</span>
+        </FluentBadge>;
 }
 
 <div style="overflow-x: auto;">
@@ -54,15 +61,15 @@
     </TemplateColumn>
     <TemplateColumn Title="Flags">
         @if (context.Recreate) {
-            <FluentBadge Appearance="BadgeAppearance.Filled" Color="BadgeColor.Success" title="Recreate — not the member's first player">Recreate</FluentBadge>
+            @FlagBadge(("Recreate", "Rec", BadgeAppearance.Filled, BadgeColor.Success, "Recreate — not the member's first player"))
         } else {
-            <FluentBadge Appearance="BadgeAppearance.Outline" Color="BadgeColor.Informative" title="Portal First-gen — the member's first player on the portal (they may have had players before the portal existed)">Portal First-gen</FluentBadge>
+            @FlagBadge(("Portal First-gen", "1st-gen", BadgeAppearance.Outline, BadgeColor.Informative, "Portal First-gen — the member's first player on the portal (they may have had players before the portal existed)"))
         }
         @if (context.Inactive) {
-            <FluentBadge Appearance="BadgeAppearance.Filled" Color="BadgeColor.Severe" title="Inactive on-site">Inactive</FluentBadge>
+            @FlagBadge(("Inactive", "IA", BadgeAppearance.Filled, BadgeColor.Severe, "Inactive on-site"))
         }
         @if (context.IsSuspended) {
-            <FluentBadge Appearance="BadgeAppearance.Outline" Color="BadgeColor.Danger" title="Suspended">Suspended</FluentBadge>
+            @FlagBadge(("Suspended", "Susp", BadgeAppearance.Outline, BadgeColor.Danger, "Suspended"))
         }
     </TemplateColumn>
     </ChildContent>
