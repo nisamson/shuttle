@@ -20,6 +20,8 @@ consistent when you change one. `Shuttle.Analysis/README.md` documents the CLI t
 - `dotnet test` — full suite (`Shuttle.Tests`, xunit.v3 via Microsoft Testing Platform).
 - `dotnet test Shuttle.Tests/Shuttle.Tests.csproj` — just the main test project.
 - **Single test / subset:** `dotnet test --filter "FullyQualifiedName~<Namespace.Class>"`.
+- **Always run the full test suite (`dotnet test`) immediately before pushing** — regardless of
+  how targeted your changes were.
 - **WebClient tests (offline, no Azure auth):**
   - bUnit: `dotnet test Shuttle.WebClient.Tests/Shuttle.WebClient.Tests.csproj`
   - Playwright E2E: `dotnet test Shuttle.WebClient.E2E/Shuttle.WebClient.E2E.csproj`

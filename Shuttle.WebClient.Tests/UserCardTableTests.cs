@@ -1,4 +1,5 @@
 using Bunit;
+using System.Linq;
 using Shuttle.Models.Users;
 using Shuttle.WebClient.Components.Users;
 
@@ -51,5 +52,34 @@ public class UserCardTableTests : WebClientTestContext {
         var cut = Render<UserCardTable>(p => p.Add(c => c.Users, new List<UserCard>()));
 
         Assert.Contains("No users match your search", cut.Markup);
+    }
+
+    [Fact]
+    public void Clicking_a_sortable_header_raises_sort_changed_and_flips_direction() {
+        var users = new List<UserCard> { User(1, "alpha"), User(2, "bravo") };
+        UserCardTable.UserTableSort? captured = null;
+
+        var cut = Render<UserCardTable>(p => p
+            .Add(c => c.Users, users)
+            .Add(c => c.SortField, UserSortField.Username)
+            .Add(c => c.SortDescending, false)
+            .Add(c => c.SortChanged, (UserCardTable.UserTableSort s) => captured = s));
+
+        var header = cut.FindAll("thead [role=button]").First(e => e.TextContent.Contains("Username"));
+        header.Click();
+
+        Assert.NotNull(captured);
+        Assert.Equal(UserSortField.Username, captured!.Value.Field);
+        // Clicking the already-active ascending column flips it to descending.
+        Assert.True(captured.Value.Descending);
+    }
+
+    [Fact]
+    public void Headers_are_not_clickable_when_sort_is_disabled() {
+        var users = new List<UserCard> { User(1, "alpha"), User(2, "bravo") };
+
+        var cut = Render<UserCardTable>(p => p.Add(c => c.Users, users));
+
+        Assert.Empty(cut.FindAll("thead [role=button]"));
     }
 }

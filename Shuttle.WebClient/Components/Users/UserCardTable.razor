@@ -1,36 +1,39 @@
 @using Shuttle.Models.Users
+@using Microsoft.FluentUI.AspNetCore.Components
 
-<div class="user-table-wrapper">
-    <table class="user-table">
-        <thead>
-            <tr>
-                <th class="@ThClass(UserSortField.Username)" @onclick="() => ToggleSort(UserSortField.Username)">Username<span class="sort-ind">@SortIndicator(UserSortField.Username)</span></th>
-                <th class="num @ThClass(UserSortField.UserId)" @onclick="() => ToggleSort(UserSortField.UserId)">User ID<span class="sort-ind">@SortIndicator(UserSortField.UserId)</span></th>
-                @if (ShowDiscord) {
-                    <th class="@ThClass(UserSortField.DiscordName)" @onclick="() => ToggleSort(UserSortField.DiscordName)">Discord<span class="sort-ind">@SortIndicator(UserSortField.DiscordName)</span></th>
-                }
-            </tr>
-        </thead>
-        <tbody>
-            @if (Loading) {
-                <tr>
-                    <td colspan="@ColumnCount" class="user-table-msg"><FluentSpinner/> Loading users…</td>
-                </tr>
-            } else if (Users is null || Users.Count == 0) {
-                <tr>
-                    <td colspan="@ColumnCount" class="user-table-msg">No users match your search.</td>
-                </tr>
-            } else {
-                @foreach (var u in Users) {
-                    <tr>
-                        <td><ShuttleLink Emphasized="true" Href="@UserRoute(u.UserId)">@u.Username</ShuttleLink></td>
-                        <td class="num">@u.UserId</td>
-                        @if (ShowDiscord) {
-                            <td>@(string.IsNullOrWhiteSpace(u.DiscordName) ? "—" : u.DiscordName)</td>
-                        }
-                    </tr>
-                }
-            }
-        </tbody>
-    </table>
+@{
+    // Fully controlled sort header: the indicator reflects the SortField/SortDescending parameters
+    // (so it stays correct when sort changes via URL/back-navigation, not just header clicks), and a
+    // click raises SortChanged to the parent. No local grid sorting — Items are rendered as given.
+    RenderFragment<(string Title, UserSortField Field)> SortHeader = spec =>
+        @<span role="@(Sortable ? "button" : null)"
+               style="@(Sortable ? "cursor: pointer; user-select: none;" : null); @(SortField == spec.Field ? "color: var(--accent-fill-rest);" : null)"
+               @onclick="() => ToggleSort(spec.Field)">@spec.Title<span style="font-size: 0.85em;">@SortIndicator(spec.Field)</span></span>;
+}
+
+<div style="overflow-x: auto;">
+<FluentDataGrid Items="@Rows" TGridItem="UserCard" Loading="Loading" Style="@GridStyle"
+                GridTemplateColumns="@GridColumns">
+    <ChildContent>
+    <TemplateColumn Title="Username" HeaderCellItemTemplate="@(_ => SortHeader(("Username", UserSortField.Username)))">
+        <ShuttleLink Emphasized="true" Href="@UserRoute(context.UserId)">@context.Username</ShuttleLink>
+    </TemplateColumn>
+    <TemplateColumn Title="User ID" Align="DataGridCellAlignment.End"
+                    HeaderCellItemTemplate="@(_ => SortHeader(("User ID", UserSortField.UserId)))">
+        <span style="font-variant-numeric: tabular-nums;">@context.UserId</span>
+    </TemplateColumn>
+    @if (ShowDiscord) {
+        <TemplateColumn Title="Discord" HeaderCellItemTemplate="@(_ => SortHeader(("Discord", UserSortField.DiscordName)))">
+            @(string.IsNullOrWhiteSpace(context.DiscordName) ? "—" : context.DiscordName)
+        </TemplateColumn>
+    }
+    </ChildContent>
+
+    <LoadingContent>
+        <FluentSpinner/> Loading users…
+    </LoadingContent>
+    <EmptyContent>
+        No users match your search.
+    </EmptyContent>
+</FluentDataGrid>
 </div>

@@ -248,6 +248,9 @@ Tests live in `Shuttle.Tests` (xunit.v3, run via the Microsoft Testing Platform 
 - `dotnet test Shuttle.Tests/Shuttle.Tests.csproj` — run just the test project.
 - `dotnet test --filter "FullyQualifiedName~<Namespace.Class>"` — run a targeted subset.
 
+**Always run the full test suite (`dotnet test`) immediately before pushing**, regardless of how
+targeted your changes were.
+
 ### WebClient testing (no Azure auth)
 
 The Blazor WebClient can be exercised **without Entra ID / MSAL or a live `Shuttle.Api`** via a
