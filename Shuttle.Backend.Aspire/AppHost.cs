@@ -1,5 +1,6 @@
 using Aspire.Hosting.Azure;
 using Azure.Provisioning.AppService;
+using Azure.Provisioning.Authorization;
 using Azure.Provisioning.Resources;
 using Azure.Provisioning.Storage;
 using Azure.ResourceManager.Models;
@@ -8,6 +9,15 @@ using Microsoft.Extensions.Hosting;
 using Projects;
 
 var builder = DistributedApplication.CreateBuilder(args);
+
+// The generated Azure infrastructure includes RBAC role assignments (ACR AcrPull, the Aspire
+// dashboard identity's Contributor, the web app's Website Contributor). Creating those needs
+// Microsoft.Authorization/roleAssignments/write, which the CI deploy principal intentionally does
+// NOT have. Set FIRST_RUN=true for a one-time interactive bootstrap deploy (from an identity that
+// CAN assign roles) to create them; every later deploy — including CI — leaves FIRST_RUN unset, so
+// the role assignments are stripped from the template. Incremental deployments never delete the
+// already-existing assignments, so the app keeps working. See docs/deployment-ci.md.
+var isFirstRun = builder.Configuration.GetValue("FIRST_RUN", false);
 
 var shuttleRg = builder.AddParameter("shuttleRg")
     .WithDescription("The name of the resource group to deploy to");
@@ -43,6 +53,11 @@ var appServicePlan = builder.AddAzureAppServiceEnvironment("shuttle-app-service-
             Tier = "Basic"
         };
         appServicePlan.IsElasticScaleEnabled = false;
+        // Role assignments are created only on the FIRST_RUN bootstrap deploy (see note above);
+        // otherwise they are stripped so the CI principal needs no roleAssignments/write.
+        if (!isFirstRun) {
+            RemoveRoleAssignments(infra);
+        }
     });
 
 #pragma warning disable ASPIREPROBES001
@@ -58,6 +73,11 @@ var api = builder.AddProject<Shuttle_Api>("shuttle-api")
         site.IsHttpsOnly = true;
         site.SiteConfig.IsAlwaysOn = true;
         site.SiteConfig.NumberOfWorkers = 1;
+        // See note above: the web app's Website Contributor role assignment is created only on
+        // the FIRST_RUN bootstrap deploy; otherwise it is stripped from the generated template.
+        if (!isFirstRun) {
+            RemoveRoleAssignments(infra);
+        }
     });
 #pragma warning restore ASPIREPROBES001
 
@@ -78,3 +98,13 @@ if (builder.ExecutionContext.IsRunMode
 }
 
 builder.Build().Run();
+
+// Removes every auto-generated Azure RBAC role assignment from a provisioned resource's
+// infrastructure. Role assignments require Microsoft.Authorization/roleAssignments/write, which
+// the CI deploy principal intentionally lacks; they are created once by a FIRST_RUN bootstrap
+// deploy (see docs/deployment-ci.md) and left untouched by later incremental deployments.
+static void RemoveRoleAssignments(AzureResourceInfrastructure infra) {
+    foreach (var roleAssignment in infra.GetProvisionableResources().OfType<RoleAssignment>().ToList()) {
+        infra.Remove(roleAssignment);
+    }
+}
