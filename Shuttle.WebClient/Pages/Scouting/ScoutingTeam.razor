@@ -10,7 +10,7 @@
     <div><FluentSpinner/> Loading team…</div>
 } else if (loadError is not null) {
     <FluentText Color="Color.Error">@loadError</FluentText>
-    <a href="@Routes.Scouting.Root">Back to scouting</a>
+    <ShuttleLink Href="@Routes.Scouting.Root">Back to scouting</ShuttleLink>
 } else if (team is not null) {
     <FluentStack Orientation="Orientation.Vertical" VerticalGap="20">
         <FluentStack Orientation="Orientation.Horizontal"
@@ -154,7 +154,7 @@
         } else {
             <FluentDataGrid Items="@team.Boards.AsQueryable()" TGridItem="ScoutingBoardSummary" GridTemplateColumns="2fr 1fr 1fr 1.5fr 0.5fr">
                 <TemplateColumn Title="Name">
-                    <a href="@Routes.Scouting.Board(context.Id)">@context.Name</a>
+                    <ShuttleLink Href="@Routes.Scouting.Board(context.Id)">@context.Name</ShuttleLink>
                 </TemplateColumn>
                 <TemplateColumn Title="Season">@(context.DraftSeason?.ToString() ?? "—")</TemplateColumn>
                 <PropertyColumn Property="@(b => b.EntryCount)" Title="Players"/>

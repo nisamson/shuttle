@@ -61,7 +61,7 @@
         <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" Wrap="true" VerticalAlignment="VerticalAlignment.Center">
             @foreach (var selected in SelectedCards) {
                 <span style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--neutral-stroke-rest);border-radius:16px;padding:2px 4px 2px 10px;">
-                    <a href="@Routes.Players.Player(selected.PlayerId)" style="text-decoration:none;color:var(--accent-foreground-rest);">@selected.Name</a>
+                    <ShuttleLink Href="@Routes.Players.Player(selected.PlayerId)">@selected.Name</ShuttleLink>
                     <FluentButton Appearance="ButtonAppearance.Subtle" IconOnly="true" Title="@($"Remove {selected.Name}")"
                                   OnClick="() => Remove(selected.PlayerId)">
                         <FluentIcon Value="@(new Icons.Regular.Size16.Dismiss())"/>

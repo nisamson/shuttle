@@ -51,7 +51,7 @@
                     @if (node is not null) {
                         <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center" Wrap="true">
                             @if (node.UserId is { } uid) {
-                                <a class="emphasized-link" href="@Routes.Users.User(uid)">@node.Name</a>
+                                <ShuttleLink Emphasized="true" Href="@Routes.Users.User(uid)">@node.Name</ShuttleLink>
                             } else {
                                 <span>@node.Name</span>
                             }

@@ -55,7 +55,7 @@
                 <FluentText Weight="TextWeight.Bold">@result.Resolved.Count player(s) resolved</FluentText>
                 <FluentDataGrid Items="@ResolvedRows" TGridItem="PlayerLookupMatch" ResizableColumns="true">
                     <TemplateColumn Title="Player" TGridItem="PlayerLookupMatch">
-                        <a href="@Routes.Players.Player(context.PlayerId)" target="_blank" rel="noopener noreferrer">@context.Name</a>
+                        <ShuttleLink Href="@Routes.Players.Player(context.PlayerId)" target="_blank" rel="noopener noreferrer">@context.Name</ShuttleLink>
                         @if (Content.ExistingPlayerIds.Contains(context.PlayerId)) {
                             <FluentBadge Appearance="BadgeAppearance.Outline" Style="margin-inline-start: 6px;">On board</FluentBadge>
                         }

@@ -102,7 +102,8 @@ public class ScoutingPagesTests : WebClientTestContext {
         var team = await Scouting.CreateTeam(new CreateScoutingTeamRequest { Name = "Stat Scouts" });
         var board = await Scouting.CreateBoard(team.Id,
             new CreateScoutingBoardRequest { Name = "Stat Board", DraftSeason = 73 });
-        // Aaron Frost (1001): Center, TPE 1,450, bank $12,500 in the seed data.
+        // Aaron Frost (1001): Center, TPE 1,450, bank $12,500 in the seed data. The bank column
+        // abbreviates to millions (see FormatMillions), so $12,500 renders as "$0.0M".
         await Scouting.AddEntry(board.Id, new AddScoutingBoardEntryRequest { PlayerId = 1001 });
 
         var cut = Render<ScoutingBoard>(p => p.Add(c => c.BoardId, board.Id));
@@ -110,7 +111,7 @@ public class ScoutingPagesTests : WebClientTestContext {
         cut.WaitForState(() => cut.Markup.Contains("Aaron Frost"));
         Assert.Contains("Aaron Frost", cut.Markup);
         Assert.Contains("1,450", cut.Markup);
-        Assert.Contains("12,500", cut.Markup);
+        Assert.Contains("$0.0M", cut.Markup);
     }
 
     [Fact]
