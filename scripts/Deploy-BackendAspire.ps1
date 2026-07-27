@@ -15,15 +15,25 @@
 .PARAMETER SkipClean
     Skip deleting bin/obj (not recommended; defeats the purpose of this script).
 
+.PARAMETER WhatIf
+    Dry run: generate the deployment artifacts via `aspire publish` (into the AppHost's gitignored
+    'aspire-output' folder) instead of deploying. Validates that the AppHost composes and produces a
+    deployment manifest without mutating any Azure resources.
+
 .EXAMPLE
     ./Deploy-BackendAspire.ps1
 
 .EXAMPLE
     ./Deploy-BackendAspire.ps1 --debug
+
+.EXAMPLE
+    # Validate composition without deploying.
+    ./Deploy-BackendAspire.ps1 -DryRun --non-interactive
 #>
 [CmdletBinding()]
 param(
     [switch]$SkipClean,
+    [switch]$DryRun,
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$AspireArgs
 )
@@ -49,10 +59,11 @@ if (-not $SkipClean) {
     Write-Host "Clean complete." -ForegroundColor Green
 }
 
-Write-Host "Running 'aspire deploy'..." -ForegroundColor Cyan
+$aspireVerb = if ($DryRun) { "publish" } else { "deploy" }
+Write-Host "Running 'aspire $aspireVerb'..." -ForegroundColor Cyan
 Push-Location $appHostDir
 try {
-    aspire deploy @AspireArgs
+    aspire $aspireVerb @AspireArgs
     $exit = $LASTEXITCODE
 }
 finally {
@@ -60,7 +71,7 @@ finally {
 }
 
 if ($exit -ne 0) {
-    throw "aspire deploy failed with exit code $exit."
+    throw "aspire $aspireVerb failed with exit code $exit."
 }
 
-Write-Host "Deployment complete." -ForegroundColor Green
+Write-Host "$(if ($DryRun) { 'Dry run (aspire publish) complete.' } else { 'Deployment complete.' })" -ForegroundColor Green
