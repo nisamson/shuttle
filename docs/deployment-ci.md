@@ -116,6 +116,20 @@ Actions → **Release (Deploy to Production)** → *Run workflow* (from `main`),
 in the confirm box. The single job runs migrations → backend → SPA in order and stops on the
 first failure.
 
+### Dry run (validate without deploying)
+
+Check the **`dry_run`** box instead of typing `deploy`. The job still requires environment
+approval and signs in via OIDC (so it exercises the real auth + DB connectivity path), but it
+**changes nothing**:
+
+- migrations: lists applied/pending migrations and writes the **idempotent SQL** (`migration.sql`)
+  that a real apply would run — but does not apply it;
+- backend: runs `aspire publish` (generates the deployment manifest) instead of `aspire deploy`;
+- SPA: runs `dotnet publish` only, skipping the deployment-token lookup and the SWA deploy.
+
+The generated `migration.sql` and Aspire manifest are uploaded as the **`release-dry-run`**
+artifact for review before a real deployment.
+
 ## Known caveats
 
 - **Aspire role-assignment provisioning may need RBAC write on first CI run.** A fresh runner

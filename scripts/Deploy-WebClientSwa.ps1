@@ -43,6 +43,11 @@
 .PARAMETER SkipPublish
     Skip `dotnet publish` and deploy whatever is already in the publish output directory.
 
+.PARAMETER DryRun
+    Validate only: publish the app (unless -SkipPublish) but skip deployment token resolution and
+    the SWA deploy call. Touches no Azure resources and needs no token or 'az login'. Useful for a
+    build/packaging sanity check in CI.
+
 .EXAMPLE
     ./Deploy-WebClientSwa.ps1 -DeploymentToken $token
 
@@ -53,6 +58,10 @@
 .EXAMPLE
     $env:SWA_CLI_DEPLOYMENT_TOKEN = $token
     ./Deploy-WebClientSwa.ps1 -Environment preview
+
+.EXAMPLE
+    # Validate the publish output without deploying (no Azure/token needed).
+    ./Deploy-WebClientSwa.ps1 -DryRun
 #>
 [CmdletBinding()]
 param(
@@ -61,7 +70,8 @@ param(
     [string]$ResourceGroup,
     [string]$Environment = "production",
     [string]$Configuration = "Release",
-    [switch]$SkipPublish
+    [switch]$SkipPublish,
+    [switch]$DryRun
 )
 
 $ErrorActionPreference = "Stop"
@@ -73,6 +83,24 @@ $appArtifacts = Join-Path $publishRoot "wwwroot"
 
 if (-not (Test-Path $project)) {
     throw "Could not find Shuttle.WebClient project at '$project'."
+}
+
+if (-not $SkipPublish) {
+    Write-Host "Publishing Shuttle.WebClient ($Configuration)..." -ForegroundColor Cyan
+    dotnet publish $project -c $Configuration
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet publish failed with exit code $LASTEXITCODE."
+    }
+}
+
+if (-not (Test-Path $appArtifacts)) {
+    throw "Publish output not found at '$appArtifacts'. Run without -SkipPublish, or publish first."
+}
+
+if ($DryRun) {
+    Write-Host "Dry run: publish output validated at '$appArtifacts'." -ForegroundColor Green
+    Write-Host "Dry run: skipping deployment-token resolution and the Azure Static Web Apps deploy." -ForegroundColor Yellow
+    return
 }
 
 # Resolve the deployment token via the Azure CLI when none was supplied explicitly or via env var.
@@ -117,18 +145,6 @@ else {
         throw "The pinned SWA CLI is not installed (run 'npm ci') and npx (Node.js) was not found on PATH."
     }
     $swaCommand = { param($deployArgs) npx --yes "@azure/static-web-apps-cli@$SwaVersion" @deployArgs }
-}
-
-if (-not $SkipPublish) {
-    Write-Host "Publishing Shuttle.WebClient ($Configuration)..." -ForegroundColor Cyan
-    dotnet publish $project -c $Configuration
-    if ($LASTEXITCODE -ne 0) {
-        throw "dotnet publish failed with exit code $LASTEXITCODE."
-    }
-}
-
-if (-not (Test-Path $appArtifacts)) {
-    throw "Publish output not found at '$appArtifacts'. Run without -SkipPublish, or publish first."
 }
 
 Write-Host "Deploying '$appArtifacts' to Azure Static Web Apps (environment: $Environment)..." -ForegroundColor Cyan
