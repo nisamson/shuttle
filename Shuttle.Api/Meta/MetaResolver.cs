@@ -157,7 +157,11 @@ public sealed class MetaResolver : IMetaResolver {
     }
 
     private static string BuildAbsolute(string baseUrl, string url) {
-        if (Uri.TryCreate(url, UriKind.Absolute, out _)) {
+        // Only treat http(s) URLs as already-absolute. Uri.TryCreate with UriKind.Absolute
+        // is OS-dependent for rooted paths: on Unix "/icon.svg" parses as an absolute file
+        // URI (so it would be returned unresolved), whereas on Windows it does not.
+        if (Uri.TryCreate(url, UriKind.Absolute, out var absolute)
+            && (absolute.Scheme == Uri.UriSchemeHttp || absolute.Scheme == Uri.UriSchemeHttps)) {
             return url;
         }
 

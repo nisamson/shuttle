@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+# Cancel superseded runs for the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore SHLAnalytics.sln
+
+      - name: Build
+        run: dotnet build SHLAnalytics.sln -c Release --no-restore
+
+      # `--` forwards args to the Microsoft Testing Platform runner. `--report-junit`
+      # writes a JUnit XML report that captures each failing test's name, message and
+      # stack trace (the `dotnet test` MSBuild integration otherwise prints only a summary,
+      # hiding the details in a progress-only .log file).
+      - name: Test (Shuttle.Tests)
+        run: dotnet test Shuttle.Tests/Shuttle.Tests.csproj -c Release --no-build -- --report-junit --report-junit-filename junit.xml
+
+      - name: Test (Shuttle.WebClient.Tests)
+        run: dotnet test Shuttle.WebClient.Tests/Shuttle.WebClient.Tests.csproj -c Release --no-build -- --report-junit --report-junit-filename junit.xml
+
+      # Fallback: surface failing test names, messages and stack traces inline when a test
+      # step failed (JUnit XML is written into each project's TestResults directory).
+      - name: Print test failures
+        if: failure()
+        shell: bash
+        run: |
+          echo "::group::JUnit test reports"
+          find . -type f -name 'junit.xml' -print -exec cat {} \; || true
+          echo "::endgroup::"
+
+  e2e:
+    name: WebClient E2E
+    runs-on: ubuntu-latest
+    # Advisory: E2E is heavier and can be flakier than the unit suites, so a failure
+    # here reports but does not block merges. Keep it out of required status checks.
+    continue-on-error: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore Shuttle.WebClient.E2E/Shuttle.WebClient.E2E.csproj
+
+      - name: Build
+        run: dotnet build Shuttle.WebClient.E2E/Shuttle.WebClient.E2E.csproj -c Release --no-restore
+
+      - name: Install Playwright browsers
+        shell: pwsh
+        run: Shuttle.WebClient.E2E/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: Test (Shuttle.WebClient.E2E)
+        run: dotnet test Shuttle.WebClient.E2E/Shuttle.WebClient.E2E.csproj -c Release --no-build
