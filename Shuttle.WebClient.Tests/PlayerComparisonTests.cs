@@ -22,7 +22,7 @@ namespace Shuttle.WebClient.Tests;
 /// The <c>ids</c> query is bound directly through the <see cref="PlayerComparison.Ids"/> parameter.
 /// </summary>
 public class PlayerComparisonTests : WebClientTestContext {
-    private const int GoaltenderId = 1050;
+    private const int GoaltenderId = 1100;
 
     public PlayerComparisonTests() {
         // Last registration wins, so this replaces the seed client for both the page and the
@@ -31,15 +31,22 @@ public class PlayerComparisonTests : WebClientTestContext {
         Services.AddSingleton<IShuttleOptionsStorage>(new FakeOptionsStorage());
     }
 
+    // Enough skaters (ids 1001..1060) to exercise both the soft cap (10) and the hard cap (50). The
+    // first 26 keep single-letter names ("Skater A"…) that other tests assert on; the rest only pad
+    // out the count for the cap tests, which don't inspect names.
     private static IReadOnlyList<PlayerCard> TestPlayers() {
         var cards = new List<PlayerCard>();
-        for (var i = 0; i < 7; i++) {
-            cards.Add(SkaterCard(1001 + i, $"Skater {(char)('A' + i)}", 8 + i));
+        for (var i = 0; i < 60; i++) {
+            var name = i < 26 ? $"Skater {(char)('A' + i)}" : $"Skater #{i}";
+            cards.Add(SkaterCard(1001 + i, name, 8 + (i % 20)));
         }
 
         cards.Add(GoaltenderCard(GoaltenderId, "Gordie Goalie"));
         return cards;
     }
+
+    // The first {count} seeded skater ids, for building comparison URLs of a given size.
+    private static int[] SkaterIds(int count) => Enumerable.Range(1001, count).ToArray();
 
     private static PlayerCard SkaterCard(int id, string name, int fill) => BaseCard(id, name) with {
         Position = PlayerPosition.Center,
@@ -123,16 +130,26 @@ public class PlayerComparisonTests : WebClientTestContext {
     }
 
     [Fact]
-    public void More_than_the_cap_of_charted_players_shows_the_soft_cap_hint() {
-        var cut = RenderCompare(1001, 1002, 1003, 1004);
+    public void More_than_the_soft_cap_of_players_shows_the_soft_cap_hint() {
+        // 11 players is past the soft cap of 10 but well under the hard cap.
+        var cut = RenderCompare(SkaterIds(PlayerComparison.SoftCap + 1));
 
         cut.WaitForState(() => cut.Markup.Contains("Skater attributes"));
         Assert.Contains("easier to read with", cut.Markup);
     }
 
     [Fact]
-    public void At_the_soft_cap_the_add_box_is_disabled() {
+    public void Below_the_soft_cap_no_hint_and_add_box_enabled() {
         var cut = RenderCompare(1001, 1002, 1003);
+
+        cut.WaitForState(() => cut.Markup.Contains("Skater attributes"));
+        Assert.DoesNotContain("easier to read with", cut.Markup);
+        Assert.DoesNotContain("holds up to", cut.Markup);
+    }
+
+    [Fact]
+    public void At_the_hard_cap_the_add_box_is_disabled() {
+        var cut = RenderCompare(SkaterIds(PlayerComparison.HardCap));
 
         cut.WaitForState(() => cut.Markup.Contains("Skater attributes"));
         Assert.Contains("holds up to", cut.Markup);

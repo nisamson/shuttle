@@ -27,7 +27,7 @@
                             SelectedItem="selectedToAdd"
                             SelectedItemChanged="OnPlayerSelected"/>
         @if (AddDisabled) {
-            <FluentText Size="TextSize.Size200">A comparison holds up to @MaxComparison players.</FluentText>
+            <FluentText Size="TextSize.Size200">A comparison holds up to @HardCap players.</FluentText>
         }
     </FluentStack>
 
@@ -51,9 +51,9 @@
         </FluentMessageBar>
     }
 
-    @if (chartedPlayers.Count > MaxComparison) {
+    @if (requestedIds.Count > SoftCap) {
         <FluentMessageBar Intent="MessageBarIntent.Info" Title="Large comparison">
-            Comparisons are easier to read with @MaxComparison or fewer players.
+            Comparisons are easier to read with @SoftCap or fewer players.
         </FluentMessageBar>
     }
 

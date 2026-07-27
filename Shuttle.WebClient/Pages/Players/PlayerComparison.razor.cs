@@ -12,8 +12,14 @@ using Shuttle.WebClient.Services;
 namespace Shuttle.WebClient.Pages.Players;
 
 public partial class PlayerComparison : ComponentBase, IDisposable {
-    /// <summary>The most players the add-UX will let you accumulate before nudging you to stop.</summary>
-    public const int MaxComparison = 3;
+    /// <summary>
+    /// The number of players beyond which comparison charts get hard to read; passing it shows a
+    /// non-blocking warning but adding more is still allowed up to <see cref="HardCap"/>.
+    /// </summary>
+    public const int SoftCap = 10;
+
+    /// <summary>The maximum number of players a single comparison can hold; the add UX stops here.</summary>
+    public const int HardCap = 50;
 
     [Parameter, SupplyParameterFromQuery(Name = "ids")] public string? Ids { get; set; }
 
@@ -56,7 +62,7 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
     private string? loadError;
     private bool darkMode;
 
-    private bool AddDisabled => requestedIds.Count >= MaxComparison;
+    private bool AddDisabled => requestedIds.Count >= HardCap;
 
     // The requested players that resolved to a card, in requested order (charted or excluded).
     private IReadOnlyList<PlayerCard> SelectedCards =>
