@@ -21,6 +21,13 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
     /// <summary>The maximum number of players a single comparison can hold; the add UX stops here.</summary>
     public const int HardCap = 50;
 
+    /// <summary>
+    /// Upper bound on concurrent per-player TPE-timeline requests, sized to the browser's typical
+    /// per-origin connection limit so a cold load of a large comparison doesn't burst one request per
+    /// player at once.
+    /// </summary>
+    private const int MaxTimelineConcurrency = 6;
+
     [Parameter, SupplyParameterFromQuery(Name = "ids")] public string? Ids { get; set; }
 
     [Inject] private IShuttlePlayerClient PlayerClient { get; set; } = null!;
@@ -229,7 +236,11 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
             StateHasChanged();
 
             try {
-                var results = await Task.WhenAll(toFetch.Select(FetchTimelineAsync));
+                // Bound the fan-out so a cold load of a large comparison doesn't fire one request per
+                // player at once (the hard cap allows up to HardCap). The gate is sized to the browser's
+                // typical per-origin connection limit; each per-player request keeps its own ETag/304.
+                using var gate = new SemaphoreSlim(MaxTimelineConcurrency);
+                var results = await Task.WhenAll(toFetch.Select(id => FetchTimelineAsync(id, gate)));
                 foreach (var (id, points) in results) {
                     timelines[id] = points ?? Array.Empty<TpeTimelinePoint>();
                 }
@@ -245,11 +256,15 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
         needsRedraw = true;
     }
 
-    private async Task<(int Id, IReadOnlyList<TpeTimelinePoint>? Points)> FetchTimelineAsync(int id) {
+    private async Task<(int Id, IReadOnlyList<TpeTimelinePoint>? Points)> FetchTimelineAsync(
+        int id, SemaphoreSlim gate) {
+        await gate.WaitAsync();
         try {
             return (id, await PlayerClient.GetPlayerTpeTimeline(id));
         } catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound) {
             return (id, null);
+        } finally {
+            gate.Release();
         }
     }
 

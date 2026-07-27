@@ -189,6 +189,24 @@ public class PlayerComparisonTests : WebClientTestContext {
     }
 
     [Fact]
+    public void Opening_the_timeline_tab_loads_every_players_series_even_past_the_concurrency_cap() {
+        // More players than MaxTimelineConcurrency (6) so the throttled fan-out is exercised.
+        const int count = 8;
+        var cut = RenderCompare(SkaterIds(count));
+        cut.WaitForState(() => cut.Markup.Contains("Skater attributes"));
+
+        // FluentTabs drives selection through its own web-component events (no onclick bUnit can
+        // trigger), so switch tabs the way the component does: set the bound id and run its after-hook.
+        SetActiveTimelineTab(cut);
+
+        cut.WaitForState(() => GetTimelineChart(cut) is not null);
+        var timelineChart = GetTimelineChart(cut);
+        Assert.NotNull(timelineChart);
+        // One overlaid timeline trace per player — nothing dropped by the concurrency gate.
+        Assert.Equal(count, timelineChart!.Data.Count);
+    }
+
+    [Fact]
     public void Removing_a_player_updates_the_combined_chart_in_place() {
         var cut = RenderCompare(1001, 1002, 1003);
         cut.WaitForState(() => cut.Markup.Contains("Skater attributes"));
@@ -214,6 +232,24 @@ public class PlayerComparisonTests : WebClientTestContext {
         (AttributeChart?)typeof(PlayerComparison)
             .GetField("combinedChart", BindingFlags.NonPublic | BindingFlags.Instance)!
             .GetValue(cut.Instance);
+
+    private static AttributeChart? GetTimelineChart(IRenderedComponent<PlayerComparison> cut) =>
+        (AttributeChart?)typeof(PlayerComparison)
+            .GetField("timelineChart", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(cut.Instance);
+
+    // Mirrors what @bind-ActiveTabId + its :after hook do when the TPE-timeline tab is selected.
+    private static void SetActiveTimelineTab(IRenderedComponent<PlayerComparison> cut) {
+        var type = typeof(PlayerComparison);
+        var timelineTabId = (string)type
+            .GetField("TimelineTabId", BindingFlags.NonPublic | BindingFlags.Static)!
+            .GetValue(null)!;
+        type.GetField("activeTabId", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(cut.Instance, timelineTabId);
+
+        var onTabChanged = type.GetMethod("OnTabChangedAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        cut.InvokeAsync(() => (Task)onTabChanged.Invoke(cut.Instance, null)!).GetAwaiter().GetResult();
+    }
 
     private sealed class FakeOptionsStorage : IShuttleOptionsStorage {
         public ShuttleOptions CurrentOptions => ShuttleOptions.Default;
