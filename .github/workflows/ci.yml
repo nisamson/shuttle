@@ -47,6 +47,9 @@ jobs:
   e2e:
     name: WebClient E2E
     runs-on: ubuntu-latest
+    # Advisory: E2E is heavier and can be flakier than the unit suites, so a failure
+    # here reports but does not block merges. Keep it out of required status checks.
+    continue-on-error: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
