@@ -149,6 +149,14 @@ orchestration host.
   JWTs, the Jobs dashboard uses interactive OpenID Connect, and the WebClient uses MSAL.
 - Observability is via **OpenTelemetry**, configured centrally in `Shuttle.ServiceDefaults`
   and per-project `ActivitySources`.
+- **ETag DB-fed read endpoints.** Any endpoint whose response only changes when the periodic
+  `DbUpdateJob` refreshes the database should be ETagged: read the freshness signal via
+  `IDatabaseFreshnessProvider` and return the body through the `ControllerBase.DbVersionedOk(...)`
+  helper (`Shuttle.Api/Services/DatabaseVersionedResults.cs`), which stamps `Cache-Control`,
+  `Last-Modified`, and a strong `ETag` and returns `304 Not Modified` on a matching
+  `If-None-Match`. Add this to any **new** DB-update-fed endpoint. Do **not** use it for responses
+  that also vary by caller (e.g. auth-dependent bodies) or on non-`GET`/body-carrying (`QUERY`)
+  endpoints, where a path+query ETag would be incorrect.
 
 ### Shuttle.WebClient structure
 

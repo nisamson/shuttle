@@ -29,6 +29,15 @@
         <a href="." class="reload">Reload</a>
         <span class="dismiss">🗙</span>
     </div>
+    <!--
+      These _content scripts are cached with a bounded max-age by staticwebapp.config.json. They
+      load by their stable (non-fingerprinted) URL: the #[.{fingerprint}] placeholder is not
+      expanded for _content RCL assets, and classic <script> tags don't consult the importmap.
+      Caching turns a per-load 304 revalidation -- which blocks startup because these execute
+      before Blazor boots -- into a cache hit for the duration of the window. A bounded window
+      (rather than `immutable`) is used precisely because the URL is not fingerprinted, so a
+      redeploy that changes the file is still picked up once the window lapses.
+    -->
     <script src="_content/Microsoft.Authentication.WebAssembly.Msal/AuthenticationService.js"></script>
     <script src="_content/Plotly.Blazor/plotly-3.5.0.min.js"></script>
     <script src="_content/Plotly.Blazor/plotly-interop-7.1.0.js"></script>

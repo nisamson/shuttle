@@ -12,8 +12,21 @@ using Shuttle.WebClient.Services;
 namespace Shuttle.WebClient.Pages.Players;
 
 public partial class PlayerComparison : ComponentBase, IDisposable {
-    /// <summary>The most players the add-UX will let you accumulate before nudging you to stop.</summary>
-    public const int MaxComparison = 3;
+    /// <summary>
+    /// The number of players beyond which comparison charts get hard to read; passing it shows a
+    /// non-blocking warning but adding more is still allowed up to <see cref="HardCap"/>.
+    /// </summary>
+    public const int SoftCap = 10;
+
+    /// <summary>The maximum number of players a single comparison can hold; the add UX stops here.</summary>
+    public const int HardCap = 50;
+
+    /// <summary>
+    /// Upper bound on concurrent per-player TPE-timeline requests, sized to the browser's typical
+    /// per-origin connection limit so a cold load of a large comparison doesn't burst one request per
+    /// player at once.
+    /// </summary>
+    private const int MaxTimelineConcurrency = 6;
 
     [Parameter, SupplyParameterFromQuery(Name = "ids")] public string? Ids { get; set; }
 
@@ -56,7 +69,7 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
     private string? loadError;
     private bool darkMode;
 
-    private bool AddDisabled => requestedIds.Count >= MaxComparison;
+    private bool AddDisabled => requestedIds.Count >= HardCap;
 
     // The requested players that resolved to a card, in requested order (charted or excluded).
     private IReadOnlyList<PlayerCard> SelectedCards =>
@@ -86,13 +99,15 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
                 .ToList();
 
             if (toFetch.Count > 0) {
-                var results = await Task.WhenAll(toFetch.Select(FetchAsync));
-                foreach (var (id, card) in results) {
-                    if (card is null) {
-                        missing.Add(id);
-                    } else {
-                        cards[id] = card;
-                    }
+                // One bulk round trip for all newly requested players; ids the server doesn't return
+                // are recorded as missing so they're not re-fetched on the next navigation.
+                var fetched = await PlayerClient.GetPlayerCardsBatched(toFetch);
+                foreach (var card in fetched) {
+                    cards[card.PlayerId] = card;
+                }
+
+                foreach (var id in toFetch.Where(id => !cards.ContainsKey(id))) {
+                    missing.Add(id);
                 }
             }
 
@@ -108,14 +123,6 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
             loadError = ex.Message;
         } finally {
             loading = false;
-        }
-    }
-
-    private async Task<(int Id, PlayerCard? Card)> FetchAsync(int id) {
-        try {
-            return (id, await PlayerClient.GetPlayer(id));
-        } catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound) {
-            return (id, null);
         }
     }
 
@@ -229,7 +236,11 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
             StateHasChanged();
 
             try {
-                var results = await Task.WhenAll(toFetch.Select(FetchTimelineAsync));
+                // Bound the fan-out so a cold load of a large comparison doesn't fire one request per
+                // player at once (the hard cap allows up to HardCap). The gate is sized to the browser's
+                // typical per-origin connection limit; each per-player request keeps its own ETag/304.
+                using var gate = new SemaphoreSlim(MaxTimelineConcurrency);
+                var results = await Task.WhenAll(toFetch.Select(id => FetchTimelineAsync(id, gate)));
                 foreach (var (id, points) in results) {
                     timelines[id] = points ?? Array.Empty<TpeTimelinePoint>();
                 }
@@ -245,11 +256,15 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
         needsRedraw = true;
     }
 
-    private async Task<(int Id, IReadOnlyList<TpeTimelinePoint>? Points)> FetchTimelineAsync(int id) {
+    private async Task<(int Id, IReadOnlyList<TpeTimelinePoint>? Points)> FetchTimelineAsync(
+        int id, SemaphoreSlim gate) {
+        await gate.WaitAsync();
         try {
             return (id, await PlayerClient.GetPlayerTpeTimeline(id));
         } catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound) {
             return (id, null);
+        } finally {
+            gate.Release();
         }
     }
 

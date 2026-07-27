@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Net.Http.Headers;
 using Shuttle.Api.Contracts;
+using Shuttle.Api.Services;
 using Shuttle.EFCore;
 using Shuttle.EFCore.Entities.Portal;
 using Shuttle.Models.Players;
@@ -19,11 +19,22 @@ namespace Shuttle.Api.Controllers;
 [Route("players")]
 [Route("player")]
 public class PlayerController : ControllerBase {
+    /// <summary>Cache lifetime for card/search/timeline responses before revalidation.</summary>
+    private static readonly TimeSpan CacheMaxAge = TimeSpan.FromMinutes(5);
+
+    /// <summary>Cache lifetime for the slim autocomplete directory (fetched once, filtered locally).</summary>
+    private static readonly TimeSpan DirectoryCacheMaxAge = TimeSpan.FromHours(1);
+
     private readonly ShlDbContext db;
+    private readonly IDatabaseFreshnessProvider freshness;
     private readonly ILogger<PlayerController> logger;
 
-    public PlayerController(ShlDbContext db, ILogger<PlayerController> logger) {
+    public PlayerController(
+        ShlDbContext db,
+        IDatabaseFreshnessProvider freshness,
+        ILogger<PlayerController> logger) {
         this.db = db;
+        this.freshness = freshness;
         this.logger = logger;
     }
 
@@ -32,7 +43,10 @@ public class PlayerController : ControllerBase {
     /// </summary>
     [HttpGet]
     [ProducesResponseType<IReadOnlyList<PlayerCard>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status304NotModified)]
     public async Task<ActionResult<IReadOnlyList<PlayerCard>>> GetPlayers(CancellationToken cancellationToken) {
+        var lastUpdated = await freshness.GetLastUpdatedAsync(cancellationToken);
+
         var rows = await db.PlayerInformation
             .AsNoTracking()
             .IgnoreAutoIncludes()
@@ -40,7 +54,7 @@ public class PlayerController : ControllerBase {
             .SelectCardRows(db.PlayerInformation)
             .ToListAsync(cancellationToken);
 
-        return Ok(rows.ToPlayerCards());
+        return this.DbVersionedOk(rows.ToPlayerCards(), lastUpdated, CacheMaxAge);
     }
 
     /// <summary>
@@ -50,8 +64,11 @@ public class PlayerController : ControllerBase {
     /// </summary>
     [HttpGet("suggestions")]
     [ProducesResponseType<IReadOnlyList<PlayerSuggestion>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status304NotModified)]
     public async Task<ActionResult<IReadOnlyList<PlayerSuggestion>>> GetPlayerSuggestions(
         CancellationToken cancellationToken) {
+        var lastUpdated = await freshness.GetLastUpdatedAsync(cancellationToken);
+
         var suggestions = await db.PlayerInformation
             .AsNoTracking()
             .IgnoreAutoIncludes()
@@ -65,20 +82,18 @@ public class PlayerController : ControllerBase {
             })
             .ToListAsync(cancellationToken);
 
-        Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue {
-            Public = true,
-            MaxAge = TimeSpan.FromHours(1),
-        };
-
-        return Ok(suggestions);
+        return this.DbVersionedOk(suggestions, lastUpdated, DirectoryCacheMaxAge);
     }
     /// filtered, sorted, and paginated server-side.
     /// </summary>
     [HttpGet("search")]
     [ProducesResponseType<PagedResult<PlayerCard>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status304NotModified)]
     public async Task<ActionResult<PagedResult<PlayerCard>>> SearchPlayers(
         [FromQuery] PlayerSearchQuery query,
         CancellationToken cancellationToken) {
+        var lastUpdated = await freshness.GetLastUpdatedAsync(cancellationToken);
+
         var filtered = ApplyFilters(
             db.PlayerInformation.AsNoTracking().IgnoreAutoIncludes(),
             db.PlayerInformation,
@@ -97,12 +112,15 @@ public class PlayerController : ControllerBase {
 
         var cards = rows.ToPlayerCards();
 
-        return Ok(new PagedResult<PlayerCard> {
-            Items = cards,
-            Page = page,
-            PageSize = pageSize,
-            TotalCount = totalCount,
-        });
+        return this.DbVersionedOk(
+            new PagedResult<PlayerCard> {
+                Items = cards,
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+            },
+            lastUpdated,
+            CacheMaxAge);
     }
 
     private const int MaxPageSize = 100;
@@ -213,8 +231,11 @@ public class PlayerController : ControllerBase {
     /// </summary>
     [HttpGet("{playerId:int}")]
     [ProducesResponseType<PlayerCard>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status304NotModified)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PlayerCard>> GetPlayer(int playerId, CancellationToken cancellationToken) {
+        var lastUpdated = await freshness.GetLastUpdatedAsync(cancellationToken);
+
         var row = await db.PlayerInformation
             .AsNoTracking()
             .IgnoreAutoIncludes()
@@ -227,7 +248,7 @@ public class PlayerController : ControllerBase {
             return NotFound();
         }
 
-        return Ok(row.ToPlayerCard());
+        return this.DbVersionedOk(row.ToPlayerCard(), lastUpdated, CacheMaxAge);
     }
 
     /// <summary>
@@ -237,10 +258,13 @@ public class PlayerController : ControllerBase {
     /// </summary>
     [HttpGet("{playerId:int}/tpe-timeline")]
     [ProducesResponseType<IReadOnlyList<TpeTimelinePoint>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status304NotModified)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IReadOnlyList<TpeTimelinePoint>>> GetPlayerTpeTimeline(
         int playerId,
         CancellationToken cancellationToken) {
+        var lastUpdated = await freshness.GetLastUpdatedAsync(cancellationToken);
+
         var playerExists = await db.PlayerInformation
             .AsNoTracking()
             .AnyAsync(p => p.PlayerId == playerId, cancellationToken);
@@ -260,10 +284,51 @@ public class PlayerController : ControllerBase {
             })
             .ToListAsync(cancellationToken);
 
-        return Ok(timeline);
+        return this.DbVersionedOk(timeline, lastUpdated, CacheMaxAge);
     }
 
     private const int MaxResolveInputs = 200;
+
+    /// <summary>Upper bound on the number of ids accepted by the batch card lookup.</summary>
+    private const int MaxCardIds = 500;
+
+    /// <summary>
+    /// Fetches the "at a glance" <see cref="PlayerCard"/> for a batch of player ids in a single round
+    /// trip, ordered by name. Unknown ids are simply omitted from the result. Uses the HTTP
+    /// <c>QUERY</c> method (a safe, idempotent read that carries a request body) so large id sets are
+    /// not constrained by URL length. Backs the scouting board and player comparison, which resolve
+    /// many cards at once. Not ETagged: the id set lives in the request body, so a path+query
+    /// validator could not distinguish distinct batches.
+    /// </summary>
+    [AcceptVerbs("QUERY", Route = "cards")]
+    [ProducesResponseType<IReadOnlyList<PlayerCard>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<IReadOnlyList<PlayerCard>>> GetPlayerCards(
+        [FromBody] PlayerCardsRequest request,
+        CancellationToken cancellationToken) {
+        var ids = (request.PlayerIds ?? []).Distinct().ToList();
+
+        if (ids.Count == 0) {
+            return Ok(Array.Empty<PlayerCard>());
+        }
+
+        if (ids.Count > MaxCardIds) {
+            return BadRequest(new ProblemDetails {
+                Detail = $"Too many ids; request at most {MaxCardIds} player cards at a time.",
+                Status = StatusCodes.Status400BadRequest,
+            });
+        }
+
+        var rows = await db.PlayerInformation
+            .AsNoTracking()
+            .IgnoreAutoIncludes()
+            .Where(p => ids.Contains(p.PlayerId))
+            .OrderBy(p => p.Name)
+            .SelectCardRows(db.PlayerInformation)
+            .ToListAsync(cancellationToken);
+
+        return Ok(rows.ToPlayerCards());
+    }
 
     private sealed record NameMatch(int PlayerId, string LoweredName);
 

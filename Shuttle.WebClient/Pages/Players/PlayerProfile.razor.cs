@@ -11,6 +11,7 @@ using Shuttle.Models.Players;
 using Shuttle.Shl.Api.Models.Common;
 using Shuttle.Shl.Api.Models.Portal.V1;
 using Shuttle.WebClient.Components;
+using Shuttle.WebClient.Extensions;
 using Shuttle.WebClient.Models;
 using Shuttle.WebClient.Models.Options;
 using Shuttle.WebClient.Services;
@@ -350,10 +351,10 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
             yield return ("Weight", card.Weight is int w ? $"{w} lbs" : "—");
             yield return ("Birthplace", string.IsNullOrWhiteSpace(card.Birthplace) ? "—" : card.Birthplace);
             yield return ("Nation", string.IsNullOrWhiteSpace(card.IihfNation) ? "—" : card.IihfNation);
-            yield return ("Created", card.CreationDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            yield return ("Created", card.CreationDate.ToShortDate());
 
             if (card.RetirementDate is DateTime retired) {
-                yield return ("Retired", retired.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                yield return ("Retired", retired.ToShortDate());
             }
         }
     }

@@ -2,7 +2,7 @@ using System.Drawing;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Net.Http.Headers;
+using Shuttle.Api.Services;
 using Shuttle.EFCore;
 using Shuttle.Models.Leagues;
 using Shuttle.Shl.Api.Models.Common;
@@ -19,11 +19,18 @@ namespace Shuttle.Api.Controllers;
 [Route("leagues")]
 [Route("league")]
 public class LeagueController : ControllerBase {
+    private static readonly TimeSpan CacheMaxAge = TimeSpan.FromHours(1);
+
     private readonly ShlDbContext db;
+    private readonly IDatabaseFreshnessProvider freshness;
     private readonly ILogger<LeagueController> logger;
 
-    public LeagueController(ShlDbContext db, ILogger<LeagueController> logger) {
+    public LeagueController(
+        ShlDbContext db,
+        IDatabaseFreshnessProvider freshness,
+        ILogger<LeagueController> logger) {
         this.db = db;
+        this.freshness = freshness;
         this.logger = logger;
     }
 
@@ -33,8 +40,11 @@ public class LeagueController : ControllerBase {
     /// </summary>
     [HttpGet("seasons")]
     [ProducesResponseType<IReadOnlyList<LeagueSeasons>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status304NotModified)]
     public async Task<ActionResult<IReadOnlyList<LeagueSeasons>>> GetSeasons(
         CancellationToken cancellationToken) {
+        var lastUpdated = await freshness.GetLastUpdatedAsync(cancellationToken);
+
         var seasons = await db.Seasons
             .AsNoTracking()
             .ToListAsync(cancellationToken);
@@ -50,9 +60,7 @@ public class LeagueController : ControllerBase {
             .OrderBy(ls => ls.League)
             .ToList();
 
-        SetCacheHeaders();
-
-        return Ok(result);
+        return this.DbVersionedOk(result, lastUpdated, CacheMaxAge);
     }
 
     /// <summary>
@@ -61,8 +69,11 @@ public class LeagueController : ControllerBase {
     /// </summary>
     [HttpGet("seasons/current")]
     [ProducesResponseType<IReadOnlyList<LeagueCurrentSeason>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status304NotModified)]
     public async Task<ActionResult<IReadOnlyList<LeagueCurrentSeason>>> GetCurrentSeasons(
         CancellationToken cancellationToken) {
+        var lastUpdated = await freshness.GetLastUpdatedAsync(cancellationToken);
+
         var seasons = await db.Seasons
             .AsNoTracking()
             .ToListAsync(cancellationToken);
@@ -73,16 +84,7 @@ public class LeagueController : ControllerBase {
             .OrderBy(ls => ls.League)
             .ToList();
 
-        SetCacheHeaders();
-
-        return Ok(result);
-    }
-
-    private void SetCacheHeaders() {
-        Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue {
-            Public = true,
-            MaxAge = TimeSpan.FromHours(1),
-        };
+        return this.DbVersionedOk(result, lastUpdated, CacheMaxAge);
     }
 
     /// <summary>
@@ -97,6 +99,7 @@ public class LeagueController : ControllerBase {
     /// <param name="cancellationToken">A cancellation token.</param>
     [HttpGet("{league}/teams/{teamId:int}")]
     [ProducesResponseType<TeamCard>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status304NotModified)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<TeamCard>> GetTeam(
         string league,
@@ -106,6 +109,8 @@ public class LeagueController : ControllerBase {
         if (!KnownLeague.TryFromAbbreviation(league, out var knownLeague)) {
             return NotFound();
         }
+
+        var lastUpdated = await freshness.GetLastUpdatedAsync(cancellationToken);
 
         var leagueId = knownLeague.Id;
         var query = db.Teams
@@ -125,9 +130,7 @@ public class LeagueController : ControllerBase {
             return NotFound();
         }
 
-        SetCacheHeaders();
-
-        return Ok(ToTeamCard(team, knownLeague));
+        return this.DbVersionedOk(ToTeamCard(team, knownLeague), lastUpdated, CacheMaxAge);
     }
 
     private static TeamCard ToTeamCard(TeamEntity team, KnownLeague league) =>

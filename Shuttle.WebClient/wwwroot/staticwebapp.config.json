@@ -8,9 +8,15 @@
       }
     },
     {
+      "route": "/_content/Microsoft.Authentication.WebAssembly.Msal/*",
+      "headers": {
+        "cache-control": "public, max-age=3600"
+      }
+    },
+    {
       "route": "/_content/*",
       "headers": {
-        "cache-control": "no-cache"
+        "cache-control": "public, max-age=86400"
       }
     },
     {

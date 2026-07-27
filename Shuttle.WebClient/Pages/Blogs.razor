@@ -14,7 +14,7 @@
                 <ShuttleLink Class="" Href="@Routes.Articles.Blog(entry.Slug)">
                     <FluentText Weight="TextWeight.Bold" Size="TextSize.Size400" Block="true">@entry.Title</FluentText>
                 </ShuttleLink>
-                <FluentText Size="TextSize.Size200" Block="true">@entry.Date.ToString("MMMM d, yyyy")</FluentText>
+                <FluentText Size="TextSize.Size200" Block="true">@entry.Date.ToLongDate()</FluentText>
             </FluentStack>
         </FluentCard>
     }

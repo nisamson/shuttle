@@ -162,19 +162,25 @@ public partial class ScoutingBoard : ComponentBase {
             return;
         }
 
-        foreach (var entry in board.Entries) {
-            if (playerCards.ContainsKey(entry.PlayerId)) {
-                continue;
-            }
+        var toFetch = board.Entries
+            .Select(e => e.PlayerId)
+            .Where(id => !playerCards.ContainsKey(id))
+            .Distinct()
+            .ToList();
 
-            try {
-                var card = await PlayerClient.GetPlayer(entry.PlayerId);
-                if (card is not null) {
-                    playerCards[entry.PlayerId] = card;
-                }
-            } catch (ApiException) {
-                // Leave the entry without an enriched card; the row falls back to the player id.
+        if (toFetch.Count == 0) {
+            return;
+        }
+
+        try {
+            // One bulk round trip instead of a request per entry; unresolved ids simply stay absent
+            // and their rows fall back to the raw player id.
+            var cards = await PlayerClient.GetPlayerCardsBatched(toFetch);
+            foreach (var card in cards) {
+                playerCards[card.PlayerId] = card;
             }
+        } catch (ApiException) {
+            // Leave the entries without enriched cards; the rows fall back to the player id.
         }
     }
 

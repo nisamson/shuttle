@@ -1,3 +1,4 @@
+using Shuttle.Api.Client;
 using Shuttle.Models.Players;
 using Shuttle.Shl.Api.Models.Common;
 using Shuttle.Shl.Api.Models.Portal.V1;
@@ -153,6 +154,50 @@ public class InMemoryShuttlePlayerClientTests {
         Assert.Contains("Dup", result.Ambiguous);
         Assert.Equal([2003], result.Resolved.Select(p => p.PlayerId));
         Assert.Empty(result.NotFound);
+    }
+
+    [Fact]
+    public async Task GetPlayerCards_returns_matching_cards_ordered_by_name() {
+        var all = await client.GetPlayers();
+        var ids = all.Select(p => p.PlayerId).Take(3).ToList();
+
+        var cards = await client.GetPlayerCards(new PlayerCardsRequest { PlayerIds = ids });
+
+        Assert.Equal(ids.OrderBy(i => i), cards.Select(c => c.PlayerId).OrderBy(i => i));
+        Assert.Equal(
+            cards.Select(c => c.Name).OrderBy(n => n, StringComparer.OrdinalIgnoreCase),
+            cards.Select(c => c.Name));
+    }
+
+    [Fact]
+    public async Task GetPlayerCards_omits_unknown_ids_and_dedups() {
+        var known = (await client.GetPlayers())[0].PlayerId;
+
+        var cards = await client.GetPlayerCards(new PlayerCardsRequest {
+            PlayerIds = [known, known, 999_999],
+        });
+
+        Assert.Equal([known], cards.Select(c => c.PlayerId));
+    }
+
+    [Fact]
+    public async Task GetPlayerCards_returns_empty_for_empty_or_null_ids() {
+        Assert.Empty(await client.GetPlayerCards(new PlayerCardsRequest { PlayerIds = [] }));
+        Assert.Empty(await client.GetPlayerCards(new PlayerCardsRequest()));
+    }
+
+    [Fact]
+    public async Task GetPlayerCardsBatched_chunks_large_id_sets_and_returns_all_matches() {
+        // Build a client with more players than a single batch so the chunking path is exercised.
+        var many = Enumerable.Range(0, 1200)
+            .Select(i => Card(3000 + i, $"Player {i:D4}"))
+            .ToList();
+        var batchClient = new InMemoryShuttlePlayerClient(many);
+        var ids = many.Select(c => c.PlayerId).ToList();
+
+        var cards = await batchClient.GetPlayerCardsBatched(ids);
+
+        Assert.Equal(ids.OrderBy(i => i), cards.Select(c => c.PlayerId).OrderBy(i => i));
     }
 
     private static PlayerCard Card(int id, string name) => new() {

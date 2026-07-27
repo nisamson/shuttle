@@ -1,8 +1,6 @@
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Net.Http.Headers;
+using Shuttle.Api.Services;
 using Shuttle.Api.Services.Recruitment;
 using Shuttle.Models.Recruitment;
 using EfCore = Shuttle.EFCore.Recruitment;
@@ -45,7 +43,7 @@ public class RecruitmentController : ControllerBase {
         IReadOnlyList<RecruiterCategorySummary> summary =
             [.. snapshot.Analysis.CategorySummary.Select(c => c.ToSummaryDto())];
 
-        return CachedOk(summary, snapshot.LastUpdated);
+        return this.DbVersionedOk(summary, snapshot.LastUpdated, CacheMaxAge);
     }
 
     /// <summary>
@@ -71,7 +69,7 @@ public class RecruitmentController : ControllerBase {
             [.. SelectRecruiters(snapshot.Analysis.Tallies, category, sort ?? RecruiterSortField.Recruits, descending, limit)
                 .Select(t => t.ToTallyDto())];
 
-        return CachedOk(tallies, snapshot.LastUpdated);
+        return this.DbVersionedOk(tallies, snapshot.LastUpdated, CacheMaxAge);
     }
 
     /// <summary>
@@ -94,7 +92,7 @@ public class RecruitmentController : ControllerBase {
             return NotFound();
         }
 
-        return CachedOk(tally.ToDetailDto(), snapshot.LastUpdated);
+        return this.DbVersionedOk(tally.ToDetailDto(), snapshot.LastUpdated, CacheMaxAge);
     }
 
     /// <summary>
@@ -124,7 +122,7 @@ public class RecruitmentController : ControllerBase {
         var depthCap = maxDepth is { } d ? Math.Clamp(d, 1, MaxDepth) : (int?)null;
         var tree = EfCore.RecruitmentAnalyzer.BuildLineageTree(tally, childLookup, depthCap);
 
-        return CachedOk(tree.ToTreeDto(), snapshot.LastUpdated);
+        return this.DbVersionedOk(tree.ToTreeDto(), snapshot.LastUpdated, CacheMaxAge);
     }
 
     /// <summary>
@@ -165,41 +163,4 @@ public class RecruitmentController : ControllerBase {
         analysis.Tallies.FirstOrDefault(t =>
             (t.Category == EfCore.RecruiterCategory.Player || t.Category == EfCore.RecruiterCategory.External)
             && string.Equals(t.Recruiter, recruiter, StringComparison.OrdinalIgnoreCase));
-
-    /// <summary>
-    /// Sets cache headers (including an ETag/Last-Modified derived from the database freshness signal)
-    /// and returns <c>200</c> with <paramref name="body"/>, or <c>304 Not Modified</c> when the
-    /// caller's <c>If-None-Match</c> already matches.
-    /// </summary>
-    private ActionResult CachedOk<T>(T body, DateTimeOffset? lastUpdated) {
-        var headers = Response.GetTypedHeaders();
-        headers.CacheControl = new CacheControlHeaderValue {
-            Public = true,
-            MaxAge = CacheMaxAge,
-        };
-
-        if (lastUpdated is { } lu) {
-            headers.LastModified = lu;
-            var etag = ComputeETag(lu);
-            headers.ETag = etag;
-
-            var ifNoneMatch = Request.GetTypedHeaders().IfNoneMatch;
-            if (ifNoneMatch is { Count: > 0 }
-                && ifNoneMatch.Any(t => t.Compare(etag, useStrongComparison: false))) {
-                return StatusCode(StatusCodes.Status304NotModified);
-            }
-        }
-
-        return Ok(body);
-    }
-
-    /// <summary>
-    /// Builds a strong ETag from the freshness signal and the exact resource (path + query), so
-    /// distinct endpoints/queries never share a validator.
-    /// </summary>
-    private EntityTagHeaderValue ComputeETag(DateTimeOffset lastUpdated) {
-        var raw = $"{lastUpdated:o}|{Request.Path}{Request.QueryString}";
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
-        return new EntityTagHeaderValue($"\"{Convert.ToHexString(hash, 0, 8).ToLowerInvariant()}\"");
-    }
 }

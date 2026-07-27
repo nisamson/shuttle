@@ -53,7 +53,7 @@
         <SeasonNumber Season="context.DraftSeason"/>
     </TemplateColumn>
     <TemplateColumn Title="Created" HeaderCellItemTemplate="@(_ => SortHeader(("Created", PlayerSortField.Created)))">
-        @context.CreationDate.ToString("yyyy-MM-dd")
+        @context.CreationDate.ToShortDate()
     </TemplateColumn>
     <TemplateColumn Title="Total TPE" Align="DataGridCellAlignment.End"
                     HeaderCellItemTemplate="@(_ => SortHeader(("Total TPE", PlayerSortField.TotalTpe)))">
