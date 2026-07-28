@@ -5,6 +5,7 @@ using SixLabors.ImageSharp.PixelFormats;
 using Shuttle.Fhm.Vision.Layout;
 using Shuttle.Fhm.Vision.Model;
 using Shuttle.Fhm.Vision.Ocr;
+using Shuttle.Fhm.Vision.Recognition;
 
 namespace Shuttle.Fhm.Vision.Extraction;
 
@@ -33,12 +34,19 @@ public sealed class RegionExtractor {
     private readonly IOcrEngine ocr;
     private readonly ILogger logger;
     private readonly bool isolateWhiteText;
+    private readonly IDigitRecognizer? digitRecognizer;
 
-    public RegionExtractor(IOcrEngine ocr, ILogger<RegionExtractor>? logger = null, bool isolateWhiteText = true) {
+    public RegionExtractor(
+        IOcrEngine ocr,
+        ILogger<RegionExtractor>? logger = null,
+        bool isolateWhiteText = true,
+        IDigitRecognizer? digitRecognizer = null
+    ) {
         ArgumentNullException.ThrowIfNull(ocr);
         this.ocr = ocr;
         this.logger = logger ?? NullLogger<RegionExtractor>.Instance;
         this.isolateWhiteText = isolateWhiteText;
+        this.digitRecognizer = digitRecognizer;
     }
 
     /// <summary>True when the given field kind holds FHM's white numeric text worth binarising before OCR.</summary>
@@ -91,7 +99,7 @@ public sealed class RegionExtractor {
 
         foreach (var region in profile.Regions) {
             var isolate = isolateWhiteText && ShouldIsolateWhiteText(region.Kind);
-            var raw = await RecognizeAsync(image, region.Bounds, isolate, cancellationToken);
+            var raw = await ReadRegionAsync(image, region, isolate, cancellationToken);
 
             if (region.Kind == FieldKind.Bio) {
                 ApplyBioLine(raw, sink, ref position);
@@ -239,5 +247,30 @@ public sealed class RegionExtractor {
         var png = await RegionImaging.CropForOcrAsync(
             image, pixels, cancellationToken, isolateWhiteText: isolate);
         return await ocr.RecognizeAsync(png, cancellationToken);
+    }
+
+    /// <summary>
+    /// Reads a region's text. For purely-numeric cells (<see cref="FieldKind.Integer"/> /
+    /// <see cref="FieldKind.Float"/>) the trained template recognizer is tried first and used when
+    /// confident; otherwise (and for all other kinds) it falls back to the OCR engine.
+    /// </summary>
+    private async Task<string> ReadRegionAsync(
+        Image<Rgba32> image, FieldRegion region, bool isolate, CancellationToken cancellationToken) {
+        if (digitRecognizer is not null && region.Kind is FieldKind.Integer or FieldKind.Float) {
+            var pixels = region.Bounds.ToPixels(image.Width, image.Height);
+            var read = digitRecognizer.Read(image, pixels);
+            if (read.Recognized && read.Text.Length > 0) {
+                logger.LogDebug(
+                    "Digit recognizer read '{Text}' for '{Key}' (worst score {Worst:0.###})",
+                    read.Text, region.Key, read.WorstScore);
+                return read.Text;
+            }
+
+            logger.LogDebug(
+                "Digit recognizer not confident for '{Key}' (text '{Text}', worst score {Worst:0.###}); falling back to OCR",
+                region.Key, read.Text, read.WorstScore);
+        }
+
+        return await RecognizeAsync(image, region.Bounds, isolate, cancellationToken);
     }
 }

@@ -50,13 +50,19 @@ dotnet run --project Shuttle.Fhm.Vision -- ingest-image --image shot.png \
 # 5. Diagnose a profile: dump each anchor/region crop + its OCR text (why is a region empty?)
 dotnet run --project Shuttle.Fhm.Vision -- inspect --image shot.png \
     --profile fhm10-forward-profile.json --out inspect
+
+# 6. Train the custom digit recognizer for FHM's rating font (interactive labelling)
+dotnet run --project Shuttle.Fhm.Vision -- train-digits --image shot.png \
+    --profile fhm10-forward-profile.json --templates digits.json --out glyphs
 ```
 
 Common options: `--pid` (explicit process id) or `--process` (name fragment, default `FHM`);
 `--profile` (layout JSON; `monitor` accepts it repeatedly to match each frame against several
 profiles in order — the first whose anchors match wins); `--db` (SQLite path, default
 `fhm-captures.db`); `--images` (screenshot folder, default `images/` beside the database);
-`--interval` (monitor poll ms, default 750).
+`--interval` (monitor poll ms, default 750); `--templates` (digit-template JSON produced by
+`train-digits`; when supplied to `monitor`/`ingest-image`, numeric cells use the trained
+recognizer and fall back to OCR only when it is not confident).
 
 ## Calibration workflow
 
@@ -118,6 +124,26 @@ Two further robustness measures target FHM's small numeric cells:
   substitutions back to digits for strictly-numeric cells (`l`/`I`/`|` → `1`, `O`/`Q` → `0`,
   `S` → `5`, `B` → `8`, `Z` → `2`, `G` → `6`, `T` → `7`), so e.g. a `14` read as `l4` is not
   silently truncated to `4`.
+
+## Custom digit recognizer (FHM rating font)
+
+General-purpose OCR is unreliable on the short, isolated numeric cells FHM renders. Because those
+ratings use a single fixed font, a tiny **template / nearest-neighbour recognizer** is far more
+accurate. It lives in `Recognition/` and is *opt-in* via `--templates`:
+
+1. **Train** with `train-digits`: for each numeric region of each matching profile it segments the
+   cell into individual glyphs (`DigitSegmenter`, vertical projection over white "ink" pixels),
+   optionally dumps a preview PNG per glyph (`--out`), and prompts you to type each glyph's
+   character (blank/`s` skips, `q` saves and quits). Labels are appended to the `--templates` JSON
+   (`DigitTemplateStore`), so you can build the set up across several screenshots.
+2. **Use** it by passing the same `--templates` file to `monitor` or `ingest-image`. For
+   `Integer`/`Float` regions, `RegionExtractor` normalizes each segmented glyph to a fixed grid
+   (default 12×20), classifies it by nearest template (Hamming distance), and uses the result when
+   every glyph matches within tolerance; otherwise it **falls back to the Windows OCR pipeline**
+   above. `Bio` regions (which contain letters) always use OCR.
+
+The template set is plain JSON (glyph size + `'1'`/`'0'` bit strings), so it is easy to inspect,
+edit, and commit alongside the layout profiles.
 
 Alternatives can be dropped in behind the same interface. As evaluated in the plan:
 

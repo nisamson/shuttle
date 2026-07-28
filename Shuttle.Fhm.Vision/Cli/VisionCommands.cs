@@ -9,6 +9,7 @@ using Shuttle.Fhm.Vision.Extraction;
 using Shuttle.Fhm.Vision.Layout;
 using Shuttle.Fhm.Vision.Monitor;
 using Shuttle.Fhm.Vision.Ocr;
+using Shuttle.Fhm.Vision.Recognition;
 using Shuttle.Fhm.Vision.Storage;
 
 namespace Shuttle.Fhm.Vision.Cli;
@@ -27,6 +28,7 @@ public static class VisionCommands {
         root.Subcommands.Add(BuildMonitor());
         root.Subcommands.Add(BuildIngestImage());
         root.Subcommands.Add(BuildInspect());
+        root.Subcommands.Add(BuildTrainDigits());
         return root;
     }
 
@@ -130,13 +132,14 @@ public static class VisionCommands {
         };
         var dbOption = DatabaseOption();
         var imagesOption = ImagesOption();
+        var templatesOption = TemplatesOption();
         var intervalOption = new Option<int>("--interval") {
             Description = "Polling interval in milliseconds.",
             DefaultValueFactory = _ => 750,
         };
 
         var command = new Command("monitor", "Watch the FHM window and store unique player-info screens.") {
-            pidOption, processOption, profileOption, dbOption, imagesOption, intervalOption,
+            pidOption, processOption, profileOption, dbOption, imagesOption, templatesOption, intervalOption,
         };
 
         command.SetAction(async (parseResult, cancellationToken) => {
@@ -167,7 +170,9 @@ public static class VisionCommands {
 
             var store = await CaptureStore.OpenAsync(
                 parseResult.GetValue(dbOption)!, parseResult.GetValue(imagesOption), cancellationToken);
-            var extractor = new RegionExtractor(engine, new ConsoleLogger<RegionExtractor>());
+            var recognizer = await TryLoadRecognizerAsync(parseResult.GetValue(templatesOption), cancellationToken);
+            var extractor = new RegionExtractor(
+                engine, new ConsoleLogger<RegionExtractor>(), digitRecognizer: recognizer);
             var options = new MonitorOptions {
                 PollInterval = TimeSpan.FromMilliseconds(parseResult.GetValue(intervalOption)),
             };
@@ -197,9 +202,10 @@ public static class VisionCommands {
         };
         var dbOption = DatabaseOption();
         var imagesOption = ImagesOption();
+        var templatesOption = TemplatesOption();
 
         var command = new Command("ingest-image", "Parse a single saved screenshot and store the capture (offline).") {
-            imageOption, profileOption, dbOption, imagesOption,
+            imageOption, profileOption, dbOption, imagesOption, templatesOption,
         };
 
         command.SetAction(async (parseResult, cancellationToken) => {
@@ -230,7 +236,9 @@ public static class VisionCommands {
             }
 
             using var image = await SixLabors.ImageSharp.Image.LoadAsync<Rgba32>(imageFile.FullName, cancellationToken);
-            var extractor = new RegionExtractor(engine, new ConsoleLogger<RegionExtractor>());
+            var recognizer = await TryLoadRecognizerAsync(parseResult.GetValue(templatesOption), cancellationToken);
+            var extractor = new RegionExtractor(
+                engine, new ConsoleLogger<RegionExtractor>(), digitRecognizer: recognizer);
 
             LayoutProfile? matched = null;
             foreach (var candidate in profiles) {
@@ -366,6 +374,157 @@ public static class VisionCommands {
         });
 
         return command;
+    }
+
+    private static Command BuildTrainDigits() {
+        var imageOption = new Option<FileInfo>("--image", "-i") {
+            Description = "Screenshot PNG containing numeric cells to label.",
+            Required = true,
+        };
+        var profileOption = new Option<FileInfo[]>("--profile", "-p") {
+            Description = "Layout profile JSON whose numeric regions to segment. Repeat to use several.",
+            Required = true,
+            AllowMultipleArgumentsPerToken = true,
+        };
+        var templatesOption = new Option<FileInfo>("--templates", "-t") {
+            Description = "Digit template JSON to append to (created if it does not exist).",
+            Required = true,
+        };
+        var outOption = new Option<DirectoryInfo?>("--out", "-o") {
+            Description = "Directory to write labelled glyph preview PNGs into (default: none).",
+        };
+
+        var command = new Command(
+            "train-digits",
+            "Interactively label the FHM rating font: segment numeric cells into glyphs and record templates.") {
+            imageOption, profileOption, templatesOption, outOption,
+        };
+
+        command.SetAction(async (parseResult, cancellationToken) => {
+            var imageFile = parseResult.GetValue(imageOption)!;
+            var profileFiles = parseResult.GetValue(profileOption) ?? [];
+            var templatesFile = parseResult.GetValue(templatesOption)!;
+            if (!imageFile.Exists) {
+                Console.Error.WriteLine($"Image not found: {imageFile.FullName}");
+                return 1;
+            }
+
+            var missing = profileFiles.Where(f => !f.Exists).ToList();
+            if (missing.Count > 0) {
+                foreach (var file in missing) {
+                    Console.Error.WriteLine($"Profile not found: {file.FullName}");
+                }
+
+                return 1;
+            }
+
+            var engine = TryCreateOcrEngine();
+            if (engine is null) {
+                return 1;
+            }
+
+            var set = templatesFile.Exists
+                ? await DigitTemplateStore.LoadAsync(templatesFile, cancellationToken)
+                : new DigitTemplateSet();
+            Console.WriteLine(
+                $"Templates: {templatesFile.FullName} ({set.Templates.Count} existing, glyph {set.Width}x{set.Height})");
+
+            var extractor = new RegionExtractor(engine, new ConsoleLogger<RegionExtractor>());
+            var outDir = parseResult.GetValue(outOption);
+            outDir?.Create();
+
+            using var image = await SixLabors.ImageSharp.Image.LoadAsync<Rgba32>(imageFile.FullName, cancellationToken);
+            Console.WriteLine($"Image: {imageFile.FullName} ({image.Width}x{image.Height})");
+            Console.WriteLine("For each glyph, type its character then Enter. Blank or 's' skips; 'q' saves and quits.");
+
+            var added = 0;
+            var quit = false;
+            foreach (var file in profileFiles) {
+                if (quit) {
+                    break;
+                }
+
+                var profile = await LayoutProfileStore.LoadAsync(file, cancellationToken);
+                if (!await extractor.IsPlayerScreenAsync(image, profile, cancellationToken)) {
+                    Console.WriteLine($"Profile '{profile.Name}' anchors did not match; skipping.");
+                    continue;
+                }
+
+                Console.WriteLine($"=== Profile '{profile.Name}' ===");
+                foreach (var region in profile.Regions) {
+                    if (region.Kind is not (FieldKind.Integer or FieldKind.Float)) {
+                        continue;
+                    }
+
+                    var pixels = region.Bounds.ToPixels(image.Width, image.Height);
+                    var glyphs = DigitSegmenter.Segment(image, pixels, set.Width, set.Height);
+                    Console.WriteLine($"  region '{region.Key}' -> {glyphs.Count} glyph(s)");
+
+                    for (var i = 0; i < glyphs.Count; i++) {
+                        if (outDir is not null) {
+                            var png = await RegionImaging.CropToPngAsync(image, glyphs[i].Bounds, cancellationToken);
+                            await File.WriteAllBytesAsync(
+                                Path.Combine(outDir.FullName, $"{Sanitize(region.Key)}_{i}.png"), png, cancellationToken);
+                        }
+
+                        Console.Write($"    glyph[{i}] {DescribeRect(glyphs[i].Bounds)} label> ");
+                        var label = Console.ReadLine()?.Trim() ?? string.Empty;
+                        if (label.Equals("q", StringComparison.OrdinalIgnoreCase)) {
+                            quit = true;
+                            break;
+                        }
+
+                        if (label.Length == 0 || label.Equals("s", StringComparison.OrdinalIgnoreCase)) {
+                            continue;
+                        }
+
+                        set.Add(label, glyphs[i].Glyph);
+                        added++;
+                    }
+
+                    if (quit) {
+                        break;
+                    }
+                }
+            }
+
+            await DigitTemplateStore.SaveAsync(templatesFile, set, cancellationToken);
+            Console.WriteLine($"Added {added} template(s); saved {set.Templates.Count} total to {templatesFile.FullName}");
+            return 0;
+        });
+
+        return command;
+    }
+
+    /// <summary>Shared <c>--templates</c> option enabling the trained digit recognizer for numeric cells.</summary>
+    private static Option<FileInfo?> TemplatesOption() =>
+        new("--templates", "-t") {
+            Description = "Digit template JSON (from 'train-digits'); when present, numeric cells use the "
+                + "trained recognizer, falling back to OCR when it is not confident.",
+        };
+
+    /// <summary>
+    /// Loads a <see cref="TemplateDigitRecognizer"/> from the given file when it exists and is non-empty;
+    /// returns <c>null</c> (OCR-only) otherwise.
+    /// </summary>
+    private static async Task<IDigitRecognizer?> TryLoadRecognizerAsync(FileInfo? file, CancellationToken cancellationToken) {
+        if (file is null) {
+            return null;
+        }
+
+        if (!file.Exists) {
+            Console.Error.WriteLine($"Templates file not found: {file.FullName}; using OCR only.");
+            return null;
+        }
+
+        var set = await DigitTemplateStore.LoadAsync(file, cancellationToken);
+        if (set.Templates.Count == 0) {
+            Console.Error.WriteLine($"Templates file {file.FullName} is empty; using OCR only.");
+            return null;
+        }
+
+        Console.WriteLine($"Digit recognizer: {set.Templates.Count} template(s) from {file.FullName}");
+        return new TemplateDigitRecognizer(set);
     }
 
     private static async Task<(string Text, PixelRect Pixels, byte[] Png)> ReadRegionAsync(
