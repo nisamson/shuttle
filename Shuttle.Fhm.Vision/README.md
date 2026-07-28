@@ -143,12 +143,29 @@ accurate. It lives in `Recognition/` and is *opt-in* via `--templates`:
    glyph, so you can press **Enter to accept it**, type a character to label/override, `s` to skip,
    or `q` to save and quit. The recognizer is rebuilt as you go, so guesses improve within a run.
    Labels are appended to the `--templates` JSON (`DigitTemplateStore`), so you can build the set up
-   across several screenshots.
+   across several screenshots. Because the font is fixed, near-identical repeat captures of a glyph
+   are **de-duplicated on add** (`DigitTemplateSet.TryAdd`) — the trainer reports and skips them, so
+   the set stays small and its confidence margins stay meaningful.
 2. **Use** it by passing the same `--templates` file to `monitor` or `ingest-image`. For
    `Integer`/`Float` regions, `RegionExtractor` normalizes each segmented glyph to a fixed grid
    (default 12×20), classifies it by nearest template (Hamming distance), and uses the result when
    every glyph matches within tolerance; otherwise it **falls back to the Windows OCR pipeline**
    above. `Bio` regions (which contain letters) always use OCR.
+
+Two properties keep the classifier robust against the confusable pairs a fixed font still produces:
+
+- **Aspect-preserving normalization** — a segmented glyph is scaled by a *single* factor to fit the
+  normalized box and then centred (background padding), rather than stretched independently on each
+  axis. Stretching widened a narrow `1` toward `2`/wider digits; preserving aspect ratio removes that
+  whole class of confusion.
+- **Confidence margin** — a glyph is only accepted when its nearest template both clears the distance
+  tolerance (`maxNormalizedDistance`, default 0.18) **and** beats the nearest *different-label*
+  template by a minimum gap (`minConfidenceMargin`, default 0.02). A glyph whose winning label barely
+  edges out a rival is treated as unrecognized and **falls back to OCR** instead of guessing wrong.
+
+> **Normalization change:** template sets are normalization-specific. Sets trained before
+> aspect-preserving normalization was introduced must be **re-generated** (re-run `train-digits` over
+> the source screenshots) — old stored bitstrings will not match freshly segmented glyphs.
 
 The template set is plain JSON (glyph size + `'1'`/`'0'` bit strings), so it is easy to inspect,
 edit, and commit alongside the layout profiles.

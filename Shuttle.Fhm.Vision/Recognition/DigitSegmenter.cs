@@ -92,14 +92,24 @@ public static class DigitSegmenter {
 
         var glyphWidth = x1 - x0 + 1;
         var glyphHeight = bottom - top + 1;
+
+        // Aspect-preserving fit: scale the glyph by a single factor so it fits inside the normalized
+        // box, then centre it (padding the remainder with background). Scaling each axis independently
+        // would stretch narrow glyphs like '1' toward wider ones and cause 1<->2 style confusions.
+        var scale = Math.Min((double)normWidth / glyphWidth, (double)normHeight / glyphHeight);
+        var scaledWidth = Math.Clamp((int)Math.Round(glyphWidth * scale), 1, normWidth);
+        var scaledHeight = Math.Clamp((int)Math.Round(glyphHeight * scale), 1, normHeight);
+        var offsetX = (normWidth - scaledWidth) / 2;
+        var offsetY = (normHeight - scaledHeight) / 2;
+
         var pixels = new bool[normWidth * normHeight];
-        for (var ty = 0; ty < normHeight; ty++) {
-            var sy = top + (int)(((ty + 0.5) * glyphHeight) / normHeight);
+        for (var ty = 0; ty < scaledHeight; ty++) {
+            var sy = top + (int)(((ty + 0.5) * glyphHeight) / scaledHeight);
             sy = Math.Clamp(sy, top, bottom);
-            for (var tx = 0; tx < normWidth; tx++) {
-                var sx = x0 + (int)(((tx + 0.5) * glyphWidth) / normWidth);
+            for (var tx = 0; tx < scaledWidth; tx++) {
+                var sx = x0 + (int)(((tx + 0.5) * glyphWidth) / scaledWidth);
                 sx = Math.Clamp(sx, x0, x1);
-                pixels[(ty * normWidth) + tx] = ink[(sy * w) + sx];
+                pixels[((ty + offsetY) * normWidth) + tx + offsetX] = ink[(sy * w) + sx];
             }
         }
 

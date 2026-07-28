@@ -14,6 +14,7 @@ public sealed class TemplateDigitRecognizer : IDigitRecognizer {
     private readonly int width;
     private readonly int height;
     private readonly double maxNormalizedDistance;
+    private readonly double minConfidenceMargin;
     private readonly byte whiteThreshold;
     private readonly IReadOnlyList<(string Label, GlyphBitmap Glyph)> templates;
 
@@ -21,9 +22,16 @@ public sealed class TemplateDigitRecognizer : IDigitRecognizer {
     /// Per-glyph acceptance threshold as a fraction of total pixels (0..1). A glyph whose nearest
     /// template exceeds this is treated as unrecognized, so the caller can fall back to OCR.
     /// </param>
+    /// <param name="minConfidenceMargin">
+    /// Minimum required gap (as a fraction of total pixels) between the nearest template and the nearest
+    /// template of a <em>different</em> label. A glyph whose winning label barely beats a rival is treated
+    /// as unrecognized so the caller can fall back to OCR, guarding against confusable pairs (e.g. 1/2,
+    /// 9/0). Set to 0 to disable the margin check.
+    /// </param>
     public TemplateDigitRecognizer(
         DigitTemplateSet set,
         double maxNormalizedDistance = 0.18,
+        double minConfidenceMargin = 0.02,
         byte whiteThreshold = RegionImaging.WhiteTextThreshold
     ) {
         ArgumentNullException.ThrowIfNull(set);
@@ -36,6 +44,7 @@ public sealed class TemplateDigitRecognizer : IDigitRecognizer {
         height = set.Height;
         maxNormalizedDistance = Math.Clamp(maxNormalizedDistance, 0.0, 1.0);
         this.maxNormalizedDistance = maxNormalizedDistance;
+        this.minConfidenceMargin = Math.Clamp(minConfidenceMargin, 0.0, 1.0);
         this.whiteThreshold = whiteThreshold;
     }
 
@@ -75,14 +84,18 @@ public sealed class TemplateDigitRecognizer : IDigitRecognizer {
     /// </summary>
     public GlyphMatch Classify(GlyphBitmap glyph) {
         ArgumentNullException.ThrowIfNull(glyph);
-        var (label, distance) = NearestLabel(glyph);
-        var normalized = (double)distance / (width * height);
-        return new GlyphMatch(label, normalized, normalized <= maxNormalizedDistance);
+        var (label, distance, nearestOther) = NearestLabel(glyph);
+        var total = width * height;
+        var normalized = (double)distance / total;
+        var margin = nearestOther == int.MaxValue ? 1.0 : ((double)nearestOther / total) - normalized;
+        var confident = normalized <= maxNormalizedDistance && margin >= minConfidenceMargin;
+        return new GlyphMatch(label, normalized, margin, confident);
     }
 
-    private (string Label, int Distance) NearestLabel(GlyphBitmap candidate) {
+    private (string Label, int Distance, int NearestOther) NearestLabel(GlyphBitmap candidate) {
         var bestLabel = templates[0].Label;
         var bestDistance = int.MaxValue;
+        var nearestOther = int.MaxValue;
         foreach (var (label, glyph) in templates) {
             var distance = candidate.Distance(glyph);
             if (distance < bestDistance) {
@@ -91,6 +104,18 @@ public sealed class TemplateDigitRecognizer : IDigitRecognizer {
             }
         }
 
-        return (bestLabel, bestDistance);
+        // Nearest template whose label differs from the winner, for the confidence margin.
+        foreach (var (label, glyph) in templates) {
+            if (label == bestLabel) {
+                continue;
+            }
+
+            var distance = candidate.Distance(glyph);
+            if (distance < nearestOther) {
+                nearestOther = distance;
+            }
+        }
+
+        return (bestLabel, bestDistance, nearestOther);
     }
 }

@@ -68,6 +68,85 @@ public sealed class DigitRecognitionTests {
     }
 
     [Fact]
+    public void Segmenter_preserves_aspect_ratio_and_centres_narrow_glyph() {
+        // A 2-wide, 8-tall bar normalized into an 8x8 box must stay narrow and centred, not stretched
+        // to fill the width (which is what caused 1<->2 style confusions).
+        using var image = Canvas(12, 12);
+        FillBlock(image, 5, 1, 6, 8); // 2 columns wide, 8 rows tall
+        var glyphs = DigitSegmenter.Segment(image, new PixelRect(0, 0, 12, 12), 8, 8);
+
+        Assert.Single(glyphs);
+        var glyph = glyphs[0].Glyph;
+
+        static bool ColumnHasInk(GlyphBitmap g, int x) {
+            for (var y = 0; y < g.Height; y++) {
+                if (g.Pixels[(y * g.Width) + x]) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // Outer columns stay empty (no horizontal stretch); ink lands in the centred columns.
+        Assert.False(ColumnHasInk(glyph, 0));
+        Assert.False(ColumnHasInk(glyph, 7));
+        Assert.True(ColumnHasInk(glyph, 3) || ColumnHasInk(glyph, 4));
+    }
+
+    [Fact]
+    public void Classify_reports_low_confidence_when_runner_up_is_too_close() {
+        // Two labels one pixel apart; the winning label barely beats its rival, so a strict margin
+        // requirement should mark the match not-confident even though the distance is tiny.
+        var set = new DigitTemplateSet { Width = 5, Height = 7 };
+        var a = new bool[35];
+        a[0] = true;
+        a[7] = true;
+        a[14] = true;
+        var b = (bool[])a.Clone();
+        b[21] = true; // differs from 'a' by exactly one pixel
+        set.Add("1", new GlyphBitmap(5, 7, a));
+        set.Add("2", new GlyphBitmap(5, 7, b));
+
+        var recognizer = new TemplateDigitRecognizer(set, minConfidenceMargin: 0.1);
+        var match = recognizer.Classify(new GlyphBitmap(5, 7, (bool[])a.Clone()));
+
+        Assert.Equal("1", match.Label);
+        Assert.Equal(0.0, match.Score);
+        Assert.False(match.Confident);
+        Assert.True(match.Margin < 0.1, $"expected margin < 0.1 but was {match.Margin}");
+    }
+
+    [Fact]
+    public void TemplateSet_TryAdd_skips_duplicate_same_label_glyphs() {
+        var set = new DigitTemplateSet { Width = 3, Height = 3 };
+        var glyph = new GlyphBitmap(3, 3, [true, true, true, false, false, true, false, true, false]);
+
+        Assert.True(set.TryAdd("7", glyph));
+        Assert.False(set.TryAdd("7", glyph)); // exact duplicate
+        Assert.Single(set.Templates);
+
+        // Same bitmap under a different label is not a duplicate.
+        Assert.True(set.TryAdd("1", glyph));
+        Assert.Equal(2, set.Templates.Count);
+    }
+
+    [Fact]
+    public void TemplateSet_Dedup_removes_near_duplicate_same_label_templates() {
+        var set = new DigitTemplateSet { Width = 3, Height = 3 };
+        var glyph = new GlyphBitmap(3, 3, [true, true, true, false, false, true, false, true, false]);
+        set.Add("7", glyph);
+        set.Add("7", glyph);
+        set.Add("7", glyph);
+        set.Add("1", glyph);
+
+        var removed = set.Dedup();
+
+        Assert.Equal(2, removed);
+        Assert.Equal(2, set.Templates.Count);
+    }
+
+    [Fact]
     public void Recognizer_matches_a_trained_glyph_exactly() {
         using var image = Canvas(12, 12);
         FillBlock(image, 3, 2, 8, 9);

@@ -481,7 +481,7 @@ public static class VisionCommands {
 
                         var guess = guesser?.Classify(glyphs[i].Glyph);
                         var guessHint = guess is { } g
-                            ? $"guess='{g.Label}' ({(g.Confident ? "confident" : "low")} {g.Score:0.###}) "
+                            ? $"guess='{g.Label}' ({(g.Confident ? "confident" : "low")} d={g.Score:0.###} m={g.Margin:0.###}) "
                             : string.Empty;
                         Console.Write($"    glyph[{i}] {DescribeRect(glyphs[i].Bounds)} {guessHint}label> ");
 
@@ -507,7 +507,11 @@ public static class VisionCommands {
                             label = input;
                         }
 
-                        set.Add(label, glyphs[i].Glyph);
+                        if (!set.TryAdd(label, glyphs[i].Glyph)) {
+                            Console.WriteLine($"    (duplicate '{label}' glyph; skipped)");
+                            continue;
+                        }
+
                         added++;
                         guesser = new TemplateDigitRecognizer(set);
                     }

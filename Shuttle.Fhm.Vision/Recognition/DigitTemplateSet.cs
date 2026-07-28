@@ -44,6 +44,72 @@ public sealed class DigitTemplateSet {
 
         Templates.Add(new DigitTemplate { Label = label, Bits = glyph.ToBitString() });
     }
+
+    /// <summary>
+    /// Adds <paramref name="glyph"/> only if no existing <paramref name="label"/> template is within
+    /// <paramref name="dedupDistance"/> Hamming pixels of it. Because the FHM font is fixed, most captures
+    /// of a digit are near-identical; skipping duplicates keeps the set small and the classifier's
+    /// margins meaningful. Returns <c>true</c> when the template was added, <c>false</c> when skipped as a
+    /// duplicate.
+    /// </summary>
+    public bool TryAdd(string label, GlyphBitmap glyph, int dedupDistance = 0) {
+        ArgumentException.ThrowIfNullOrEmpty(label);
+        ArgumentNullException.ThrowIfNull(glyph);
+        if (glyph.Width != Width || glyph.Height != Height) {
+            throw new ArgumentException(
+                $"Glyph is {glyph.Width}x{glyph.Height}; set expects {Width}x{Height}.", nameof(glyph));
+        }
+
+        foreach (var existing in Templates) {
+            if (existing.Label != label) {
+                continue;
+            }
+
+            var other = GlyphBitmap.FromBitString(Width, Height, existing.Bits);
+            if (glyph.Distance(other) <= dedupDistance) {
+                return false;
+            }
+        }
+
+        Templates.Add(new DigitTemplate { Label = label, Bits = glyph.ToBitString() });
+        return true;
+    }
+
+    /// <summary>
+    /// Removes same-label templates that are within <paramref name="maxDistance"/> Hamming pixels of an
+    /// earlier kept template (the first occurrence is always retained). Returns the number removed.
+    /// </summary>
+    public int Dedup(int maxDistance = 0) {
+        var kept = new List<DigitTemplate>(Templates.Count);
+        var removed = 0;
+        foreach (var candidate in Templates) {
+            var glyph = GlyphBitmap.FromBitString(Width, Height, candidate.Bits);
+            var duplicate = false;
+            foreach (var keeper in kept) {
+                if (keeper.Label != candidate.Label) {
+                    continue;
+                }
+
+                if (glyph.Distance(GlyphBitmap.FromBitString(Width, Height, keeper.Bits)) <= maxDistance) {
+                    duplicate = true;
+                    break;
+                }
+            }
+
+            if (duplicate) {
+                removed++;
+            } else {
+                kept.Add(candidate);
+            }
+        }
+
+        if (removed > 0) {
+            Templates.Clear();
+            Templates.AddRange(kept);
+        }
+
+        return removed;
+    }
 }
 
 /// <summary>Loads and saves <see cref="DigitTemplateSet"/> instances as JSON on disk.</summary>
