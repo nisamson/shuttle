@@ -115,6 +115,15 @@ orchestration host.
   tokens/utilities. Small amounts of inline CSS (e.g. a `style="..."` for minor
   spacing/alignment tweaks) are permissible when a component parameter doesn't cover it.
 
+  **Publish/relinking:** a Release `dotnet publish` IL-trims by default, and additionally
+  performs **native runtime relinking** (emcc `-Oz`, which roughly halves `dotnet.native.wasm`
+  and cuts ~10% off the Brotli payload) **only when the `wasm-tools` workload is installed**.
+  A VS-installed `wasm-tools` is not visible to the standalone `dotnet` CLI — if publish prints
+  *"Publishing without optimizations… recommend using `wasm-tools`"*, relinking was skipped.
+  Install it for the CLI with `dotnet workload install wasm-tools`. `scripts/Deploy-WebClientSwa.ps1`
+  runs `dotnet workload restore` before publishing to guarantee this on every machine/CI
+  (bypass with `-SkipWorkloadRestore`). AOT (`RunAOTCompilation`) is intentionally **off**.
+
 ### Shared / supporting projects
 
 - **`Shuttle.EFCore`** — EF Core data layer: `ShlDbContext`, entities, migrations,
