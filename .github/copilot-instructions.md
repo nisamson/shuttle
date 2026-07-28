@@ -46,6 +46,10 @@ Two shipped apps over shared libraries, orchestrated by an Aspire AppHost.
   component + blog engine); must stay `browser-wasm`-compatible.
 - **`Shuttle.Analysis`** — `System.CommandLine` console tool: exports `PlayerInformation` and
   runs pluggable ML.NET **analysis flows** (see its README and `.github/skills/`).
+- **`Shuttle.Fhm.Vision`** — **Windows-only** (`net10.0-windows`) console/WinForms tool that
+  captures FHM player-info screens and OCRs their attribute/role ratings into a local **SQLite** DB
+  (region-based OCR via a JSON layout profile; OCR pluggable behind `IOcrEngine`, default
+  `Windows.Media.Ocr`). Standalone data-collection tool; see its `README.md`.
 
 Cross-cutting: auth everywhere is **Entra ID via `Microsoft.Identity.Web`**; observability is
 **OpenTelemetry**, configured centrally in `Shuttle.ServiceDefaults`.

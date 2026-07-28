@@ -1,0 +1,129 @@
+using CoenM.ImageHash;
+using CoenM.ImageHash.HashAlgorithms;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using Shuttle.Fhm.Vision.Capture;
+using Shuttle.Fhm.Vision.Extraction;
+using Shuttle.Fhm.Vision.Layout;
+using Shuttle.Fhm.Vision.Storage;
+
+namespace Shuttle.Fhm.Vision.Monitor;
+
+/// <summary>Tuning knobs for <see cref="PlayerScreenMonitor"/>.</summary>
+public sealed record MonitorOptions {
+    /// <summary>Delay between window captures.</summary>
+    public TimeSpan PollInterval { get; init; } = TimeSpan.FromMilliseconds(750);
+
+    /// <summary>
+    /// Perceptual-hash similarity (0..100) at or above which two frames are treated as the same
+    /// screen — used both to detect a settled screen and to avoid reprocessing an unchanged one.
+    /// </summary>
+    public double StabilitySimilarity { get; init; } = 98.0;
+}
+
+/// <summary>
+/// Watches a window and, whenever it settles on a new, previously-unseen player-info screen, OCRs it
+/// and stores the unique capture. A fast perceptual frame hash avoids OCR'ing transient/unchanged
+/// frames; content-hash dedup in the store avoids persisting the same player state twice.
+/// </summary>
+public sealed class PlayerScreenMonitor {
+    private readonly IFrameCapture capture;
+    private readonly RegionExtractor extractor;
+    private readonly LayoutProfile profile;
+    private readonly CaptureStore store;
+    private readonly MonitorOptions options;
+    private readonly ILogger logger;
+    private readonly PerceptualHash hasher = new();
+
+    public PlayerScreenMonitor(
+        IFrameCapture capture,
+        RegionExtractor extractor,
+        LayoutProfile profile,
+        CaptureStore store,
+        MonitorOptions? options = null,
+        ILogger<PlayerScreenMonitor>? logger = null
+    ) {
+        ArgumentNullException.ThrowIfNull(capture);
+        ArgumentNullException.ThrowIfNull(extractor);
+        ArgumentNullException.ThrowIfNull(profile);
+        ArgumentNullException.ThrowIfNull(store);
+        this.capture = capture;
+        this.extractor = extractor;
+        this.profile = profile;
+        this.store = store;
+        this.options = options ?? new MonitorOptions();
+        this.logger = logger ?? NullLogger<PlayerScreenMonitor>.Instance;
+    }
+
+    /// <summary>Runs the capture loop until <paramref name="cancellationToken"/> is cancelled.</summary>
+    public async Task RunAsync(IntPtr handle, CancellationToken cancellationToken) {
+        logger.LogInformation("Monitoring window 0x{Handle:X}; press Ctrl+C to stop.", handle);
+
+        ulong? lastProcessed = null;
+        ulong? candidate = null;
+        var confirmations = 0;
+
+        while (!cancellationToken.IsCancellationRequested) {
+            Image<Rgba32>? frame = null;
+            try {
+                frame = capture.Capture(handle);
+                var hash = hasher.Hash(frame);
+
+                if (lastProcessed is { } processed && IsSameScreen(hash, processed)) {
+                    // Screen has not changed since we last stored it; keep waiting.
+                } else if (candidate is { } pending && IsSameScreen(hash, pending)) {
+                    confirmations++;
+                    if (confirmations >= 1) {
+                        await ProcessFrameAsync(frame, cancellationToken);
+                        lastProcessed = hash;
+                        candidate = null;
+                        confirmations = 0;
+                    }
+                } else {
+                    candidate = hash;
+                    confirmations = 0;
+                }
+            } catch (OperationCanceledException) {
+                break;
+            } catch (Exception ex) {
+                logger.LogWarning(ex, "Frame capture/processing failed; retrying.");
+            } finally {
+                frame?.Dispose();
+            }
+
+            try {
+                await Task.Delay(options.PollInterval, cancellationToken);
+            } catch (OperationCanceledException) {
+                break;
+            }
+        }
+
+        logger.LogInformation("Monitoring stopped.");
+    }
+
+    private bool IsSameScreen(ulong a, ulong b) =>
+        CompareHash.Similarity(a, b) >= options.StabilitySimilarity;
+
+    private async Task ProcessFrameAsync(Image<Rgba32> frame, CancellationToken cancellationToken) {
+        if (!await extractor.IsPlayerScreenAsync(frame, profile, cancellationToken)) {
+            logger.LogDebug("Settled frame is not a player-info screen; skipping.");
+            return;
+        }
+
+        var record = await extractor.ExtractAsync(frame, profile, DateTimeOffset.UtcNow, cancellationToken);
+
+        using var pngStream = new MemoryStream();
+        await frame.SaveAsPngAsync(pngStream, cancellationToken);
+
+        var result = await store.TryStoreAsync(record, pngStream.ToArray(), cancellationToken);
+        if (result.Outcome == CaptureStoreOutcome.Stored) {
+            logger.LogInformation(
+                "Stored capture #{Id} for '{Name}' (#{Number}) -> {Image}",
+                result.RecordId, record.Name, record.JerseyNumber, result.ImageFileName);
+        } else {
+            logger.LogDebug("Duplicate capture for '{Name}' (hash already stored).", record.Name);
+        }
+    }
+}
