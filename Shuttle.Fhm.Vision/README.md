@@ -135,9 +135,12 @@ accurate. It lives in `Recognition/` and is *opt-in* via `--templates`:
 
 1. **Train** with `train-digits`: for each numeric region of each matching profile it segments the
    cell into individual glyphs (`DigitSegmenter`, vertical projection over white "ink" pixels),
-   optionally dumps a preview PNG per glyph (`--out`), and prompts you to type each glyph's
-   character (blank/`s` skips, `q` saves and quits). Labels are appended to the `--templates` JSON
-   (`DigitTemplateStore`), so you can build the set up across several screenshots.
+   optionally dumps a preview PNG per glyph (`--out`), and prompts you to label each glyph. When the
+   template set already has samples it shows the **current best guess** (label + confidence) for the
+   glyph, so you can press **Enter to accept it**, type a character to label/override, `s` to skip,
+   or `q` to save and quit. The recognizer is rebuilt as you go, so guesses improve within a run.
+   Labels are appended to the `--templates` JSON (`DigitTemplateStore`), so you can build the set up
+   across several screenshots.
 2. **Use** it by passing the same `--templates` file to `monitor` or `ingest-image`. For
    `Integer`/`Float` regions, `RegionExtractor` normalizes each segmented glyph to a fixed grid
    (default 12×20), classifies it by nearest template (Hamming distance), and uses the result when

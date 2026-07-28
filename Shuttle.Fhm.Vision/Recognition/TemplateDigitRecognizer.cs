@@ -53,16 +53,31 @@ public sealed class TemplateDigitRecognizer : IDigitRecognizer {
         var worst = 0.0;
 
         foreach (var glyph in glyphs) {
-            var (label, distance) = NearestLabel(glyph.Glyph);
-            var normalized = (double)distance / total;
-            worst = Math.Max(worst, normalized);
-            builder.Append(label);
-            if (normalized > maxNormalizedDistance) {
+            var match = Classify(glyph.Glyph);
+            worst = Math.Max(worst, match.Score);
+            builder.Append(match.Label);
+            if (!match.Confident) {
                 recognized = false;
             }
         }
 
         return new DigitReadResult(builder.ToString(), recognized, worst);
+    }
+
+    /// <summary>Normalized glyph dimensions this recognizer expects (matches its template set).</summary>
+    public int GlyphWidth => width;
+
+    public int GlyphHeight => height;
+
+    /// <summary>
+    /// Classifies a single normalized glyph against the templates. <paramref name="glyph"/> must match
+    /// <see cref="GlyphWidth"/>x<see cref="GlyphHeight"/> (i.e. produced with the same normalization).
+    /// </summary>
+    public GlyphMatch Classify(GlyphBitmap glyph) {
+        ArgumentNullException.ThrowIfNull(glyph);
+        var (label, distance) = NearestLabel(glyph);
+        var normalized = (double)distance / (width * height);
+        return new GlyphMatch(label, normalized, normalized <= maxNormalizedDistance);
     }
 
     private (string Label, int Distance) NearestLabel(GlyphBitmap candidate) {

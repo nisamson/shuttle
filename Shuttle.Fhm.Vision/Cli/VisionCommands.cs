@@ -438,9 +438,15 @@ public static class VisionCommands {
             var outDir = parseResult.GetValue(outOption);
             outDir?.Create();
 
+            // Best-guess helper built from the current templates; rebuilt whenever we add one so
+            // guesses reflect everything labelled so far (the dataset is small, so this is cheap).
+            var guesser = set.Templates.Count > 0 ? new TemplateDigitRecognizer(set) : null;
+
             using var image = await SixLabors.ImageSharp.Image.LoadAsync<Rgba32>(imageFile.FullName, cancellationToken);
             Console.WriteLine($"Image: {imageFile.FullName} ({image.Width}x{image.Height})");
-            Console.WriteLine("For each glyph, type its character then Enter. Blank or 's' skips; 'q' saves and quits.");
+            Console.WriteLine(
+                "For each glyph: press Enter to accept the guess (when shown), type a character to label it, "
+                + "'s' to skip, or 'q' to save and quit.");
 
             var added = 0;
             var quit = false;
@@ -472,19 +478,37 @@ public static class VisionCommands {
                                 Path.Combine(outDir.FullName, $"{Sanitize(region.Key)}_{i}.png"), png, cancellationToken);
                         }
 
-                        Console.Write($"    glyph[{i}] {DescribeRect(glyphs[i].Bounds)} label> ");
-                        var label = Console.ReadLine()?.Trim() ?? string.Empty;
-                        if (label.Equals("q", StringComparison.OrdinalIgnoreCase)) {
+                        var guess = guesser?.Classify(glyphs[i].Glyph);
+                        var guessHint = guess is { } g
+                            ? $"guess='{g.Label}' ({(g.Confident ? "confident" : "low")} {g.Score:0.###}) "
+                            : string.Empty;
+                        Console.Write($"    glyph[{i}] {DescribeRect(glyphs[i].Bounds)} {guessHint}label> ");
+
+                        var input = Console.ReadLine()?.Trim() ?? string.Empty;
+                        if (input.Equals("q", StringComparison.OrdinalIgnoreCase)) {
                             quit = true;
                             break;
                         }
 
-                        if (label.Length == 0 || label.Equals("s", StringComparison.OrdinalIgnoreCase)) {
+                        if (input.Equals("s", StringComparison.OrdinalIgnoreCase)) {
                             continue;
+                        }
+
+                        string label;
+                        if (input.Length == 0) {
+                            // Enter accepts the current guess; with no guess, it skips.
+                            if (guess is not { } accepted) {
+                                continue;
+                            }
+
+                            label = accepted.Label;
+                        } else {
+                            label = input;
                         }
 
                         set.Add(label, glyphs[i].Glyph);
                         added++;
+                        guesser = new TemplateDigitRecognizer(set);
                     }
 
                     if (quit) {

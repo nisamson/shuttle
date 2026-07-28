@@ -16,3 +16,9 @@ public readonly record struct DigitReadResult(string Text, bool Recognized, doub
 public interface IDigitRecognizer {
     DigitReadResult Read(Image<Rgba32> image, PixelRect region);
 }
+
+/// <summary>Nearest-template match for a single glyph.</summary>
+/// <param name="Label">The label of the closest template.</param>
+/// <param name="Score">Normalized distance to that template (0 = exact, 1 = fully different).</param>
+/// <param name="Confident">True when <paramref name="Score"/> is within the recognizer's tolerance.</param>
+public readonly record struct GlyphMatch(string Label, double Score, bool Confident);

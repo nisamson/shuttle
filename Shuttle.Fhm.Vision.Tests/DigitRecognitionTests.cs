@@ -126,4 +126,22 @@ public sealed class DigitRecognitionTests {
         Assert.False(result.Recognized);
         Assert.Equal(string.Empty, result.Text);
     }
+
+    [Fact]
+    public void Classify_returns_confident_match_for_trained_glyph() {
+        using var image = Canvas(12, 12);
+        FillBlock(image, 3, 2, 8, 9);
+        var region = new PixelRect(0, 0, 12, 12);
+
+        var set = new DigitTemplateSet { Width = 5, Height = 7 };
+        var trained = DigitSegmenter.Segment(image, region, set.Width, set.Height);
+        set.Add("9", trained[0].Glyph);
+
+        var recognizer = new TemplateDigitRecognizer(set);
+        var match = recognizer.Classify(trained[0].Glyph);
+
+        Assert.Equal("9", match.Label);
+        Assert.True(match.Confident);
+        Assert.Equal(0.0, match.Score);
+    }
 }
