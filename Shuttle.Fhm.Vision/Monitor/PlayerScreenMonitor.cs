@@ -73,7 +73,12 @@ public sealed class PlayerScreenMonitor {
             Image<Rgba32>? frame = null;
             try {
                 frame = capture.Capture(handle);
-                var hash = hasher.Hash(frame);
+                // PerceptualHash.Hash mutates the image (resizes it to 64x64), so hash a
+                // throwaway clone and keep the full-resolution frame for OCR extraction.
+                ulong hash;
+                using (var hashFrame = frame.Clone()) {
+                    hash = hasher.Hash(hashFrame);
+                }
 
                 if (lastProcessed is { } processed && IsSameScreen(hash, processed)) {
                     // Screen has not changed since we last stored it; keep waiting.

@@ -228,7 +228,7 @@ public sealed class RegionExtractor {
 
     private async Task<string> RecognizeAsync(Image<Rgba32> image, RatioRect bounds, CancellationToken cancellationToken) {
         var pixels = bounds.ToPixels(image.Width, image.Height);
-        var png = await RegionImaging.CropToPngAsync(image, pixels, cancellationToken);
+        var png = await RegionImaging.CropForOcrAsync(image, pixels, cancellationToken);
         return await ocr.RecognizeAsync(png, cancellationToken);
     }
 }

@@ -26,6 +26,7 @@ public static class VisionCommands {
         root.Subcommands.Add(BuildCalibrate());
         root.Subcommands.Add(BuildMonitor());
         root.Subcommands.Add(BuildIngestImage());
+        root.Subcommands.Add(BuildInspect());
         return root;
     }
 
@@ -260,6 +261,113 @@ public static class VisionCommands {
 
         return command;
     }
+
+    private static Command BuildInspect() {
+        var imageOption = new Option<FileInfo>("--image", "-i") {
+            Description = "Screenshot PNG to inspect.",
+            Required = true,
+        };
+        var profileOption = new Option<FileInfo[]>("--profile", "-p") {
+            Description = "Layout profile JSON to inspect. Repeat to inspect several.",
+            Required = true,
+            AllowMultipleArgumentsPerToken = true,
+        };
+        var outOption = new Option<DirectoryInfo?>("--out", "-o") {
+            Description = "Directory to write per-region crop PNGs into (default: 'inspect' beside the image).",
+        };
+
+        var command = new Command(
+            "inspect",
+            "Diagnose a profile against a screenshot: dump each anchor/region crop and its OCR text.") {
+            imageOption, profileOption, outOption,
+        };
+
+        command.SetAction(async (parseResult, cancellationToken) => {
+            var imageFile = parseResult.GetValue(imageOption)!;
+            var profileFiles = parseResult.GetValue(profileOption) ?? [];
+            if (!imageFile.Exists) {
+                Console.Error.WriteLine($"Image not found: {imageFile.FullName}");
+                return 1;
+            }
+
+            var missing = profileFiles.Where(f => !f.Exists).ToList();
+            if (missing.Count > 0) {
+                foreach (var file in missing) {
+                    Console.Error.WriteLine($"Profile not found: {file.FullName}");
+                }
+
+                return 1;
+            }
+
+            var engine = TryCreateOcrEngine();
+            if (engine is null) {
+                return 1;
+            }
+
+            using var image = await SixLabors.ImageSharp.Image.LoadAsync<Rgba32>(imageFile.FullName, cancellationToken);
+            Console.WriteLine($"Image: {imageFile.FullName} ({image.Width}x{image.Height})");
+
+            var outDir = parseResult.GetValue(outOption)
+                ?? new DirectoryInfo(Path.Combine(imageFile.DirectoryName ?? ".", "inspect"));
+            outDir.Create();
+            Console.WriteLine($"Crops -> {outDir.FullName}");
+
+            foreach (var file in profileFiles) {
+                var profile = await LayoutProfileStore.LoadAsync(file, cancellationToken);
+                Console.WriteLine();
+                Console.WriteLine($"=== Profile '{profile.Name}' ({file.Name}) ===");
+
+                for (var i = 0; i < profile.Anchors.Count; i++) {
+                    var anchor = profile.Anchors[i];
+                    var (text, pixels, png) = await ReadRegionAsync(image, engine, anchor.Bounds, cancellationToken);
+                    var matched = text.IndexOf(anchor.ExpectedText, StringComparison.OrdinalIgnoreCase) >= 0;
+                    Console.WriteLine(
+                        $"  anchor[{i}] {(matched ? "MATCH   " : "NO MATCH")} "
+                        + $"expected='{anchor.ExpectedText}' got='{Flatten(text)}' {DescribeRect(pixels)}");
+                    await DumpCropAsync(png, outDir, $"{Sanitize(profile.Name)}_anchor{i}", cancellationToken);
+                }
+
+                foreach (var region in profile.Regions) {
+                    var (text, pixels, png) = await ReadRegionAsync(image, engine, region.Bounds, cancellationToken);
+                    var flag = string.IsNullOrWhiteSpace(text) ? "EMPTY " : "      ";
+                    Console.WriteLine(
+                        $"  region {flag} {region.Group}/{region.Kind} '{region.Key}' "
+                        + $"got='{Flatten(text)}' {DescribeRect(pixels)}");
+                    await DumpCropAsync(
+                        png, outDir, $"{Sanitize(profile.Name)}_{Sanitize(region.Key)}", cancellationToken);
+                }
+            }
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "Note: crops are the exact (upscaled) images fed to OCR. Open the EMPTY regions' crop "
+                + "PNGs \u2014 if the crop shows the wrong area, adjust the region bounds in 'calibrate'; "
+                + "if it looks right but text is EMPTY, the region may still be too small/low-contrast for OCR.");
+            return 0;
+        });
+
+        return command;
+    }
+
+    private static async Task<(string Text, PixelRect Pixels, byte[] Png)> ReadRegionAsync(
+        Image<Rgba32> image, IOcrEngine engine, RatioRect bounds, CancellationToken cancellationToken) {
+        var pixels = bounds.ToPixels(image.Width, image.Height);
+        var png = await RegionImaging.CropForOcrAsync(image, pixels, cancellationToken);
+        var text = await engine.RecognizeAsync(png, cancellationToken);
+        return (text, pixels, png);
+    }
+
+    private static async Task DumpCropAsync(
+        byte[] png, DirectoryInfo outDir, string name, CancellationToken cancellationToken) {
+        await File.WriteAllBytesAsync(Path.Combine(outDir.FullName, $"{name}.png"), png, cancellationToken);
+    }
+
+    private static string DescribeRect(PixelRect r) => $"[x={r.X} y={r.Y} w={r.Width} h={r.Height}]";
+
+    private static string Flatten(string text) => text.Replace('\r', ' ').Replace('\n', ' ').Trim();
+
+    private static string Sanitize(string value) =>
+        string.Concat(value.Select(c => Array.IndexOf(Path.GetInvalidFileNameChars(), c) >= 0 ? '_' : c));
 
     private static Option<int?> PidOption() =>
         new("--pid") { Description = "Process id of the FHM window to capture." };

@@ -46,6 +46,10 @@ dotnet run --project Shuttle.Fhm.Vision -- monitor --pid 12345 \
 # 4. Parse a single saved screenshot offline (handy for testing profiles; repeat --profile)
 dotnet run --project Shuttle.Fhm.Vision -- ingest-image --image shot.png \
     --profile fhm10-forward-profile.json --profile fhm10-defense-profile.json --db fhm-captures.db
+
+# 5. Diagnose a profile: dump each anchor/region crop + its OCR text (why is a region empty?)
+dotnet run --project Shuttle.Fhm.Vision -- inspect --image shot.png \
+    --profile fhm10-forward-profile.json --out inspect
 ```
 
 Common options: `--pid` (explicit process id) or `--process` (name fragment, default `FHM`);
@@ -91,6 +95,11 @@ Screenshots are saved as `images/{yyyyMMdd-HHmmss}-{shorthash}.png`.
 
 OCR sits behind `IOcrEngine`. The default is **`WindowsMediaOcrEngine`** (built-in
 `Windows.Media.Ocr`) — offline and dependency-free, using the installed Windows OCR language packs.
+
+Region crops are **upscaled** before OCR (integer factor, shorter side lifted to at least
+`RegionImaging.OcrMinDimension` = 64px) because `Windows.Media.Ocr` returns nothing on very small
+crops such as a tight box around a two-digit rating. If a region still reads empty, use `inspect`
+(above) to dump the exact upscaled image fed to OCR and confirm the bounds are right.
 
 Alternatives can be dropped in behind the same interface. As evaluated in the plan:
 
