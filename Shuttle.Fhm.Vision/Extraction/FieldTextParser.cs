@@ -47,6 +47,11 @@ public static partial class FieldTextParser {
             if (char.IsDigit(ch)) {
                 digits.Append(ch);
                 seenDigit = true;
+            } else if (MapConfusableDigit(ch) is { } mapped) {
+                // A numeric cell contains only digits, so any letter/symbol OCR produced is a
+                // misread digit (e.g. '1' read as 'l'/'I'/'|'). Recover the most likely digit.
+                digits.Append(mapped);
+                seenDigit = true;
             } else if (ch == '-' && !seenDigit && digits.Length == 0) {
                 negative = true;
             }
@@ -62,6 +67,22 @@ public static partial class FieldTextParser {
 
         return negative ? -value : value;
     }
+
+    /// <summary>
+    /// Maps a non-digit character OCR commonly substitutes for a digit back to that digit. Only used
+    /// for strictly-numeric cells, where any non-digit is by definition a misread. Conservative: only
+    /// well-known, high-confidence confusions are mapped.
+    /// </summary>
+    private static char? MapConfusableDigit(char ch) => ch switch {
+        'l' or 'I' or '|' or '!' or '[' or ']' => '1',
+        'O' or 'Q' => '0',
+        'S' => '5',
+        'B' => '8',
+        'Z' => '2',
+        'G' => '6',
+        'T' => '7',
+        _ => null,
+    };
 
     /// <summary>
     /// Extracts the first decimal number from an OCR string. Commas are treated as thousands

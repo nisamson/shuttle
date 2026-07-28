@@ -16,6 +16,9 @@ public static class RegionImaging {
     /// <summary>Windows OCR rejects images whose dimensions exceed this; upscaling is capped to stay under it.</summary>
     private const int MaxDimension = 10000;
 
+    /// <summary>Minimum white quiet-zone (px) added around an isolated numeric crop so glyphs never touch the edge.</summary>
+    private const int MinIsolatedPadding = 10;
+
     /// <summary>
     /// Minimum value each RGB channel must reach for a pixel to count as "white" text when isolating
     /// the (white) numeric text FHM renders on a coloured/dark background.
@@ -57,6 +60,11 @@ public static class RegionImaging {
 
         if (isolateWhiteText) {
             BinarizeWhiteText(cropped, WhiteTextThreshold);
+
+            // Add a white quiet-zone so glyphs never touch the image edge: Windows OCR routinely
+            // drops a lone digit that runs into the border. Pad relative to the crop's shorter side.
+            var margin = Math.Max(MinIsolatedPadding, Math.Min(cropped.Width, cropped.Height) / 2);
+            cropped.Mutate(ctx => ctx.Pad(cropped.Width + (margin * 2), cropped.Height + (margin * 2), SixLabors.ImageSharp.Color.White));
         }
 
         var scale = ComputeUpscale(cropped.Width, cropped.Height, minDimension);

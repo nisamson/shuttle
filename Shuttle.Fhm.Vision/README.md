@@ -110,6 +110,15 @@ If a region still reads empty, use `inspect` (above): it dumps the exact upscale
 plus, for numeric/bio regions, a `.bw.png` showing the black-on-white isolation, and prints the OCR
 text **before (raw)** and **after (b/w text)** so you can compare.
 
+Two further robustness measures target FHM's small numeric cells:
+
+- **White quiet-zone padding.** Isolated numeric crops are padded with a white border before OCR,
+  because Windows OCR routinely drops a lone digit that touches the image edge (single-digit cells).
+- **Confusable-digit recovery.** `FieldTextParser.ParseInteger` maps the common OCR letter/symbol
+  substitutions back to digits for strictly-numeric cells (`l`/`I`/`|` → `1`, `O`/`Q` → `0`,
+  `S` → `5`, `B` → `8`, `Z` → `2`, `G` → `6`, `T` → `7`), so e.g. a `14` read as `l4` is not
+  silently truncated to `4`.
+
 Alternatives can be dropped in behind the same interface. As evaluated in the plan:
 
 - **Windows.Media.Ocr** (default): no native deps, good general-text accuracy.

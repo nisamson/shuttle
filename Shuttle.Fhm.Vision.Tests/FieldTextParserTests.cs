@@ -17,8 +17,20 @@ public sealed class FieldTextParserTests {
     [InlineData(" 7 ", 7)]
     [InlineData("rating: 12", 12)]
     [InlineData("-3", -3)]
-    [InlineData("1o2", 12)] // stray non-digit dropped
+    [InlineData("1o2", 12)] // stray lowercase non-digit dropped
     public void ParseInteger_extracts_digits(string input, int expected) {
+        Assert.Equal(expected, FieldTextParser.ParseInteger(input));
+    }
+
+    [Theory]
+    [InlineData("l4", 14)]  // leading '1' misread as lowercase L
+    [InlineData("I4", 14)]  // leading '1' misread as uppercase i
+    [InlineData("|4", 14)]  // leading '1' misread as pipe
+    [InlineData("S", 5)]    // single digit '5' misread as S
+    [InlineData("B", 8)]    // single digit '8' misread as B
+    [InlineData("Z", 2)]    // single digit '2' misread as Z
+    [InlineData("O", 0)]    // single digit '0' misread as O
+    public void ParseInteger_recovers_confusable_digits(string input, int expected) {
         Assert.Equal(expected, FieldTextParser.ParseInteger(input));
     }
 
