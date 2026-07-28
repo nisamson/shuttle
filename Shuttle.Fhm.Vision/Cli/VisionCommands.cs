@@ -121,9 +121,11 @@ public static class VisionCommands {
     private static Command BuildMonitor() {
         var pidOption = PidOption();
         var processOption = ProcessOption();
-        var profileOption = new Option<FileInfo>("--profile", "-p") {
-            Description = "Layout profile JSON describing the player-info screen.",
+        var profileOption = new Option<FileInfo[]>("--profile", "-p") {
+            Description = "Layout profile JSON describing a player-info screen. "
+                + "Repeat to supply several; each frame is matched against them in order.",
             Required = true,
+            AllowMultipleArgumentsPerToken = true,
         };
         var dbOption = DatabaseOption();
         var imagesOption = ImagesOption();
@@ -137,9 +139,13 @@ public static class VisionCommands {
         };
 
         command.SetAction(async (parseResult, cancellationToken) => {
-            var profileFile = parseResult.GetValue(profileOption)!;
-            if (!profileFile.Exists) {
-                Console.Error.WriteLine($"Profile not found: {profileFile.FullName}. Run 'calibrate' first.");
+            var profileFiles = parseResult.GetValue(profileOption) ?? [];
+            var missing = profileFiles.Where(f => !f.Exists).ToList();
+            if (missing.Count > 0) {
+                foreach (var file in missing) {
+                    Console.Error.WriteLine($"Profile not found: {file.FullName}. Run 'calibrate' first.");
+                }
+
                 return 1;
             }
 
@@ -153,7 +159,11 @@ public static class VisionCommands {
                 return 1;
             }
 
-            var profile = await LayoutProfileStore.LoadAsync(profileFile, cancellationToken);
+            var profiles = new List<LayoutProfile>(profileFiles.Length);
+            foreach (var file in profileFiles) {
+                profiles.Add(await LayoutProfileStore.LoadAsync(file, cancellationToken));
+            }
+
             var store = await CaptureStore.OpenAsync(
                 parseResult.GetValue(dbOption)!, parseResult.GetValue(imagesOption), cancellationToken);
             var extractor = new RegionExtractor(engine, new ConsoleLogger<RegionExtractor>());
@@ -161,8 +171,9 @@ public static class VisionCommands {
                 PollInterval = TimeSpan.FromMilliseconds(parseResult.GetValue(intervalOption)),
             };
             var monitor = new PlayerScreenMonitor(
-                new GdiWindowCapture(), extractor, profile, store, options, new ConsoleLogger<PlayerScreenMonitor>());
+                new GdiWindowCapture(), extractor, profiles, store, options, new ConsoleLogger<PlayerScreenMonitor>());
 
+            Console.WriteLine($"Matching against {profiles.Count} profile(s): {string.Join(", ", profiles.Select(p => p.Name))}");
             Console.WriteLine($"Storing captures in {Path.GetFullPath(parseResult.GetValue(dbOption)!)}");
             Console.WriteLine($"Images -> {store.ImagesDirectory}");
             await monitor.RunAsync(handle.Value, cancellationToken);
@@ -177,9 +188,11 @@ public static class VisionCommands {
             Description = "Screenshot PNG to parse.",
             Required = true,
         };
-        var profileOption = new Option<FileInfo>("--profile", "-p") {
-            Description = "Layout profile JSON to apply.",
+        var profileOption = new Option<FileInfo[]>("--profile", "-p") {
+            Description = "Layout profile JSON to apply. "
+                + "Repeat to supply several; the image is matched against them in order.",
             Required = true,
+            AllowMultipleArgumentsPerToken = true,
         };
         var dbOption = DatabaseOption();
         var imagesOption = ImagesOption();
@@ -190,14 +203,18 @@ public static class VisionCommands {
 
         command.SetAction(async (parseResult, cancellationToken) => {
             var imageFile = parseResult.GetValue(imageOption)!;
-            var profileFile = parseResult.GetValue(profileOption)!;
+            var profileFiles = parseResult.GetValue(profileOption) ?? [];
             if (!imageFile.Exists) {
                 Console.Error.WriteLine($"Image not found: {imageFile.FullName}");
                 return 1;
             }
 
-            if (!profileFile.Exists) {
-                Console.Error.WriteLine($"Profile not found: {profileFile.FullName}");
+            var missing = profileFiles.Where(f => !f.Exists).ToList();
+            if (missing.Count > 0) {
+                foreach (var file in missing) {
+                    Console.Error.WriteLine($"Profile not found: {file.FullName}");
+                }
+
                 return 1;
             }
 
@@ -206,23 +223,36 @@ public static class VisionCommands {
                 return 1;
             }
 
-            var profile = await LayoutProfileStore.LoadAsync(profileFile, cancellationToken);
+            var profiles = new List<LayoutProfile>(profileFiles.Length);
+            foreach (var file in profileFiles) {
+                profiles.Add(await LayoutProfileStore.LoadAsync(file, cancellationToken));
+            }
+
             using var image = await SixLabors.ImageSharp.Image.LoadAsync<Rgba32>(imageFile.FullName, cancellationToken);
             var extractor = new RegionExtractor(engine, new ConsoleLogger<RegionExtractor>());
 
-            if (!await extractor.IsPlayerScreenAsync(image, profile, cancellationToken)) {
-                Console.Error.WriteLine("The image does not match the profile's anchors (not a player-info screen).");
+            LayoutProfile? matched = null;
+            foreach (var candidate in profiles) {
+                if (await extractor.IsPlayerScreenAsync(image, candidate, cancellationToken)) {
+                    matched = candidate;
+                    break;
+                }
+            }
+
+            if (matched is null) {
+                Console.Error.WriteLine(
+                    $"The image did not match any of {profiles.Count} profile(s)' anchors (not a player-info screen).");
                 return 2;
             }
 
-            var record = await extractor.ExtractAsync(image, profile, DateTimeOffset.UtcNow, cancellationToken);
+            var record = await extractor.ExtractAsync(image, matched, DateTimeOffset.UtcNow, cancellationToken);
             var store = await CaptureStore.OpenAsync(
                 parseResult.GetValue(dbOption)!, parseResult.GetValue(imagesOption), cancellationToken);
             var png = await ToPngAsync(image, cancellationToken);
             var result = await store.TryStoreAsync(record, png, cancellationToken);
 
             Console.WriteLine(
-                $"{result.Outcome}: '{record.Name}' (#{record.JerseyNumber}) "
+                $"{result.Outcome} [{matched.Name}]: '{record.Name}' (#{record.JerseyNumber}) "
                 + $"attributes={record.Attributes.Count} roles={record.RoleRatings.Count} "
                 + $"-> record #{result.RecordId} {result.ImageFileName}");
             return 0;

@@ -31,7 +31,7 @@ public sealed record MonitorOptions {
 public sealed class PlayerScreenMonitor {
     private readonly IFrameCapture capture;
     private readonly RegionExtractor extractor;
-    private readonly LayoutProfile profile;
+    private readonly IReadOnlyList<LayoutProfile> profiles;
     private readonly CaptureStore store;
     private readonly MonitorOptions options;
     private readonly ILogger logger;
@@ -40,18 +40,22 @@ public sealed class PlayerScreenMonitor {
     public PlayerScreenMonitor(
         IFrameCapture capture,
         RegionExtractor extractor,
-        LayoutProfile profile,
+        IReadOnlyList<LayoutProfile> profiles,
         CaptureStore store,
         MonitorOptions? options = null,
         ILogger<PlayerScreenMonitor>? logger = null
     ) {
         ArgumentNullException.ThrowIfNull(capture);
         ArgumentNullException.ThrowIfNull(extractor);
-        ArgumentNullException.ThrowIfNull(profile);
+        ArgumentNullException.ThrowIfNull(profiles);
         ArgumentNullException.ThrowIfNull(store);
+        if (profiles.Count == 0) {
+            throw new ArgumentException("At least one layout profile is required.", nameof(profiles));
+        }
+
         this.capture = capture;
         this.extractor = extractor;
-        this.profile = profile;
+        this.profiles = profiles;
         this.store = store;
         this.options = options ?? new MonitorOptions();
         this.logger = logger ?? NullLogger<PlayerScreenMonitor>.Instance;
@@ -107,12 +111,20 @@ public sealed class PlayerScreenMonitor {
         CompareHash.Similarity(a, b) >= options.StabilitySimilarity;
 
     private async Task ProcessFrameAsync(Image<Rgba32> frame, CancellationToken cancellationToken) {
-        if (!await extractor.IsPlayerScreenAsync(frame, profile, cancellationToken)) {
-            logger.LogDebug("Settled frame is not a player-info screen; skipping.");
+        LayoutProfile? matched = null;
+        foreach (var candidate in profiles) {
+            if (await extractor.IsPlayerScreenAsync(frame, candidate, cancellationToken)) {
+                matched = candidate;
+                break;
+            }
+        }
+
+        if (matched is null) {
+            logger.LogDebug("Settled frame did not match any of the {Count} profile(s); skipping.", profiles.Count);
             return;
         }
 
-        var record = await extractor.ExtractAsync(frame, profile, DateTimeOffset.UtcNow, cancellationToken);
+        var record = await extractor.ExtractAsync(frame, matched, DateTimeOffset.UtcNow, cancellationToken);
 
         using var pngStream = new MemoryStream();
         await frame.SaveAsPngAsync(pngStream, cancellationToken);
@@ -120,10 +132,12 @@ public sealed class PlayerScreenMonitor {
         var result = await store.TryStoreAsync(record, pngStream.ToArray(), cancellationToken);
         if (result.Outcome == CaptureStoreOutcome.Stored) {
             logger.LogInformation(
-                "Stored capture #{Id} for '{Name}' (#{Number}) -> {Image}",
-                result.RecordId, record.Name, record.JerseyNumber, result.ImageFileName);
+                "Stored capture #{Id} for '{Name}' (#{Number}) via profile '{Profile}' -> {Image}",
+                result.RecordId, record.Name, record.JerseyNumber, matched.Name, result.ImageFileName);
         } else {
-            logger.LogDebug("Duplicate capture for '{Name}' (hash already stored).", record.Name);
+            logger.LogDebug(
+                "Duplicate capture for '{Name}' via profile '{Profile}' (hash already stored).",
+                record.Name, matched.Name);
         }
     }
 }

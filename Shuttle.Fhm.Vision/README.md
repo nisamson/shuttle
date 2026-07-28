@@ -39,15 +39,20 @@ dotnet run --project Shuttle.Fhm.Vision -- calibrate --pid 12345 --profile profi
 dotnet run --project Shuttle.Fhm.Vision -- calibrate --image shot.png --profile profiles/fhm.json
 
 # 3. Monitor the FHM window and collect unique player screens
-dotnet run --project Shuttle.Fhm.Vision -- monitor --pid 12345 --profile profiles/fhm.json --db fhm-captures.db
+#    (repeat --profile to match each frame against several profiles, in order)
+dotnet run --project Shuttle.Fhm.Vision -- monitor --pid 12345 \
+    --profile fhm10-forward-profile.json --profile fhm10-defense-profile.json --db fhm-captures.db
 
-# 4. Parse a single saved screenshot offline (handy for testing a profile)
-dotnet run --project Shuttle.Fhm.Vision -- ingest-image --image shot.png --profile profiles/fhm.json --db fhm-captures.db
+# 4. Parse a single saved screenshot offline (handy for testing profiles; repeat --profile)
+dotnet run --project Shuttle.Fhm.Vision -- ingest-image --image shot.png \
+    --profile fhm10-forward-profile.json --profile fhm10-defense-profile.json --db fhm-captures.db
 ```
 
 Common options: `--pid` (explicit process id) or `--process` (name fragment, default `FHM`);
-`--profile` (layout JSON); `--db` (SQLite path, default `fhm-captures.db`); `--images` (screenshot
-folder, default `images/` beside the database); `--interval` (monitor poll ms, default 750).
+`--profile` (layout JSON; `monitor` accepts it repeatedly to match each frame against several
+profiles in order — the first whose anchors match wins); `--db` (SQLite path, default
+`fhm-captures.db`); `--images` (screenshot folder, default `images/` beside the database);
+`--interval` (monitor poll ms, default 750).
 
 ## Calibration workflow
 
