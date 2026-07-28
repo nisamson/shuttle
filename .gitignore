@@ -492,6 +492,10 @@ $RECYCLE.BIN/
 *.sqlite
 *.sqlite3
 
+# Shuttle.Fhm.Vision runtime capture output
+/Shuttle.Fhm.Vision/images/
+/Shuttle.Fhm.Vision/inspect/
+
 docs/nocommit
 # Aspire deploy/publish manifest output
 Shuttle.Backend.Aspire/aspire-output/

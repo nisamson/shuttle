@@ -319,7 +319,7 @@ public static class VisionCommands {
 
                 for (var i = 0; i < profile.Anchors.Count; i++) {
                     var anchor = profile.Anchors[i];
-                    var (text, pixels, png) = await ReadRegionAsync(image, engine, anchor.Bounds, cancellationToken);
+                    var (text, pixels, png) = await ReadRegionAsync(image, engine, anchor.Bounds, false, cancellationToken);
                     var matched = text.IndexOf(anchor.ExpectedText, StringComparison.OrdinalIgnoreCase) >= 0;
                     Console.WriteLine(
                         $"  anchor[{i}] {(matched ? "MATCH   " : "NO MATCH")} "
@@ -328,21 +328,40 @@ public static class VisionCommands {
                 }
 
                 foreach (var region in profile.Regions) {
-                    var (text, pixels, png) = await ReadRegionAsync(image, engine, region.Bounds, cancellationToken);
-                    var flag = string.IsNullOrWhiteSpace(text) ? "EMPTY " : "      ";
+                    var baseName = $"{Sanitize(profile.Name)}_{Sanitize(region.Key)}";
+                    var isolate = RegionExtractor.ShouldIsolateWhiteText(region.Kind);
+
+                    // "before": the raw (upscaled, un-binarised) crop.
+                    var (rawText, pixels, rawPng) =
+                        await ReadRegionAsync(image, engine, region.Bounds, false, cancellationToken);
+                    await DumpCropAsync(rawPng, outDir, baseName, cancellationToken);
+
+                    if (!isolate) {
+                        Console.WriteLine(
+                            $"  region {EmptyFlag(rawText)} {region.Group}/{region.Kind} '{region.Key}' "
+                            + $"got='{Flatten(rawText)}' {DescribeRect(pixels)} -> {baseName}.png");
+                        continue;
+                    }
+
+                    // "after": the white-text-isolated (black-on-white) crop actually fed to OCR.
+                    var (bwText, _, bwPng) =
+                        await ReadRegionAsync(image, engine, region.Bounds, true, cancellationToken);
+                    await DumpCropAsync(bwPng, outDir, $"{baseName}.bw", cancellationToken);
+
                     Console.WriteLine(
-                        $"  region {flag} {region.Group}/{region.Kind} '{region.Key}' "
-                        + $"got='{Flatten(text)}' {DescribeRect(pixels)}");
-                    await DumpCropAsync(
-                        png, outDir, $"{Sanitize(profile.Name)}_{Sanitize(region.Key)}", cancellationToken);
+                        $"  region {region.Group}/{region.Kind} '{region.Key}' {DescribeRect(pixels)}");
+                    Console.WriteLine(
+                        $"      before (raw)      {EmptyFlag(rawText)} got='{Flatten(rawText)}' -> {baseName}.png");
+                    Console.WriteLine(
+                        $"      after  (b/w text) {EmptyFlag(bwText)} got='{Flatten(bwText)}' -> {baseName}.bw.png");
                 }
             }
 
             Console.WriteLine();
             Console.WriteLine(
-                "Note: crops are the exact (upscaled) images fed to OCR. Open the EMPTY regions' crop "
-                + "PNGs \u2014 if the crop shows the wrong area, adjust the region bounds in 'calibrate'; "
-                + "if it looks right but text is EMPTY, the region may still be too small/low-contrast for OCR.");
+                "Note: crops are the exact (upscaled) images fed to OCR; numeric/bio regions also get a "
+                + "'.bw.png' showing the white-text isolation actually used for OCR. If a crop shows the "
+                + "wrong area, adjust the region bounds in 'calibrate'.");
             return 0;
         });
 
@@ -350,9 +369,10 @@ public static class VisionCommands {
     }
 
     private static async Task<(string Text, PixelRect Pixels, byte[] Png)> ReadRegionAsync(
-        Image<Rgba32> image, IOcrEngine engine, RatioRect bounds, CancellationToken cancellationToken) {
+        Image<Rgba32> image, IOcrEngine engine, RatioRect bounds, bool isolateWhiteText, CancellationToken cancellationToken) {
         var pixels = bounds.ToPixels(image.Width, image.Height);
-        var png = await RegionImaging.CropForOcrAsync(image, pixels, cancellationToken);
+        var png = await RegionImaging.CropForOcrAsync(
+            image, pixels, cancellationToken, isolateWhiteText: isolateWhiteText);
         var text = await engine.RecognizeAsync(png, cancellationToken);
         return (text, pixels, png);
     }
@@ -361,6 +381,8 @@ public static class VisionCommands {
         byte[] png, DirectoryInfo outDir, string name, CancellationToken cancellationToken) {
         await File.WriteAllBytesAsync(Path.Combine(outDir.FullName, $"{name}.png"), png, cancellationToken);
     }
+
+    private static string EmptyFlag(string text) => string.IsNullOrWhiteSpace(text) ? "EMPTY " : "      ";
 
     private static string DescribeRect(PixelRect r) => $"[x={r.X} y={r.Y} w={r.Width} h={r.Height}]";
 

@@ -61,7 +61,7 @@ public sealed class RegionExtractorTests {
     public async Task ExtractAsync_maps_regions_to_identity_and_rating_vectors() {
         var (profile, ocr) = BuildFixture();
         using var image = BuildImage(profile);
-        var extractor = new RegionExtractor(ocr);
+        var extractor = new RegionExtractor(ocr, isolateWhiteText: false);
 
         var capture = await extractor.ExtractAsync(image, profile, DateTimeOffset.UnixEpoch, TestContext.Current.CancellationToken);
 
@@ -82,7 +82,7 @@ public sealed class RegionExtractorTests {
     public async Task IsPlayerScreenAsync_true_when_anchor_matches() {
         var (profile, ocr) = BuildFixture();
         using var image = BuildImage(profile);
-        var extractor = new RegionExtractor(ocr);
+        var extractor = new RegionExtractor(ocr, isolateWhiteText: false);
 
         Assert.True(await extractor.IsPlayerScreenAsync(image, profile, TestContext.Current.CancellationToken));
     }
@@ -92,7 +92,7 @@ public sealed class RegionExtractorTests {
         var (profile, _) = BuildFixture();
         using var image = BuildImage(profile);
         var ocr = new ColorMapOcrEngine(new Dictionary<Rgba32, string>()); // anchor reads empty
-        var extractor = new RegionExtractor(ocr);
+        var extractor = new RegionExtractor(ocr, isolateWhiteText: false);
 
         Assert.False(await extractor.IsPlayerScreenAsync(image, profile, TestContext.Current.CancellationToken));
     }

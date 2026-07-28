@@ -98,8 +98,17 @@ OCR sits behind `IOcrEngine`. The default is **`WindowsMediaOcrEngine`** (built-
 
 Region crops are **upscaled** before OCR (integer factor, shorter side lifted to at least
 `RegionImaging.OcrMinDimension` = 64px) because `Windows.Media.Ocr` returns nothing on very small
-crops such as a tight box around a two-digit rating. If a region still reads empty, use `inspect`
-(above) to dump the exact upscaled image fed to OCR and confirm the bounds are right.
+crops such as a tight box around a two-digit rating.
+
+Because FHM renders its numeric data as **white text** over a coloured/dark background, numeric and
+bio regions (`Integer`, `Float`, `Bio`) are also **binarised to black-on-white** before OCR: pixels
+whose R, G and B all reach `RegionImaging.WhiteTextThreshold` (170) become black text, everything
+else becomes white. This strips the busy background and markedly improves recognition. Disable it by
+constructing `RegionExtractor(..., isolateWhiteText: false)`.
+
+If a region still reads empty, use `inspect` (above): it dumps the exact upscaled crop fed to OCR
+plus, for numeric/bio regions, a `.bw.png` showing the black-on-white isolation, and prints the OCR
+text **before (raw)** and **after (b/w text)** so you can compare.
 
 Alternatives can be dropped in behind the same interface. As evaluated in the plan:
 

@@ -32,12 +32,18 @@ public sealed class RegionExtractor {
 
     private readonly IOcrEngine ocr;
     private readonly ILogger logger;
+    private readonly bool isolateWhiteText;
 
-    public RegionExtractor(IOcrEngine ocr, ILogger<RegionExtractor>? logger = null) {
+    public RegionExtractor(IOcrEngine ocr, ILogger<RegionExtractor>? logger = null, bool isolateWhiteText = true) {
         ArgumentNullException.ThrowIfNull(ocr);
         this.ocr = ocr;
         this.logger = logger ?? NullLogger<RegionExtractor>.Instance;
+        this.isolateWhiteText = isolateWhiteText;
     }
+
+    /// <summary>True when the given field kind holds FHM's white numeric text worth binarising before OCR.</summary>
+    public static bool ShouldIsolateWhiteText(FieldKind kind) =>
+        kind is FieldKind.Integer or FieldKind.Float or FieldKind.Bio;
 
     /// <summary>
     /// Returns true when every anchor's region contains its expected text (case-insensitive), i.e.
@@ -53,7 +59,7 @@ public sealed class RegionExtractor {
         ArgumentNullException.ThrowIfNull(profile);
 
         foreach (var anchor in profile.Anchors) {
-            var text = await RecognizeAsync(image, anchor.Bounds, cancellationToken);
+            var text = await RecognizeAsync(image, anchor.Bounds, false, cancellationToken);
             if (text.IndexOf(anchor.ExpectedText, StringComparison.OrdinalIgnoreCase) < 0) {
                 return false;
             }
@@ -84,7 +90,8 @@ public sealed class RegionExtractor {
         var sink = new FieldSink(attributes, roles, numbers, textFields);
 
         foreach (var region in profile.Regions) {
-            var raw = await RecognizeAsync(image, region.Bounds, cancellationToken);
+            var isolate = isolateWhiteText && ShouldIsolateWhiteText(region.Kind);
+            var raw = await RecognizeAsync(image, region.Bounds, isolate, cancellationToken);
 
             if (region.Kind == FieldKind.Bio) {
                 ApplyBioLine(raw, sink, ref position);
@@ -226,9 +233,11 @@ public sealed class RegionExtractor {
         target[key] = value.Value;
     }
 
-    private async Task<string> RecognizeAsync(Image<Rgba32> image, RatioRect bounds, CancellationToken cancellationToken) {
+    private async Task<string> RecognizeAsync(
+        Image<Rgba32> image, RatioRect bounds, bool isolate, CancellationToken cancellationToken) {
         var pixels = bounds.ToPixels(image.Width, image.Height);
-        var png = await RegionImaging.CropForOcrAsync(image, pixels, cancellationToken);
+        var png = await RegionImaging.CropForOcrAsync(
+            image, pixels, cancellationToken, isolateWhiteText: isolate);
         return await ocr.RecognizeAsync(png, cancellationToken);
     }
 }

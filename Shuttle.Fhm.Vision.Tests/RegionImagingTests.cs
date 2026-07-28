@@ -31,8 +31,27 @@ public sealed class RegionImagingTests {
 
         var png = await RegionImaging.CropForOcrAsync(image, rect, TestContext.Current.CancellationToken);
 
+        using var large = Image.Load<Rgba32>(png);
+        Assert.Equal(200, large.Width);
+        Assert.Equal(120, large.Height);
+    }
+
+    [Fact]
+    public async Task CropForOcrAsync_isolates_white_text_to_black_on_white() {
+        // Left half white (text), right half blue (background); 64px shorter side avoids upscaling.
+        using var image = new Image<Rgba32>(64, 64, new Rgba32(0, 0, 255));
+        for (var y = 0; y < 64; y++) {
+            for (var x = 0; x < 32; x++) {
+                image[x, y] = new Rgba32(255, 255, 255);
+            }
+        }
+
+        var png = await RegionImaging.CropForOcrAsync(
+            image, new PixelRect(0, 0, 64, 64), TestContext.Current.CancellationToken, isolateWhiteText: true);
+
         using var result = Image.Load<Rgba32>(png);
-        Assert.Equal(200, result.Width);
-        Assert.Equal(120, result.Height);
+        Assert.Equal(64, result.Width);
+        Assert.Equal(new Rgba32(0, 0, 0), result[0, 0]);       // white text -> black
+        Assert.Equal(new Rgba32(255, 255, 255), result[63, 0]); // blue background -> white
     }
 }
