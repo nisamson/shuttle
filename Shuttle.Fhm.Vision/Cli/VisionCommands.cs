@@ -30,6 +30,7 @@ public static class VisionCommands {
         root.Subcommands.Add(BuildIngestImage());
         root.Subcommands.Add(BuildInspect());
         root.Subcommands.Add(BuildTrainDigits());
+        root.Subcommands.Add(BuildEvalDigits());
         return root;
     }
 
@@ -523,6 +524,110 @@ public static class VisionCommands {
         });
 
         return command;
+    }
+
+    private static Command BuildEvalDigits() {
+        var templatesOption = new Option<FileInfo>("--templates", "-t") {
+            Description = "Digit template JSON (from 'train-digits') to score.",
+            Required = true,
+        };
+        var thresholdOption = new Option<double>("--threshold") {
+            Description = "Confidence threshold used at recognition time, for context in the margin report.",
+            DefaultValueFactory = _ => 0.18,
+        };
+
+        var command = new Command(
+            "eval-digits",
+            "Score a digit template set by leave-one-out cross-validation: per-label accuracy, "
+            + "confusion pairs and confidence margins, so you can tell when it is solid.") {
+            templatesOption, thresholdOption,
+        };
+
+        command.SetAction(async (parseResult, cancellationToken) => {
+            var templatesFile = parseResult.GetValue(templatesOption)!;
+            if (!templatesFile.Exists) {
+                Console.Error.WriteLine($"Templates file not found: {templatesFile.FullName}");
+                return 1;
+            }
+
+            var threshold = parseResult.GetValue(thresholdOption);
+            var set = await DigitTemplateStore.LoadAsync(templatesFile, cancellationToken);
+            if (set.Templates.Count < 2) {
+                Console.Error.WriteLine(
+                    $"Only {set.Templates.Count} template(s); leave-one-out needs at least 2. Collect more with 'train-digits'.");
+                return 2;
+            }
+
+            var eval = DigitTemplateEvaluator.Evaluate(set);
+            Console.WriteLine($"Templates: {templatesFile.FullName}");
+            Console.WriteLine(
+                $"Glyph {set.Width}x{set.Height}; {eval.TemplateCount} template(s) across {eval.PerLabel.Count} label(s); "
+                + $"recognition threshold {threshold:0.###}");
+            Console.WriteLine(
+                $"Leave-one-out accuracy: {eval.Correct}/{eval.TemplateCount} ({eval.Accuracy:P1})");
+            Console.WriteLine();
+
+            Console.WriteLine("  label  count  acc      same   other   margin");
+            foreach (var s in eval.PerLabel) {
+                var flag = LabelHealthFlag(s, threshold);
+                Console.WriteLine(
+                    $"  {s.Label,-5}  {s.Count,5}  {s.Accuracy,6:P0}  {s.MeanSameDistance,6:0.###} "
+                    + $"{s.MeanNearestOtherDistance,6:0.###}  {s.Margin,6:0.###}  {flag}");
+            }
+
+            if (eval.Confusions.Count > 0) {
+                Console.WriteLine();
+                Console.WriteLine("Confusions (held-out actual -> predicted):");
+                foreach (var c in eval.Confusions) {
+                    Console.WriteLine($"  '{c.Actual}' misread as '{c.Predicted}'  x{c.Count}");
+                }
+            }
+
+            if (eval.SingleSampleLabels.Count > 0) {
+                Console.WriteLine();
+                Console.WriteLine(
+                    "Only one sample (cannot be validated; will always miss under leave-one-out): "
+                    + string.Join(", ", eval.SingleSampleLabels.Select(l => $"'{l}'")));
+            }
+
+            Console.WriteLine();
+            Console.WriteLine(Verdict(eval, threshold));
+            return 0;
+        });
+
+        return command;
+    }
+
+    /// <summary>Flags a label that needs attention: misclassifications, thin coverage, or a slim margin.</summary>
+    private static string LabelHealthFlag(LabelStats s, double threshold) {
+        if (s.Accuracy < 1.0) {
+            return "<- errors";
+        }
+
+        if (s.Count < 5) {
+            return "<- few samples";
+        }
+
+        if (s.Margin < threshold) {
+            return "<- slim margin";
+        }
+
+        return string.Empty;
+    }
+
+    private static string Verdict(DigitEvaluation eval, double threshold) {
+        var thinLabels = eval.PerLabel.Count(s => s.Count < 5);
+        var slimLabels = eval.PerLabel.Count(s => s.Accuracy >= 1.0 && s.Margin < threshold);
+
+        if (eval.Accuracy >= 1.0 && thinLabels == 0 && slimLabels == 0) {
+            return "Verdict: SOLID - 100% leave-one-out accuracy with healthy sample counts and margins.";
+        }
+
+        if (eval.Accuracy >= 0.98 && eval.Confusions.Count == 0) {
+            return "Verdict: GOOD - collect a few more samples for the flagged labels to firm up margins.";
+        }
+
+        return "Verdict: NEEDS MORE DATA - address the confusions above and add samples for flagged labels, then re-run.";
     }
 
     /// <summary>Shared <c>--templates</c> option enabling the trained digit recognizer for numeric cells.</summary>

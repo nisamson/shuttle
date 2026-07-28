@@ -54,6 +54,9 @@ dotnet run --project Shuttle.Fhm.Vision -- inspect --image shot.png \
 # 6. Train the custom digit recognizer for FHM's rating font (interactive labelling)
 dotnet run --project Shuttle.Fhm.Vision -- train-digits --image shot.png \
     --profile fhm10-forward-profile.json --templates digits.json --out glyphs
+
+# 7. Score the trained template set (leave-one-out accuracy, confusions, margins)
+dotnet run --project Shuttle.Fhm.Vision -- eval-digits --templates digits.json
 ```
 
 Common options: `--pid` (explicit process id) or `--process` (name fragment, default `FHM`);
@@ -149,6 +152,31 @@ accurate. It lives in `Recognition/` and is *opt-in* via `--templates`:
 
 The template set is plain JSON (glyph size + `'1'`/`'0'` bit strings), so it is easy to inspect,
 edit, and commit alongside the layout profiles.
+
+### How much training data, and knowing when it's solid
+
+Because this is nearest-neighbour matching of a **single fixed font** (not a learned model), extra
+samples only buy coverage of rendering variance (anti-aliasing, segmentation jitter). You only need
+the 10 digits (`0`–`9`), plus `.`/`-` if any region shows decimals or negatives — segmentation is
+per-glyph, so `14` is just `1` then `4`; you do not need every 1–99 value. A good target is roughly
+**8–15 clean samples per digit (~100–150 total)**; **3–5 per digit** is a workable minimum. Bias
+collection toward the confusable pairs (`1`/`7`, `3`/`8`, `5`/`6`, `6`/`8`, `0`/`8`) and capture each
+digit both alone and as part of a multi-digit cell.
+
+Rather than guess a count, measure it with **`eval-digits`**, which runs leave-one-out
+cross-validation over the template set (each glyph classified against all the others) and reports:
+
+- **Leave-one-out accuracy**, overall and per label.
+- **Confusion pairs** — which actual label gets misread as which, so you know exactly what to collect.
+- **Confidence margin** per label: the mean distance to the nearest *other-label* template minus the
+  mean distance to the nearest *same-label* one. A comfortably positive margin (well above the
+  recognition `--threshold`, default 0.18) means robust identification regardless of raw count.
+- Flags for labels with **errors**, **few samples** (< 5), or a **slim margin**, plus a
+  SOLID / GOOD / NEEDS MORE DATA verdict.
+
+Collect until accuracy plateaus at 100% with healthy margins and no thin/slim-margin flags. Note that
+leave-one-out cannot validate a label that has only one sample (removing it leaves no same-label
+neighbour), so `eval-digits` calls those out separately.
 
 Alternatives can be dropped in behind the same interface. As evaluated in the plan:
 
