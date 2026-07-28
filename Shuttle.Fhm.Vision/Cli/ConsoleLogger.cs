@@ -5,10 +5,15 @@ namespace Shuttle.Fhm.Vision.Cli;
 /// <summary>A minimal <see cref="ILogger{T}"/> that writes single-line, timestamped output to the console.</summary>
 public sealed class ConsoleLogger<T> : ILogger<T> {
     private static readonly Lock Gate = new();
+    private readonly LogLevel minLevel;
+
+    public ConsoleLogger(LogLevel minLevel = LogLevel.Information) {
+        this.minLevel = minLevel;
+    }
 
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
-    public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Information;
+    public bool IsEnabled(LogLevel logLevel) => logLevel >= minLevel;
 
     public void Log<TState>(
         LogLevel logLevel,

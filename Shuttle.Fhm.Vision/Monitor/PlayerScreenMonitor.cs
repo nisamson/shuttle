@@ -82,8 +82,10 @@ public sealed class PlayerScreenMonitor {
 
                 if (lastProcessed is { } processed && IsSameScreen(hash, processed)) {
                     // Screen has not changed since we last stored it; keep waiting.
+                    logger.LogDebug("Scanned frame hash=0x{Hash:X16}: unchanged since last stored screen.", hash);
                 } else if (candidate is { } pending && IsSameScreen(hash, pending)) {
                     confirmations++;
+                    logger.LogDebug("Scanned frame hash=0x{Hash:X16}: settled, processing.", hash);
                     if (confirmations >= 1) {
                         await ProcessFrameAsync(frame, cancellationToken);
                         lastProcessed = hash;
@@ -93,6 +95,7 @@ public sealed class PlayerScreenMonitor {
                 } else {
                     candidate = hash;
                     confirmations = 0;
+                    logger.LogDebug("Scanned frame hash=0x{Hash:X16}: new candidate screen.", hash);
                 }
             } catch (OperationCanceledException) {
                 break;

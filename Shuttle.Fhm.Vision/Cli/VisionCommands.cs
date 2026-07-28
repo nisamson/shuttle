@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.Drawing;
 using System.Runtime.Versioning;
+using Microsoft.Extensions.Logging;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using Shuttle.Fhm.Vision.Calibration;
@@ -133,13 +134,14 @@ public static class VisionCommands {
         var dbOption = DatabaseOption();
         var imagesOption = ImagesOption();
         var templatesOption = TemplatesOption();
+        var verboseOption = VerboseOption();
         var intervalOption = new Option<int>("--interval") {
             Description = "Polling interval in milliseconds.",
             DefaultValueFactory = _ => 750,
         };
 
         var command = new Command("monitor", "Watch the FHM window and store unique player-info screens.") {
-            pidOption, processOption, profileOption, dbOption, imagesOption, templatesOption, intervalOption,
+            pidOption, processOption, profileOption, dbOption, imagesOption, templatesOption, verboseOption, intervalOption,
         };
 
         command.SetAction(async (parseResult, cancellationToken) => {
@@ -171,13 +173,14 @@ public static class VisionCommands {
             var store = await CaptureStore.OpenAsync(
                 parseResult.GetValue(dbOption)!, parseResult.GetValue(imagesOption), cancellationToken);
             var recognizer = await TryLoadRecognizerAsync(parseResult.GetValue(templatesOption), cancellationToken);
+            var level = parseResult.GetValue(verboseOption) ? LogLevel.Debug : LogLevel.Information;
             var extractor = new RegionExtractor(
-                engine, new ConsoleLogger<RegionExtractor>(), digitRecognizer: recognizer);
+                engine, new ConsoleLogger<RegionExtractor>(level), digitRecognizer: recognizer);
             var options = new MonitorOptions {
                 PollInterval = TimeSpan.FromMilliseconds(parseResult.GetValue(intervalOption)),
             };
             var monitor = new PlayerScreenMonitor(
-                new GdiWindowCapture(), extractor, profiles, store, options, new ConsoleLogger<PlayerScreenMonitor>());
+                new GdiWindowCapture(), extractor, profiles, store, options, new ConsoleLogger<PlayerScreenMonitor>(level));
 
             Console.WriteLine($"Matching against {profiles.Count} profile(s): {string.Join(", ", profiles.Select(p => p.Name))}");
             Console.WriteLine($"Storing captures in {Path.GetFullPath(parseResult.GetValue(dbOption)!)}");
@@ -203,9 +206,10 @@ public static class VisionCommands {
         var dbOption = DatabaseOption();
         var imagesOption = ImagesOption();
         var templatesOption = TemplatesOption();
+        var verboseOption = VerboseOption();
 
         var command = new Command("ingest-image", "Parse a single saved screenshot and store the capture (offline).") {
-            imageOption, profileOption, dbOption, imagesOption, templatesOption,
+            imageOption, profileOption, dbOption, imagesOption, templatesOption, verboseOption,
         };
 
         command.SetAction(async (parseResult, cancellationToken) => {
@@ -237,8 +241,9 @@ public static class VisionCommands {
 
             using var image = await SixLabors.ImageSharp.Image.LoadAsync<Rgba32>(imageFile.FullName, cancellationToken);
             var recognizer = await TryLoadRecognizerAsync(parseResult.GetValue(templatesOption), cancellationToken);
+            var level = parseResult.GetValue(verboseOption) ? LogLevel.Debug : LogLevel.Information;
             var extractor = new RegionExtractor(
-                engine, new ConsoleLogger<RegionExtractor>(), digitRecognizer: recognizer);
+                engine, new ConsoleLogger<RegionExtractor>(level), digitRecognizer: recognizer);
 
             LayoutProfile? matched = null;
             foreach (var candidate in profiles) {
@@ -501,6 +506,13 @@ public static class VisionCommands {
         new("--templates", "-t") {
             Description = "Digit template JSON (from 'train-digits'); when present, numeric cells use the "
                 + "trained recognizer, falling back to OCR when it is not confident.",
+        };
+
+    /// <summary>Shared <c>--verbose</c> flag that lowers console logging to Debug (per-scan / per-region detail).</summary>
+    private static Option<bool> VerboseOption() =>
+        new("--verbose", "-v") {
+            Description = "Log Debug-level detail: every scanned frame, per-region recognizer/OCR reads, "
+                + "profile-match results and duplicate skips.",
         };
 
     /// <summary>

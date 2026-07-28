@@ -62,7 +62,9 @@ profiles in order — the first whose anchors match wins); `--db` (SQLite path, 
 `fhm-captures.db`); `--images` (screenshot folder, default `images/` beside the database);
 `--interval` (monitor poll ms, default 750); `--templates` (digit-template JSON produced by
 `train-digits`; when supplied to `monitor`/`ingest-image`, numeric cells use the trained
-recognizer and fall back to OCR only when it is not confident).
+recognizer and fall back to OCR only when it is not confident); `--verbose`/`-v` (on
+`monitor`/`ingest-image`, log Debug-level detail: every scanned frame, per-region
+recognizer/OCR reads, profile-match results and duplicate skips).
 
 ## Calibration workflow
 
