@@ -93,25 +93,22 @@ public sealed class TemplateDigitRecognizer : IDigitRecognizer {
     }
 
     private (string Label, int Distance, int NearestOther) NearestLabel(GlyphBitmap candidate) {
+        // Single pass tracking the nearest template and the nearest template of a *different* label
+        // (the runner-up used for the confidence margin). The runner-up is only ever replaced by a
+        // label distinct from the current winner, so it always holds the nearest non-winning label.
         var bestLabel = templates[0].Label;
         var bestDistance = int.MaxValue;
         var nearestOther = int.MaxValue;
         foreach (var (label, glyph) in templates) {
             var distance = candidate.Distance(glyph);
             if (distance < bestDistance) {
+                if (bestDistance != int.MaxValue && !string.Equals(label, bestLabel, StringComparison.Ordinal)) {
+                    nearestOther = bestDistance;
+                }
+
                 bestDistance = distance;
                 bestLabel = label;
-            }
-        }
-
-        // Nearest template whose label differs from the winner, for the confidence margin.
-        foreach (var (label, glyph) in templates) {
-            if (label == bestLabel) {
-                continue;
-            }
-
-            var distance = candidate.Distance(glyph);
-            if (distance < nearestOther) {
+            } else if (distance < nearestOther && !string.Equals(label, bestLabel, StringComparison.Ordinal)) {
                 nearestOther = distance;
             }
         }

@@ -21,7 +21,7 @@ public static class GlyphImaging {
         graphics.Clear(Color.White);
         for (var y = 0; y < glyph.Height; y++) {
             for (var x = 0; x < glyph.Width; x++) {
-                if (glyph.Pixels[(y * glyph.Width) + x]) {
+                if (glyph[(y * glyph.Width) + x]) {
                     graphics.FillRectangle(Brushes.Black, x * scale, y * scale, scale, scale);
                 }
             }

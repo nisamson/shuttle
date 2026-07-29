@@ -80,7 +80,7 @@ public sealed class DigitRecognitionTests {
 
         static bool ColumnHasInk(GlyphBitmap g, int x) {
             for (var y = 0; y < g.Height; y++) {
-                if (g.Pixels[(y * g.Width) + x]) {
+                if (g[(y * g.Width) + x]) {
                     return true;
                 }
             }
@@ -115,6 +115,33 @@ public sealed class DigitRecognitionTests {
         Assert.Equal(0.0, match.Score);
         Assert.False(match.Confident);
         Assert.True(match.Margin < 0.1, $"expected margin < 0.1 but was {match.Margin}");
+    }
+
+    [Fact]
+    public void Classify_margin_uses_nearest_different_label_across_many_labels() {
+        // Winner '5' sits at distance 0; the margin must reflect the *nearest different label*, which is
+        // '3' (1 pixel away), not the further '8'. Guards the single-pass distinct-label runner-up.
+        var set = new DigitTemplateSet { Width = 5, Height = 7 };
+        var five = new bool[35];
+        five[0] = true;
+        var three = (bool[])five.Clone();
+        three[1] = true; // 1 pixel from five
+        var eight = (bool[])five.Clone();
+        eight[1] = true;
+        eight[2] = true;
+        eight[3] = true; // 3 pixels from five
+
+        set.Add("8", new GlyphBitmap(5, 7, eight));
+        set.Add("3", new GlyphBitmap(5, 7, three));
+        set.Add("5", new GlyphBitmap(5, 7, five));
+
+        var recognizer = new TemplateDigitRecognizer(set, minConfidenceMargin: 0.0);
+        var match = recognizer.Classify(new GlyphBitmap(5, 7, (bool[])five.Clone()));
+
+        Assert.Equal("5", match.Label);
+        Assert.Equal(0.0, match.Score);
+        // Nearest other is '3' at 1 pixel of 35 -> margin == 1/35.
+        Assert.Equal(1.0 / 35.0, match.Margin, 6);
     }
 
     [Fact]
