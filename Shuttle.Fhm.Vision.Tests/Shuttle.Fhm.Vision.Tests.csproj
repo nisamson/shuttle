@@ -3,6 +3,9 @@
     <PropertyGroup>
         <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
         <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+        <!-- Allow restore/compile of this Windows-only project on non-Windows CI agents
+             (e.g. the Ubuntu build). Its tests are only executed on Windows. -->
+        <EnableWindowsTargeting>true</EnableWindowsTargeting>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
