@@ -45,33 +45,55 @@ public static class PendingGlyphBuilder {
         CancellationToken cancellationToken
     ) {
         ArgumentNullException.ThrowIfNull(images);
-        ArgumentNullException.ThrowIfNull(profiles);
-        ArgumentNullException.ThrowIfNull(extractor);
 
         var result = new List<PendingGlyph>();
         foreach (var file in images) {
-            if (file is null || !file.Exists) {
+            result.AddRange(
+                await BuildForImageAsync(file, profiles, normWidth, normHeight, extractor, cancellationToken));
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Segments the numeric regions of every matching <paramref name="profile"/> for a single
+    /// <paramref name="image"/>. Processing one image at a time keeps the training UI responsive on
+    /// large screenshot sets (rather than building the whole queue up front). Returns an empty list for
+    /// a missing file or an image no profile matches.
+    /// </summary>
+    public static async Task<IReadOnlyList<PendingGlyph>> BuildForImageAsync(
+        FileInfo image,
+        IReadOnlyList<LayoutProfile> profiles,
+        int normWidth,
+        int normHeight,
+        RegionExtractor extractor,
+        CancellationToken cancellationToken
+    ) {
+        ArgumentNullException.ThrowIfNull(profiles);
+        ArgumentNullException.ThrowIfNull(extractor);
+
+        if (image is null || !image.Exists) {
+            return [];
+        }
+
+        var result = new List<PendingGlyph>();
+        using var loaded = await SixLabors.ImageSharp.Image.LoadAsync<Rgba32>(image.FullName, cancellationToken);
+        foreach (var profile in profiles) {
+            if (!await extractor.IsPlayerScreenAsync(loaded, profile, cancellationToken)) {
                 continue;
             }
 
-            using var image = await SixLabors.ImageSharp.Image.LoadAsync<Rgba32>(file.FullName, cancellationToken);
-            foreach (var profile in profiles) {
-                if (!await extractor.IsPlayerScreenAsync(image, profile, cancellationToken)) {
+            foreach (var region in profile.Regions) {
+                if (region.Kind is not (FieldKind.Integer or FieldKind.Float)) {
                     continue;
                 }
 
-                foreach (var region in profile.Regions) {
-                    if (region.Kind is not (FieldKind.Integer or FieldKind.Float)) {
-                        continue;
-                    }
-
-                    var pixels = region.Bounds.ToPixels(image.Width, image.Height);
-                    var glyphs = DigitSegmenter.Segment(image, pixels, normWidth, normHeight);
-                    for (var i = 0; i < glyphs.Count; i++) {
-                        var png = await RegionImaging.CropToPngAsync(image, glyphs[i].Bounds, cancellationToken);
-                        result.Add(new PendingGlyph(
-                            file.Name, region.Key, i, glyphs.Count, glyphs[i].Glyph, png));
-                    }
+                var pixels = region.Bounds.ToPixels(loaded.Width, loaded.Height);
+                var glyphs = DigitSegmenter.Segment(loaded, pixels, normWidth, normHeight);
+                for (var i = 0; i < glyphs.Count; i++) {
+                    var png = await RegionImaging.CropToPngAsync(loaded, glyphs[i].Bounds, cancellationToken);
+                    result.Add(new PendingGlyph(
+                        image.Name, region.Key, i, glyphs.Count, glyphs[i].Glyph, png));
                 }
             }
         }

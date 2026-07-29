@@ -585,17 +585,15 @@ public static class VisionCommands {
             }
 
             var extractor = new RegionExtractor(engine, new ConsoleLogger<RegionExtractor>());
-            var initial = await PendingGlyphBuilder.BuildAsync(
-                imageFiles, profiles, set.Width, set.Height, extractor, cancellationToken);
-            Console.WriteLine($"Queued {initial.Count} glyph(s) from {imageFiles.Length} preloaded image(s).");
+            Console.WriteLine($"Queued {imageFiles.Length} preloaded image(s); more can be added in the GUI.");
 
-            // Segment images added from within the GUI on a threadpool thread so the (async, WinRT) OCR
-            // anchor check never runs on the WinForms STA thread.
-            IReadOnlyList<PendingGlyph> AddImages(IReadOnlyList<FileInfo> files) =>
-                Task.Run(() => PendingGlyphBuilder.BuildAsync(
-                    files, profiles, set.Width, set.Height, extractor, cancellationToken)).GetAwaiter().GetResult();
+            // Segment a single image on a threadpool thread so the (async, WinRT) OCR anchor check never
+            // runs on the WinForms STA thread. The form calls this lazily, one file at a time.
+            IReadOnlyList<PendingGlyph> ProcessImage(FileInfo file) =>
+                Task.Run(() => PendingGlyphBuilder.BuildForImageAsync(
+                    file, profiles, set.Width, set.Height, extractor, cancellationToken)).GetAwaiter().GetResult();
 
-            var total = DigitTrainerLauncher.Run(initial, set, templatesFile, AddImages);
+            var total = DigitTrainerLauncher.Run(imageFiles, set, templatesFile, ProcessImage);
             Console.WriteLine($"Saved {total} template(s) to {templatesFile.FullName}.");
             return 0;
         });

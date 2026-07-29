@@ -9,25 +9,27 @@ namespace Shuttle.Fhm.Vision.Training;
 [SupportedOSPlatform("windows")]
 public static class DigitTrainerLauncher {
     /// <summary>
-    /// Opens the digit trainer over the given <paramref name="pending"/> glyph queue, appending to
-    /// <paramref name="set"/> and saving to <paramref name="templatesFile"/>. The optional
-    /// <paramref name="addImages"/> delegate lets the form pull in and segment more screenshots at
-    /// runtime. Returns the number of templates in the set as of the last save.
+    /// Opens the digit trainer over the given <paramref name="initialImages"/>, appending to
+    /// <paramref name="set"/> and saving to <paramref name="templatesFile"/>. The
+    /// <paramref name="processImage"/> delegate segments a single screenshot into pending glyphs; the
+    /// form invokes it lazily (one file at a time) as its buffer drains, so large image sets stay
+    /// responsive. Returns the number of templates in the set as of the last save.
     /// </summary>
     public static int Run(
-        IReadOnlyList<PendingGlyph> pending,
+        IReadOnlyList<FileInfo> initialImages,
         DigitTemplateSet set,
         FileInfo templatesFile,
-        Func<IReadOnlyList<FileInfo>, IReadOnlyList<PendingGlyph>>? addImages
+        Func<FileInfo, IReadOnlyList<PendingGlyph>> processImage
     ) {
-        ArgumentNullException.ThrowIfNull(pending);
+        ArgumentNullException.ThrowIfNull(initialImages);
         ArgumentNullException.ThrowIfNull(set);
         ArgumentNullException.ThrowIfNull(templatesFile);
+        ArgumentNullException.ThrowIfNull(processImage);
 
         var savedCount = set.Templates.Count;
         var thread = new Thread(() => {
             ApplicationConfiguration.Initialize();
-            using var form = new DigitTrainerForm(pending, set, templatesFile, addImages);
+            using var form = new DigitTrainerForm(initialImages, set, templatesFile, processImage);
             form.ShowDialog();
             savedCount = form.SavedTemplateCount;
         });

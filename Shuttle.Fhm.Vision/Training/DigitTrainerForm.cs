@@ -13,17 +13,24 @@ namespace Shuttle.Fhm.Vision.Training;
 /// resulting <see cref="DigitTemplateSet"/>. The recognizer is rebuilt after every added template so
 /// guesses improve within a session (the dataset is small).
 /// </summary>
+/// <remarks>
+/// Screenshots are segmented <em>one file at a time, on demand</em> (via <see cref="processImage"/>):
+/// only when the buffered glyphs run out is the next queued file processed. This keeps the UI
+/// responsive on large image sets instead of freezing while the whole queue is built up front.
+/// </remarks>
 [SupportedOSPlatform("windows")]
 public sealed class DigitTrainerForm : Form {
     private readonly DigitTemplateSet set;
     private readonly FileInfo templatesFile;
-    private readonly List<PendingGlyph> pending;
-    private readonly Func<IReadOnlyList<FileInfo>, IReadOnlyList<PendingGlyph>>? addImages;
+    private readonly Func<FileInfo, IReadOnlyList<PendingGlyph>> processImage;
+    private readonly Queue<FileInfo> fileQueue;
+    private readonly List<PendingGlyph> pending = [];
 
     private TemplateDigitRecognizer? recognizer;
     private int index;
     private int added;
     private int skippedDuplicates;
+    private int processedFiles;
 
     private readonly PictureBox originalBox = new() {
         Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Gainsboro,
@@ -47,18 +54,19 @@ public sealed class DigitTrainerForm : Form {
     public int SavedTemplateCount { get; private set; }
 
     public DigitTrainerForm(
-        IReadOnlyList<PendingGlyph> pending,
+        IReadOnlyList<FileInfo> initialImages,
         DigitTemplateSet set,
         FileInfo templatesFile,
-        Func<IReadOnlyList<FileInfo>, IReadOnlyList<PendingGlyph>>? addImages
+        Func<FileInfo, IReadOnlyList<PendingGlyph>> processImage
     ) {
-        ArgumentNullException.ThrowIfNull(pending);
+        ArgumentNullException.ThrowIfNull(initialImages);
         ArgumentNullException.ThrowIfNull(set);
         ArgumentNullException.ThrowIfNull(templatesFile);
+        ArgumentNullException.ThrowIfNull(processImage);
         this.set = set;
         this.templatesFile = templatesFile;
-        this.pending = [.. pending];
-        this.addImages = addImages;
+        this.processImage = processImage;
+        fileQueue = new Queue<FileInfo>(initialImages);
         SavedTemplateCount = set.Templates.Count;
         recognizer = set.Templates.Count > 0 ? new TemplateDigitRecognizer(set) : null;
 
@@ -109,7 +117,6 @@ public sealed class DigitTrainerForm : Form {
         AddRow(side, help);
 
         var addImagesButton = new Button { Text = "Add images…", Dock = DockStyle.Fill, Height = 30 };
-        addImagesButton.Enabled = addImages is not null;
         addImagesButton.Click += (_, _) => OnAddImages();
         AddRow(side, addImagesButton);
 
@@ -166,6 +173,41 @@ public sealed class DigitTrainerForm : Form {
 
     private PendingGlyph? Current => index >= 0 && index < pending.Count ? pending[index] : null;
 
+    /// <summary>
+    /// Ensures <see cref="Current"/> points at a glyph, segmenting queued image files one at a time until
+    /// one yields glyphs or the queue empties. Returns <c>true</c> when a current glyph is available.
+    /// </summary>
+    private bool EnsureCurrentAvailable() {
+        while (index >= pending.Count && fileQueue.Count > 0) {
+            ProcessNextFile();
+        }
+
+        return Current is not null;
+    }
+
+    private void ProcessNextFile() {
+        var file = fileQueue.Dequeue();
+        status.ForeColor = Color.DimGray;
+        status.Text = $"Segmenting {file.Name}… ({fileQueue.Count} file(s) left)";
+        status.Refresh();
+
+        IReadOnlyList<PendingGlyph> found;
+        var previousCursor = Cursor;
+        Cursor = Cursors.WaitCursor;
+        try {
+            found = processImage(file);
+        } catch (Exception ex) {
+            MessageBox.Show(this, $"Could not segment '{file.Name}':\n{ex.Message}",
+                "Add images", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            found = [];
+        } finally {
+            Cursor = previousCursor;
+        }
+
+        processedFiles++;
+        pending.AddRange(found);
+    }
+
     private void ShowCurrent() {
         originalBox.Image?.Dispose();
         normalizedBox.Image?.Dispose();
@@ -173,19 +215,20 @@ public sealed class DigitTrainerForm : Form {
         normalizedBox.Image = null;
         labelInput.Clear();
 
-        if (Current is not { } glyph) {
-            contextLabel.Text = pending.Count == 0
-                ? "No glyphs queued. Use \u2018Add images\u2026\u2019 to load screenshots."
+        if (!EnsureCurrentAvailable()) {
+            contextLabel.Text = processedFiles == 0 && fileQueue.Count == 0
+                ? "No images queued. Use \u2018Add images\u2026\u2019 to load screenshots."
                 : "All queued glyphs handled. Add more images or save.";
             confidenceLabel.Text = string.Empty;
             SetInputEnabled(false);
             return;
         }
 
+        var glyph = Current!;
         SetInputEnabled(true);
         contextLabel.Text =
             $"{glyph.ImageName}\nregion '{glyph.RegionKey}'  glyph {glyph.GlyphIndex + 1}/{glyph.GlyphCount}"
-            + $"\nqueued {index + 1}/{pending.Count}";
+            + $"\nbuffered {index + 1}/{pending.Count}  ({fileQueue.Count} file(s) queued)";
         originalBox.Image = GlyphImaging.FromPng(glyph.OriginalCropPng);
         normalizedBox.Image = GlyphImaging.Render(glyph.Normalized);
 
@@ -255,14 +298,10 @@ public sealed class DigitTrainerForm : Form {
     }
 
     private string StatsText() =>
-        $"added {added}, dup-skipped {skippedDuplicates}, remaining {Math.Max(0, pending.Count - index - 1)}, "
-        + $"templates {set.Templates.Count}.";
+        $"added {added}, dup-skipped {skippedDuplicates}, buffered {Math.Max(0, pending.Count - index - 1)}, "
+        + $"files-queued {fileQueue.Count}, templates {set.Templates.Count}.";
 
     private void OnAddImages() {
-        if (addImages is null) {
-            return;
-        }
-
         using var dialog = new OpenFileDialog {
             Title = "Add screenshots to segment",
             Filter = "PNG images (*.png)|*.png|All files (*.*)|*.*",
@@ -272,31 +311,14 @@ public sealed class DigitTrainerForm : Form {
             return;
         }
 
-        var files = dialog.FileNames.Select(f => new FileInfo(f)).ToList();
-        IReadOnlyList<PendingGlyph> found;
-        var previousCursor = Cursor;
-        Cursor = Cursors.WaitCursor;
-        try {
-            found = addImages(files);
-        } catch (Exception ex) {
-            Cursor = previousCursor;
-            MessageBox.Show(this, $"Could not segment the added images:\n{ex.Message}",
-                "Add images", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            return;
-        } finally {
-            Cursor = previousCursor;
-        }
-
-        if (found.Count == 0) {
-            status.ForeColor = Color.DarkOrange;
-            status.Text = "No numeric glyphs found in the added image(s) — check the profile matches.";
-            return;
-        }
-
+        // Enqueue only — the files are segmented one at a time, on demand, as the buffer drains.
         var wasFinished = Current is null;
-        pending.AddRange(found);
+        foreach (var name in dialog.FileNames) {
+            fileQueue.Enqueue(new FileInfo(name));
+        }
+
         status.ForeColor = Color.ForestGreen;
-        status.Text = $"Added {found.Count} glyph(s) from {files.Count} image(s).  {StatsText()}";
+        status.Text = $"Queued {dialog.FileNames.Length} image(s).  {StatsText()}";
         if (wasFinished) {
             ShowCurrent();
         }
