@@ -31,6 +31,7 @@ public sealed class DigitTrainerForm : Form {
     private int added;
     private int skippedDuplicates;
     private int processedFiles;
+    private bool saving;
 
     private readonly PictureBox originalBox = new() {
         Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Gainsboro,
@@ -121,11 +122,11 @@ public sealed class DigitTrainerForm : Form {
         AddRow(side, addImagesButton);
 
         var save = new Button { Text = "Save (keep open)", Dock = DockStyle.Fill, Height = 32 };
-        save.Click += (_, _) => Save(closeAfter: false);
+        save.Click += async (_, _) => await SaveAsync(closeAfter: false);
         AddRow(side, save);
 
         var saveClose = new Button { Text = "Save && close", Dock = DockStyle.Fill, Height = 32 };
-        saveClose.Click += (_, _) => Save(closeAfter: true);
+        saveClose.Click += async (_, _) => await SaveAsync(closeAfter: true);
         AddRow(side, saveClose);
 
         AddRow(side, status);
@@ -324,25 +325,45 @@ public sealed class DigitTrainerForm : Form {
         }
     }
 
-    private void Save(bool closeAfter) {
+    private async Task SaveAsync(bool closeAfter) {
+        if (saving) {
+            return;
+        }
+
+        saving = true;
+        var previousCursor = Cursor;
+        Cursor = Cursors.WaitCursor;
+        status.ForeColor = Color.DimGray;
+        status.Text = $"Deduplicating and saving {set.Templates.Count} template(s)…";
+        status.Refresh();
+
         try {
-            set.Dedup();
-            DigitTemplateStore.SaveAsync(templatesFile, set, CancellationToken.None).GetAwaiter().GetResult();
+            // Dedup is CPU-bound and can be heavy on large sets; run it (and the write) off the UI thread
+            // so the window stays responsive and shows progress instead of freezing.
+            var count = await Task.Run(() => {
+                set.Dedup();
+                DigitTemplateStore.SaveAsync(templatesFile, set, CancellationToken.None).GetAwaiter().GetResult();
+                return set.Templates.Count;
+            });
+
+            SavedTemplateCount = count;
+            if (closeAfter) {
+                DialogResult = DialogResult.OK;
+                Close();
+                return;
+            }
+
+            status.ForeColor = Color.ForestGreen;
+            status.Text = $"Saved {count} template(s) to {templatesFile.Name} at {DateTime.Now:HH:mm:ss}.";
         } catch (Exception ex) {
+            status.ForeColor = Color.Firebrick;
+            status.Text = "Save failed.";
             MessageBox.Show(this, $"Could not save templates:\n{ex.Message}",
                 "Save", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            return;
+        } finally {
+            saving = false;
+            Cursor = previousCursor;
         }
-
-        SavedTemplateCount = set.Templates.Count;
-        if (closeAfter) {
-            DialogResult = DialogResult.OK;
-            Close();
-            return;
-        }
-
-        status.ForeColor = Color.ForestGreen;
-        status.Text = $"Saved {set.Templates.Count} template(s) to {templatesFile.Name} at {DateTime.Now:HH:mm:ss}.";
     }
 
     protected override void Dispose(bool disposing) {

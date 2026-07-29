@@ -174,6 +174,37 @@ public sealed class DigitRecognitionTests {
     }
 
     [Fact]
+    public void GlyphBitmap_has_content_value_equality() {
+        var a = new GlyphBitmap(3, 3, [true, true, true, false, false, true, false, true, false]);
+        var b = new GlyphBitmap(3, 3, [true, true, true, false, false, true, false, true, false]);
+        var c = new GlyphBitmap(3, 3, [true, false, true, false, false, true, false, true, false]);
+
+        Assert.Equal(a, b);
+        Assert.Equal(a.GetHashCode(), b.GetHashCode());
+        Assert.NotEqual(a, c);
+
+        var seen = new HashSet<GlyphBitmap> { a };
+        Assert.False(seen.Add(b)); // exact duplicate collapses in a hash set
+        Assert.True(seen.Add(c));
+    }
+
+    [Fact]
+    public void TemplateSet_Dedup_exact_collapses_identical_templates_per_label() {
+        var set = new DigitTemplateSet { Width = 3, Height = 3 };
+        var seven = new GlyphBitmap(3, 3, [true, true, true, false, false, true, false, true, false]);
+        var sevenVariant = new GlyphBitmap(3, 3, [true, true, true, false, false, true, false, true, true]);
+        set.Add("7", seven);
+        set.Add("7", seven); // exact dup -> removed
+        set.Add("7", sevenVariant); // different content -> kept
+        set.Add("1", seven); // different label -> kept
+
+        var removed = set.Dedup(); // exact fast path (maxDistance == 0)
+
+        Assert.Equal(1, removed);
+        Assert.Equal(3, set.Templates.Count);
+    }
+
+    [Fact]
     public void Recognizer_matches_a_trained_glyph_exactly() {
         using var image = Canvas(12, 12);
         FillBlock(image, 3, 2, 8, 9);

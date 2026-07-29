@@ -8,10 +8,11 @@ namespace Shuttle.Fhm.Vision.Recognition;
 /// into 32-bit words so the hot-path <see cref="Distance"/> is a XOR + population count over words rather
 /// than a per-pixel loop.
 /// </summary>
-public sealed class GlyphBitmap {
+public sealed class GlyphBitmap : IEquatable<GlyphBitmap> {
     private const int BitsPerWord = 32;
 
     private readonly uint[] words;
+    private readonly int hash;
 
     public GlyphBitmap(int width, int height, bool[] pixels) {
         ValidateSize(width, height);
@@ -31,6 +32,7 @@ public sealed class GlyphBitmap {
         }
 
         InkCount = PopCount(words);
+        hash = ComputeHash(width, height, words);
     }
 
     private GlyphBitmap(int width, int height, int length, uint[] words) {
@@ -39,6 +41,7 @@ public sealed class GlyphBitmap {
         Length = length;
         this.words = words;
         InkCount = PopCount(words);
+        hash = ComputeHash(width, height, words);
     }
 
     public int Width { get; }
@@ -111,6 +114,30 @@ public sealed class GlyphBitmap {
         return new GlyphBitmap(width, height, bits.Length, words);
     }
 
+    /// <summary>
+    /// Value equality by exact pixel content and dimensions. Lets glyphs be used as hash-set/dictionary
+    /// keys so exact-duplicate detection is O(1) per glyph instead of a pairwise scan.
+    /// </summary>
+    public bool Equals(GlyphBitmap? other) {
+        if (other is null) {
+            return false;
+        }
+
+        if (ReferenceEquals(this, other)) {
+            return true;
+        }
+
+        if (Width != other.Width || Height != other.Height || hash != other.hash) {
+            return false;
+        }
+
+        return words.AsSpan().SequenceEqual(other.words);
+    }
+
+    public override bool Equals(object? obj) => Equals(obj as GlyphBitmap);
+
+    public override int GetHashCode() => hash;
+
     private static int WordCount(int length) => (length + BitsPerWord - 1) / BitsPerWord;
 
     private static void ValidateSize(int width, int height) {
@@ -125,5 +152,13 @@ public sealed class GlyphBitmap {
         }
 
         return count;
+    }
+
+    private static int ComputeHash(int width, int height, uint[] words) {
+        var hash = new HashCode();
+        hash.Add(width);
+        hash.Add(height);
+        hash.AddBytes(System.Runtime.InteropServices.MemoryMarshal.AsBytes(words.AsSpan()));
+        return hash.ToHashCode();
     }
 }

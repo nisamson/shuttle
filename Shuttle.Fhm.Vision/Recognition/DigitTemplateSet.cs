@@ -97,9 +97,36 @@ public sealed class DigitTemplateSet {
     /// <summary>
     /// Removes same-label templates that are within <paramref name="maxDistance"/> Hamming pixels of an
     /// earlier kept template (the first occurrence is always retained). Comparisons stay within each
-    /// label group. Returns the number removed.
+    /// label group. The common exact case (<paramref name="maxDistance"/> == 0) is O(N) via content
+    /// hashing; a positive threshold falls back to an O(N²) per-label pairwise scan. Returns the number
+    /// removed.
     /// </summary>
     public int Dedup(int maxDistance = 0) {
+        return maxDistance == 0 ? DedupExact() : DedupWithin(maxDistance);
+    }
+
+    private int DedupExact() {
+        var seen = new Dictionary<string, HashSet<GlyphBitmap>>(StringComparer.Ordinal);
+        var keptGlyphs = new Dictionary<string, List<GlyphBitmap>>(StringComparer.Ordinal);
+        var kept = new List<DigitTemplate>(Templates.Count);
+        var removed = 0;
+
+        foreach (var candidate in Templates) {
+            var glyph = GlyphBitmap.FromBitString(Width, Height, candidate.Bits);
+            if (!GetOrAddSet(seen, candidate.Label).Add(glyph)) {
+                removed++;
+                continue;
+            }
+
+            GetOrAddGroup(keptGlyphs, candidate.Label).Add(glyph);
+            kept.Add(candidate);
+        }
+
+        Commit(kept, keptGlyphs, removed);
+        return removed;
+    }
+
+    private int DedupWithin(int maxDistance) {
         var keptGlyphs = new Dictionary<string, List<GlyphBitmap>>(StringComparer.Ordinal);
         var kept = new List<DigitTemplate>(Templates.Count);
         var removed = 0;
@@ -123,13 +150,16 @@ public sealed class DigitTemplateSet {
             }
         }
 
+        Commit(kept, keptGlyphs, removed);
+        return removed;
+    }
+
+    private void Commit(List<DigitTemplate> kept, Dictionary<string, List<GlyphBitmap>> keptGlyphs, int removed) {
         if (removed > 0) {
             Templates.Clear();
             Templates.AddRange(kept);
             byLabel = keptGlyphs;
         }
-
-        return removed;
     }
 
     private void EnsureCompatible(GlyphBitmap glyph) {
@@ -154,6 +184,15 @@ public sealed class DigitTemplateSet {
         }
 
         return group;
+    }
+
+    private static HashSet<GlyphBitmap> GetOrAddSet(Dictionary<string, HashSet<GlyphBitmap>> sets, string label) {
+        if (!sets.TryGetValue(label, out var set)) {
+            set = [];
+            sets[label] = set;
+        }
+
+        return set;
     }
 }
 
