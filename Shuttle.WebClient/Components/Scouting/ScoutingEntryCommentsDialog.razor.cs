@@ -27,6 +27,9 @@ public partial class ScoutingEntryCommentsDialog : FluentDialogInstance {
     }
 
     protected override async Task OnInitializedAsync() {
+        // Let the base configure the dialog chrome (which invokes OnInitializeDialog to add the
+        // footer "Close" button); skipping this leaves Escape as the only way to exit the dialog.
+        await base.OnInitializedAsync();
         await ReloadAsync();
         loading = false;
     }
