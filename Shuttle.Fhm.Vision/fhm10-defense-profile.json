@@ -447,39 +447,6 @@
       }
     },
     {
-      "key": "Crease-Clearing Defenceman",
-      "group": "role",
-      "kind": "integer",
-      "bounds": {
-        "x": 0.4519628099173554,
-        "y": 0.4520547945205479,
-        "width": 0.017045454545454544,
-        "height": 0.020950846091861403
-      }
-    },
-    {
-      "key": "Punishing Defenceman",
-      "group": "role",
-      "kind": "integer",
-      "bounds": {
-        "x": 0.45144628099173556,
-        "y": 0.47058823529411764,
-        "width": 0.01859504132231405,
-        "height": 0.019339242546333603
-      }
-    },
-    {
-      "key": "Shutdown Defenceman",
-      "group": "role",
-      "kind": "integer",
-      "bounds": {
-        "x": 0.45041322314049587,
-        "y": 0.48589846897663175,
-        "width": 0.020144628099173553,
-        "height": 0.019339242546333603
-      }
-    },
-    {
       "key": "Old-School Defenceman",
       "group": "role",
       "kind": "integer",
@@ -521,6 +488,39 @@
         "y": 0.5761482675261885,
         "width": 0.01756198347107438,
         "height": 0.019339242546333603
+      }
+    },
+    {
+      "key": "Crease-Clearing Defenceman",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.45144628099173556,
+        "y": 0.45769540692989524,
+        "width": 0.013429752066115703,
+        "height": 0.015310233682514102
+      }
+    },
+    {
+      "key": "Punishing Defenceman",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.4519628099173554,
+        "y": 0.47058823529411764,
+        "width": 0.013429752066115703,
+        "height": 0.018533440773569703
+      }
+    },
+    {
+      "key": "Shutdown Defenceman",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.4535123966942149,
+        "y": 0.48912167606768736,
+        "width": 0.014979338842975207,
+        "height": 0.015310233682514102
       }
     }
   ]
