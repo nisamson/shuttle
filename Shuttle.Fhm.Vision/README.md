@@ -158,6 +158,13 @@ accurate. It lives in `Recognition/` and is *opt-in* via `--templates`:
    move on, and **Save**/**Save && close** to write the JSON. An **Add images…** button pulls in more
    screenshots and segments them into the queue mid-session. It takes the same `--templates` and
    (repeatable) `--profile`; `--image` is optional since you can add images from the UI.
+
+   To keep mislabels out of the set (a single wrong sample poisons the nearest-neighbour matcher for
+   its whole class), the GUI **flags a likely mislabel live**: when the model *confidently* reads the
+   glyph as a different character than the one you typed, a warning appears under the label box, and
+   saving that label asks for confirmation first. Accepting the model's own guess never prompts. Run
+   `eval-digits` afterwards to catch any that slipped through — a template whose nearest neighbour is a
+   *different* label (negative margin / a confusion pair) is the tell-tale of a bad sample.
 2. **Use** it by passing the same `--templates` file to `monitor` or `ingest-image`. For
    `Integer`/`Float` regions, `RegionExtractor` normalizes each segmented glyph to a fixed grid
    (default 12×20), classifies it by nearest template (Hamming distance), and uses the result when

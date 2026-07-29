@@ -27,6 +27,7 @@ public sealed class DigitTrainerForm : Form {
     private readonly List<PendingGlyph> pending = [];
 
     private TemplateDigitRecognizer? recognizer;
+    private GlyphMatch? currentGuess;
     private int index;
     private int added;
     private int skippedDuplicates;
@@ -41,10 +42,14 @@ public sealed class DigitTrainerForm : Form {
     };
     private readonly Label contextLabel = new() { Dock = DockStyle.Fill, AutoSize = true };
     private readonly Label confidenceLabel = new() {
-        Dock = DockStyle.Fill, AutoSize = true, Font = new Font(FontFamily.GenericMonospace, 10, FontStyle.Bold),
+        Dock = DockStyle.Fill, AutoSize = true, Font = new Font(FontFamily.GenericMonospace, 12, FontStyle.Bold),
     };
     private readonly TextBox labelInput = new() {
-        Dock = DockStyle.Fill, Font = new Font(FontFamily.GenericMonospace, 14), MaxLength = 1,
+        Dock = DockStyle.Fill, Font = new Font(FontFamily.GenericMonospace, 16), MaxLength = 1,
+    };
+    private readonly Label warningLabel = new() {
+        Dock = DockStyle.Fill, AutoSize = true, ForeColor = Color.Firebrick,
+        Font = new Font(FontFamily.GenericSansSerif, 11, FontStyle.Bold), MaximumSize = new Size(300, 0),
     };
     private readonly Label status = new() { Dock = DockStyle.Fill, AutoSize = true, ForeColor = Color.ForestGreen };
     private readonly Button acceptButton = new() { Text = "Accept guess (Enter)", Dock = DockStyle.Fill, Height = 32 };
@@ -72,6 +77,7 @@ public sealed class DigitTrainerForm : Form {
         recognizer = set.Templates.Count > 0 ? new TemplateDigitRecognizer(set) : null;
 
         Text = "FHM Vision — Digit Trainer";
+        Font = new Font(Font.FontFamily, Font.SizeInPoints + 1.5f);
         Width = 1100;
         Height = 720;
         MinimumSize = new Size(820, 560);
@@ -105,6 +111,7 @@ public sealed class DigitTrainerForm : Form {
         AddRow(side, contextLabel);
         AddRow(side, Labeled("Best guess", confidenceLabel));
         AddRow(side, Labeled("Label (0-9, '.', '-')", labelInput));
+        AddRow(side, warningLabel);
         AddRow(side, acceptButton);
         AddRow(side, saveLabelButton);
         AddRow(side, skipButton);
@@ -135,6 +142,7 @@ public sealed class DigitTrainerForm : Form {
         saveLabelButton.Click += (_, _) => SaveTypedLabel();
         skipButton.Click += (_, _) => Advance();
         labelInput.KeyDown += OnLabelKeyDown;
+        labelInput.TextChanged += (_, _) => UpdateMismatchWarning();
 
         Controls.Add(side);
         Controls.Add(previews);
@@ -214,6 +222,8 @@ public sealed class DigitTrainerForm : Form {
         normalizedBox.Image?.Dispose();
         originalBox.Image = null;
         normalizedBox.Image = null;
+        currentGuess = null;
+        warningLabel.Text = string.Empty;
         labelInput.Clear();
 
         if (!EnsureCurrentAvailable()) {
@@ -238,6 +248,7 @@ public sealed class DigitTrainerForm : Form {
             confidenceLabel.ForeColor = Color.DimGray;
         } else {
             var match = recognizer.Classify(glyph.Normalized);
+            currentGuess = match;
             confidenceLabel.Text = $"'{match.Label}'  d={match.Score:0.###}  m={match.Margin:0.###}  "
                 + (match.Confident ? "confident" : "low");
             confidenceLabel.ForeColor = match.Confident ? Color.ForestGreen : Color.DarkOrange;
@@ -274,9 +285,42 @@ public sealed class DigitTrainerForm : Form {
         Apply(label[..1]);
     }
 
+    private void UpdateMismatchWarning() {
+        var typed = labelInput.Text.Trim();
+        if (typed.Length == 0
+            || currentGuess is not { Confident: true } guess
+            || string.Equals(guess.Label, typed, StringComparison.Ordinal)) {
+            warningLabel.Text = string.Empty;
+            return;
+        }
+
+        warningLabel.Text = $"\u26A0 Model reads '{guess.Label}' confidently; you typed '{typed}'. "
+            + "Double-check for a mislabel.";
+    }
+
     private void Apply(string label) {
         if (Current is not { } glyph) {
             return;
+        }
+
+        // Guard against contaminating the set: if the model is confident this glyph is a different
+        // character than the one being assigned, make the user confirm (a mislabelled sample poisons the
+        // nearest-neighbour matcher for the whole class).
+        if (currentGuess is { Confident: true } guess
+            && !string.Equals(guess.Label, label, StringComparison.Ordinal)) {
+            var answer = MessageBox.Show(
+                this,
+                $"The model confidently reads this glyph as '{guess.Label}' "
+                + $"(d={guess.Score:0.###}, margin={guess.Margin:0.###}), but you labelled it '{label}'.\n\n"
+                + $"Add it as '{label}' anyway?",
+                "Possible mislabel",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning);
+            if (answer != DialogResult.Yes) {
+                labelInput.SelectAll();
+                labelInput.Focus();
+                return;
+            }
         }
 
         if (set.TryAdd(label, glyph.Normalized)) {
