@@ -12,6 +12,7 @@ using Shuttle.Fhm.Vision.Monitor;
 using Shuttle.Fhm.Vision.Ocr;
 using Shuttle.Fhm.Vision.Recognition;
 using Shuttle.Fhm.Vision.Storage;
+using Shuttle.Fhm.Vision.Training;
 
 namespace Shuttle.Fhm.Vision.Cli;
 
@@ -30,6 +31,7 @@ public static class VisionCommands {
         root.Subcommands.Add(BuildIngestImage());
         root.Subcommands.Add(BuildInspect());
         root.Subcommands.Add(BuildTrainDigits());
+        root.Subcommands.Add(BuildTrainDigitsGui());
         root.Subcommands.Add(BuildEvalDigits());
         return root;
     }
@@ -524,6 +526,77 @@ public static class VisionCommands {
 
             await DigitTemplateStore.SaveAsync(templatesFile, set, cancellationToken);
             Console.WriteLine($"Added {added} template(s); saved {set.Templates.Count} total to {templatesFile.FullName}");
+            return 0;
+        });
+
+        return command;
+    }
+
+    private static Command BuildTrainDigitsGui() {
+        var templatesOption = new Option<FileInfo>("--templates", "-t") {
+            Description = "Digit template JSON to append to (created if it does not exist).",
+            Required = true,
+        };
+        var profileOption = new Option<FileInfo[]>("--profile", "-p") {
+            Description = "Layout profile JSON whose numeric regions to segment. Repeat to use several.",
+            Required = true,
+            AllowMultipleArgumentsPerToken = true,
+        };
+        var imageOption = new Option<FileInfo[]>("--image", "-i") {
+            Description = "Screenshot PNG(s) to preload. Optional — more can be added from within the GUI.",
+            AllowMultipleArgumentsPerToken = true,
+        };
+
+        var command = new Command(
+            "train-digits-gui",
+            "Interactive GUI trainer: label FHM rating glyphs with original/normalized previews and "
+            + "live confidence, pulling in multiple screenshots.") {
+            templatesOption, profileOption, imageOption,
+        };
+
+        command.SetAction(async (parseResult, cancellationToken) => {
+            var templatesFile = parseResult.GetValue(templatesOption)!;
+            var profileFiles = parseResult.GetValue(profileOption) ?? [];
+            var imageFiles = parseResult.GetValue(imageOption) ?? [];
+
+            var missing = profileFiles.Where(f => !f.Exists).ToList();
+            if (missing.Count > 0) {
+                foreach (var file in missing) {
+                    Console.Error.WriteLine($"Profile not found: {file.FullName}");
+                }
+
+                return 1;
+            }
+
+            var engine = TryCreateOcrEngine();
+            if (engine is null) {
+                return 1;
+            }
+
+            var set = templatesFile.Exists
+                ? await DigitTemplateStore.LoadAsync(templatesFile, cancellationToken)
+                : new DigitTemplateSet();
+            Console.WriteLine(
+                $"Templates: {templatesFile.FullName} ({set.Templates.Count} existing, glyph {set.Width}x{set.Height})");
+
+            var profiles = new List<LayoutProfile>();
+            foreach (var file in profileFiles) {
+                profiles.Add(await LayoutProfileStore.LoadAsync(file, cancellationToken));
+            }
+
+            var extractor = new RegionExtractor(engine, new ConsoleLogger<RegionExtractor>());
+            var initial = await PendingGlyphBuilder.BuildAsync(
+                imageFiles, profiles, set.Width, set.Height, extractor, cancellationToken);
+            Console.WriteLine($"Queued {initial.Count} glyph(s) from {imageFiles.Length} preloaded image(s).");
+
+            // Segment images added from within the GUI on a threadpool thread so the (async, WinRT) OCR
+            // anchor check never runs on the WinForms STA thread.
+            IReadOnlyList<PendingGlyph> AddImages(IReadOnlyList<FileInfo> files) =>
+                Task.Run(() => PendingGlyphBuilder.BuildAsync(
+                    files, profiles, set.Width, set.Height, extractor, cancellationToken)).GetAwaiter().GetResult();
+
+            var total = DigitTrainerLauncher.Run(initial, set, templatesFile, AddImages);
+            Console.WriteLine($"Saved {total} template(s) to {templatesFile.FullName}.");
             return 0;
         });
 

@@ -7,6 +7,7 @@
         <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
         <IsTestProject>true</IsTestProject>
+        <UseWindowsForms>true</UseWindowsForms>
         <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
         <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
     </PropertyGroup>
@@ -25,6 +26,9 @@
 
     <ItemGroup>
         <Using Include="Xunit" />
+        <!-- WinForms (UseWindowsForms) adds a global System.Drawing using that clashes with
+             SixLabors.ImageSharp.Image in these tests; drop it and qualify where needed. -->
+        <Using Remove="System.Drawing" />
     </ItemGroup>
 
 </Project>

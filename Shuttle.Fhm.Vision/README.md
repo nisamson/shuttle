@@ -55,6 +55,10 @@ dotnet run --project Shuttle.Fhm.Vision -- inspect --image shot.png \
 dotnet run --project Shuttle.Fhm.Vision -- train-digits --image shot.png \
     --profile fhm10-forward-profile.json --templates digits.json --out glyphs
 
+# 6b. Same, but in a GUI: original + normalized glyph previews, live confidence, multi-image
+dotnet run --project Shuttle.Fhm.Vision -- train-digits-gui --templates digits.json \
+    --profile fhm10-forward-profile.json --image shot.png --image shot2.png
+
 # 7. Score the trained template set (leave-one-out accuracy, confusions, margins)
 dotnet run --project Shuttle.Fhm.Vision -- eval-digits --templates digits.json
 ```
@@ -146,6 +150,14 @@ accurate. It lives in `Recognition/` and is *opt-in* via `--templates`:
    across several screenshots. Because the font is fixed, near-identical repeat captures of a glyph
    are **de-duplicated on add** (`DigitTemplateSet.TryAdd`) — the trainer reports and skips them, so
    the set stays small and its confidence margins stay meaningful.
+
+   Prefer a GUI? **`train-digits-gui`** (Windows-only WinForms) does the same labelling visually: for
+   each glyph it shows the **original crop** next to the **normalized (matched) bitmap** and the
+   current model's **confidence** (guess label, distance `d`, runner-up margin `m`, confident/low).
+   Press **Enter** to accept the guess (or type `0`–`9`/`.`/`-` then Enter to label), **Skip** to
+   move on, and **Save**/**Save && close** to write the JSON. An **Add images…** button pulls in more
+   screenshots and segments them into the queue mid-session. It takes the same `--templates` and
+   (repeatable) `--profile`; `--image` is optional since you can add images from the UI.
 2. **Use** it by passing the same `--templates` file to `monitor` or `ingest-image`. For
    `Integer`/`Float` regions, `RegionExtractor` normalizes each segmented glyph to a fixed grid
    (default 12×20), classifies it by nearest template (Hamming distance), and uses the result when
