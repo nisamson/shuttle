@@ -1,0 +1,615 @@
+{
+  "name": "fhm-forward-screen",
+  "anchors": [
+    {
+      "bounds": {
+        "x": 0.49741735537190085,
+        "y": 0.22562449637389204,
+        "width": 0.09142561983471074,
+        "height": 0.020950846091861403
+      },
+      "expectedText": "OFFENSIVE RATINGS"
+    },
+    {
+      "bounds": {
+        "x": 0.7417355371900827,
+        "y": 0.22723609991941982,
+        "width": 0.08729338842975207,
+        "height": 0.017727639000805803
+      },
+      "expectedText": "DEFENSIVE RATINGS"
+    },
+    {
+      "bounds": {
+        "x": 0.25258264462809915,
+        "y": 0.22723609991941982,
+        "width": 0.06714876033057851,
+        "height": 0.016116035455278
+      },
+      "expectedText": "ROLE RATINGS"
+    },
+    {
+      "bounds": {
+        "x": 0.2572314049586777,
+        "y": 0.28041901692183724,
+        "width": 0.05113636363636364,
+        "height": 0.018533440773569703
+      },
+      "expectedText": "GOALSCORER"
+    }
+  ],
+  "regions": [
+    {
+      "key": "Perimeter Shooter",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.4524793388429752,
+        "y": 0.29653505237711525,
+        "width": 0.016012396694214875,
+        "height": 0.019339242546333603
+      }
+    },
+    {
+      "key": "Sniper",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.45144628099173556,
+        "y": 0.3126510878323932,
+        "width": 0.018078512396694214,
+        "height": 0.019339242546333603
+      }
+    },
+    {
+      "key": "Garbage Collector",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.44989669421487605,
+        "y": 0.3287671232876712,
+        "width": 0.01859504132231405,
+        "height": 0.017727639000805803
+      }
+    },
+    {
+      "key": "Dangler",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.45144628099173556,
+        "y": 0.370668815471394,
+        "width": 0.018078512396694214,
+        "height": 0.0136986301369863
+      }
+    },
+    {
+      "key": "Speedy Forward",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.45041322314049587,
+        "y": 0.3827558420628525,
+        "width": 0.02066115702479339,
+        "height": 0.020145044319097503
+      }
+    },
+    {
+      "key": "Bio",
+      "group": "identity",
+      "kind": "bio",
+      "bounds": {
+        "x": 0.09452479338842976,
+        "y": 0.11281224818694602,
+        "width": 0.49483471074380164,
+        "height": 0.020950846091861403
+      }
+    },
+    {
+      "key": "Playmaker",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.45144628099173556,
+        "y": 0.42143432715551976,
+        "width": 0.018078512396694214,
+        "height": 0.018533440773569703
+      }
+    },
+    {
+      "key": "Setup Man",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.4535123966942149,
+        "y": 0.4391619661563255,
+        "width": 0.015495867768595042,
+        "height": 0.017727639000805803
+      }
+    },
+    {
+      "key": "Gretzky\u0027s Office",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.4519628099173554,
+        "y": 0.45608380338436744,
+        "width": 0.017045454545454544,
+        "height": 0.016921837228041903
+      }
+    },
+    {
+      "key": "Screener",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.45454545454545453,
+        "y": 0.49476228847703463,
+        "width": 0.011880165289256199,
+        "height": 0.016921837228041903
+      }
+    },
+    {
+      "key": "Power Forward",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.4535123966942149,
+        "y": 0.5124899274778405,
+        "width": 0.013946280991735538,
+        "height": 0.016921837228041903
+      }
+    },
+    {
+      "key": "Counterattacking Forward",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.4550619834710744,
+        "y": 0.5487510072522159,
+        "width": 0.011363636363636364,
+        "height": 0.016921837228041903
+      }
+    },
+    {
+      "key": "Two-Way Forward",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.45454545454545453,
+        "y": 0.5664786462530218,
+        "width": 0.013946280991735538,
+        "height": 0.014504431909750202
+      }
+    },
+    {
+      "key": "Up and Down Winger",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.452995867768595,
+        "y": 0.5825946817082998,
+        "width": 0.015495867768595042,
+        "height": 0.016921837228041903
+      }
+    },
+    {
+      "key": "Ginder",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.4519628099173554,
+        "y": 0.6196615632554392,
+        "width": 0.018078512396694214,
+        "height": 0.016116035455278
+      }
+    },
+    {
+      "key": "Aggressive Forechecker",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.4524793388429752,
+        "y": 0.6349717969379532,
+        "width": 0.016012396694214875,
+        "height": 0.018533440773569703
+      }
+    },
+    {
+      "key": "Punishing Forward",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.45144628099173556,
+        "y": 0.6526994359387591,
+        "width": 0.01652892561983471,
+        "height": 0.018533440773569703
+      }
+    },
+    {
+      "key": "Backchecking Forward",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.4535123966942149,
+        "y": 0.6905721192586624,
+        "width": 0.014979338842975207,
+        "height": 0.016921837228041903
+      }
+    },
+    {
+      "key": "Shadow",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.452995867768595,
+        "y": 0.7066881547139404,
+        "width": 0.014979338842975207,
+        "height": 0.019339242546333603
+      }
+    },
+    {
+      "key": "Goon",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.45144628099173556,
+        "y": 0.7639000805801772,
+        "width": 0.019111570247933883,
+        "height": 0.015310233682514102
+      }
+    },
+    {
+      "key": "Agitator",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.4493801652892562,
+        "y": 0.7429492344883158,
+        "width": 0.022727272727272728,
+        "height": 0.019339242546333603
+      }
+    },
+    {
+      "key": "Enforcer",
+      "group": "role",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.45041322314049587,
+        "y": 0.7784045124899275,
+        "width": 0.02169421487603306,
+        "height": 0.019339242546333603
+      }
+    },
+    {
+      "key": "Screening",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.5898760330578512,
+        "y": 0.24979854955680902,
+        "width": 0.012913223140495868,
+        "height": 0.0136986301369863
+      }
+    },
+    {
+      "key": "Getting Open",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.5883264462809917,
+        "y": 0.26510878323932313,
+        "width": 0.014979338842975207,
+        "height": 0.016921837228041903
+      }
+    },
+    {
+      "key": "Passing",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.5883264462809917,
+        "y": 0.28122481869460114,
+        "width": 0.015495867768595042,
+        "height": 0.016116035455278
+      }
+    },
+    {
+      "key": "Puckhandling",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.5878099173553719,
+        "y": 0.29734085414987915,
+        "width": 0.014979338842975207,
+        "height": 0.015310233682514102
+      }
+    },
+    {
+      "key": "Shooting Accuracy",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.5867768595041323,
+        "y": 0.3150684931506849,
+        "width": 0.01652892561983471,
+        "height": 0.012087026591458501
+      }
+    },
+    {
+      "key": "Shooting Range",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.5872933884297521,
+        "y": 0.3279613215149073,
+        "width": 0.015495867768595042,
+        "height": 0.016921837228041903
+      }
+    },
+    {
+      "key": "Offensive Read",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.5872933884297521,
+        "y": 0.3448831587429492,
+        "width": 0.018078512396694214,
+        "height": 0.016921837228041903
+      }
+    },
+    {
+      "key": "Checking",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.8233471074380165,
+        "y": 0.24818694601128122,
+        "width": 0.012913223140495868,
+        "height": 0.016921837228041903
+      }
+    },
+    {
+      "key": "Faceoffs",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.8212809917355371,
+        "y": 0.26430298146655923,
+        "width": 0.01652892561983471,
+        "height": 0.017727639000805803
+      }
+    },
+    {
+      "key": "Hitting",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.8223140495867769,
+        "y": 0.28041901692183724,
+        "width": 0.01652892561983471,
+        "height": 0.016116035455278
+      }
+    },
+    {
+      "key": "Positioning",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.8217975206611571,
+        "y": 0.29411764705882354,
+        "width": 0.014462809917355372,
+        "height": 0.019339242546333603
+      }
+    },
+    {
+      "key": "Shot Blocking",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.8223140495867769,
+        "y": 0.3134568896051571,
+        "width": 0.015495867768595042,
+        "height": 0.015310233682514102
+      }
+    },
+    {
+      "key": "Stickchecking",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.8217975206611571,
+        "y": 0.330378726833199,
+        "width": 0.014979338842975207,
+        "height": 0.015310233682514102
+      }
+    },
+    {
+      "key": "Defensive Read",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.8207644628099173,
+        "y": 0.3440773569701853,
+        "width": 0.01859504132231405,
+        "height": 0.019339242546333603
+      }
+    },
+    {
+      "key": "Aggression",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.577995867768595,
+        "y": 0.5286059629331185,
+        "width": 0.015495867768595042,
+        "height": 0.016921837228041903
+      }
+    },
+    {
+      "key": "Bravery",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.5774793388429752,
+        "y": 0.5439161966156325,
+        "width": 0.01652892561983471,
+        "height": 0.019339242546333603
+      }
+    },
+    {
+      "key": "Determination",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.5769628099173554,
+        "y": 0.5616438356164384,
+        "width": 0.017045454545454544,
+        "height": 0.015310233682514102
+      }
+    },
+    {
+      "key": "Team Player",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.5769628099173554,
+        "y": 0.5745366639806607,
+        "width": 0.017045454545454544,
+        "height": 0.019339242546333603
+      }
+    },
+    {
+      "key": "Leadership",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.5774793388429752,
+        "y": 0.5930701047542305,
+        "width": 0.01756198347107438,
+        "height": 0.016921837228041903
+      }
+    },
+    {
+      "key": "Temperament",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.5769628099173554,
+        "y": 0.6091861402095085,
+        "width": 0.01756198347107438,
+        "height": 0.016921837228041903
+      }
+    },
+    {
+      "key": "Professionalism",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.5785123966942148,
+        "y": 0.6244963738920226,
+        "width": 0.015495867768595042,
+        "height": 0.017727639000805803
+      }
+    },
+    {
+      "key": "Acceleration",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.8223140495867769,
+        "y": 0.5278001611603546,
+        "width": 0.014462809917355372,
+        "height": 0.017727639000805803
+      }
+    },
+    {
+      "key": "Agility",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.8212809917355371,
+        "y": 0.5447219983883964,
+        "width": 0.017045454545454544,
+        "height": 0.014504431909750202
+      }
+    },
+    {
+      "key": "Balance",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.8207644628099173,
+        "y": 0.5600322320709106,
+        "width": 0.01756198347107438,
+        "height": 0.016116035455278
+      }
+    },
+    {
+      "key": "Speed",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.8207644628099173,
+        "y": 0.5745366639806607,
+        "width": 0.01652892561983471,
+        "height": 0.018533440773569703
+      }
+    },
+    {
+      "key": "Stamina",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.8202479338842975,
+        "y": 0.5930701047542305,
+        "width": 0.01859504132231405,
+        "height": 0.017727639000805803
+      }
+    },
+    {
+      "key": "Strength",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.8212809917355371,
+        "y": 0.6083803384367445,
+        "width": 0.014979338842975207,
+        "height": 0.016116035455278
+      }
+    },
+    {
+      "key": "Fighting",
+      "group": "attribute",
+      "kind": "integer",
+      "bounds": {
+        "x": 0.8223140495867769,
+        "y": 0.6236905721192587,
+        "width": 0.014462809917355372,
+        "height": 0.020145044319097503
+      }
+    },
+    {
+      "key": "Consensus Scouting Ability",
+      "group": "other",
+      "kind": "float",
+      "bounds": {
+        "x": 0.05526859504132232,
+        "y": 0.43352135374697826,
+        "width": 0.01859504132231405,
+        "height": 0.024174053182917002
+      }
+    },
+    {
+      "key": "Team Scouting Ability",
+      "group": "other",
+      "kind": "float",
+      "bounds": {
+        "x": 0.05475206611570248,
+        "y": 0.2771958098307816,
+        "width": 0.02066115702479339,
+        "height": 0.018533440773569703
+      }
+    }
+  ]
+}

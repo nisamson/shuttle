@@ -150,6 +150,14 @@ orchestration host.
 - **`Shuttle.Backend.Aspire`** — .NET Aspire AppHost that orchestrates `shuttle-api`,
   wiring it to Azure SQL and Application Insights and publishing it
   as an Azure App Service website. Run this project for local orchestration.
+- **`Shuttle.Fhm.Vision`** — **Windows-only** (`net10.0-windows`) console/WinForms tool that
+  captures Franchise Hockey Manager (FHM) player-info screens and extracts their attribute and
+  role ratings via **region-based OCR** into a local **SQLite** database (screenshots saved
+  alongside). It monitors the FHM window (auto-detected or by `--pid`), uses a JSON **layout
+  profile** of ratio-based field regions (authored with the interactive `calibrate` editor), and
+  de-duplicates captures by content hash. OCR is pluggable behind `IOcrEngine`; the default is the
+  built-in `Windows.Media.Ocr` engine. Standalone (not part of the cross-platform build/orchestration)
+  and provides the data-collection stage for a future ratings→roles model. See its `README.md`.
 - **`Shuttle.Tests`** — the test project (see Test section below).
 
 ### Cross-cutting notes

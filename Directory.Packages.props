@@ -68,7 +68,7 @@
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.3" />
     <PackageVersion Include="Microsoft.Extensions.Http.Polly" Version="10.0.3" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.1.0" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.1.0" />
     <PackageVersion Include="Microsoft.Identity.Web" Version="$(MicrosoftIdentityWebVersion)" />
     <PackageVersion Include="Microsoft.Identity.Web.UI" Version="$(MicrosoftIdentityWebVersion)" />
