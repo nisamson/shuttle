@@ -43,6 +43,12 @@
 .PARAMETER SkipPublish
     Skip `dotnet publish` and deploy whatever is already in the publish output directory.
 
+.PARAMETER SkipWorkloadRestore
+    Skip the `dotnet workload restore` step that ensures the `wasm-tools` workload is installed.
+    Without that workload, `dotnet publish` silently falls back to the prebuilt runtime (no native
+    relinking), producing a larger WASM payload. Use this only when you know the workload is already
+    present (e.g. to save time locally) or are deploying pre-built artifacts with -SkipPublish.
+
 .PARAMETER DryRun
     Validate only: publish the app (unless -SkipPublish) but skip deployment token resolution and
     the SWA deploy call. Touches no Azure resources and needs no token or 'az login'. Useful for a
@@ -71,6 +77,7 @@ param(
     [string]$Environment = "production",
     [string]$Configuration = "Release",
     [switch]$SkipPublish,
+    [switch]$SkipWorkloadRestore,
     [switch]$DryRun
 )
 
@@ -86,6 +93,19 @@ if (-not (Test-Path $project)) {
 }
 
 if (-not $SkipPublish) {
+    if (-not $SkipWorkloadRestore) {
+        # Ensure the wasm-tools workload is present so `dotnet publish` performs native runtime
+        # relinking (emcc -Oz). Without it, publish falls back to the prebuilt dotnet.native.wasm
+        # (~2x larger) and only IL-trims, inflating the download. `workload restore` is idempotent
+        # and a no-op once the workload is installed.
+        Write-Host "Restoring .NET workloads (wasm-tools) for native relinking..." -ForegroundColor Cyan
+        dotnet workload restore $project
+        if ($LASTEXITCODE -ne 0) {
+            throw "dotnet workload restore failed with exit code $LASTEXITCODE. " +
+                "Install manually with 'dotnet workload install wasm-tools' or pass -SkipWorkloadRestore."
+        }
+    }
+
     Write-Host "Publishing Shuttle.WebClient ($Configuration)..." -ForegroundColor Cyan
     dotnet publish $project -c $Configuration
     if ($LASTEXITCODE -ne 0) {
