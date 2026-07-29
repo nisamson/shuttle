@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Numerics;
 
 namespace Shuttle.Fhm.Vision.Recognition;
@@ -6,21 +5,39 @@ namespace Shuttle.Fhm.Vision.Recognition;
 /// <summary>
 /// A fixed-size, normalized monochrome glyph: a row-major bit per pixel, set where there is ink (text).
 /// Used both as a template and as a candidate to classify by nearest neighbour. Pixels are stored packed
-/// (a <see cref="BitArray"/> plus a cached 32-bit-word view) so the hot-path <see cref="Distance"/> is a
-/// XOR + population count over words rather than a per-pixel loop.
+/// into 32-bit words so the hot-path <see cref="Distance"/> is a XOR + population count over words rather
+/// than a per-pixel loop.
 /// </summary>
 public sealed class GlyphBitmap {
-    private readonly int[] words;
+    private const int BitsPerWord = 32;
 
-    public GlyphBitmap(int width, int height, bool[] pixels)
-        : this(width, height, BuildBits(width, height, pixels)) {
-    }
+    private readonly uint[] words;
 
-    private GlyphBitmap(int width, int height, BitArray bits) {
+    public GlyphBitmap(int width, int height, bool[] pixels) {
+        ValidateSize(width, height);
+        ArgumentNullException.ThrowIfNull(pixels);
+        if (pixels.Length != width * height) {
+            throw new ArgumentException($"Expected {width * height} pixels, got {pixels.Length}.", nameof(pixels));
+        }
+
         Width = width;
         Height = height;
-        Bits = bits;
-        words = ToWords(bits);
+        Length = pixels.Length;
+        words = new uint[WordCount(Length)];
+        for (var i = 0; i < pixels.Length; i++) {
+            if (pixels[i]) {
+                words[i / BitsPerWord] |= 1u << (i % BitsPerWord);
+            }
+        }
+
+        InkCount = PopCount(words);
+    }
+
+    private GlyphBitmap(int width, int height, int length, uint[] words) {
+        Width = width;
+        Height = height;
+        Length = length;
+        this.words = words;
         InkCount = PopCount(words);
     }
 
@@ -28,14 +45,19 @@ public sealed class GlyphBitmap {
 
     public int Height { get; }
 
-    /// <summary>The packed pixel bits (row-major), <c>true</c> where there is ink.</summary>
-    public BitArray Bits { get; }
-
     /// <summary>Number of pixels (<see cref="Width"/> * <see cref="Height"/>).</summary>
-    public int Length => Bits.Length;
+    public int Length { get; }
 
     /// <summary>Reads a single row-major pixel; <c>true</c> where there is ink.</summary>
-    public bool this[int index] => Bits[index];
+    public bool this[int index] {
+        get {
+            if ((uint)index >= (uint)Length) {
+                throw new ArgumentOutOfRangeException(nameof(index));
+            }
+
+            return (words[index / BitsPerWord] & (1u << (index % BitsPerWord))) != 0;
+        }
+    }
 
     /// <summary>Number of ink pixels (used to reject noise/empty glyphs).</summary>
     public int InkCount { get; }
@@ -55,7 +77,7 @@ public sealed class GlyphBitmap {
         var a = words;
         var b = other.words;
         for (var i = 0; i < a.Length; i++) {
-            distance += BitOperations.PopCount((uint)(a[i] ^ b[i]));
+            distance += BitOperations.PopCount(a[i] ^ b[i]);
         }
 
         return distance;
@@ -63,9 +85,9 @@ public sealed class GlyphBitmap {
 
     /// <summary>Serializes the pixels as a run of <c>'1'</c>/<c>'0'</c> characters (row-major).</summary>
     public string ToBitString() {
-        var chars = new char[Bits.Length];
-        for (var i = 0; i < chars.Length; i++) {
-            chars[i] = Bits[i] ? '1' : '0';
+        var chars = new char[Length];
+        for (var i = 0; i < Length; i++) {
+            chars[i] = this[i] ? '1' : '0';
         }
 
         return new string(chars);
@@ -79,41 +101,27 @@ public sealed class GlyphBitmap {
             throw new ArgumentException($"Expected {width * height} bits, got {bits.Length}.", nameof(bits));
         }
 
-        var array = new BitArray(bits.Length);
+        var words = new uint[WordCount(bits.Length)];
         for (var i = 0; i < bits.Length; i++) {
             if (bits[i] == '1') {
-                array[i] = true;
+                words[i / BitsPerWord] |= 1u << (i % BitsPerWord);
             }
         }
 
-        return new GlyphBitmap(width, height, array);
+        return new GlyphBitmap(width, height, bits.Length, words);
     }
 
-    private static BitArray BuildBits(int width, int height, bool[] pixels) {
-        ValidateSize(width, height);
-        ArgumentNullException.ThrowIfNull(pixels);
-        if (pixels.Length != width * height) {
-            throw new ArgumentException($"Expected {width * height} pixels, got {pixels.Length}.", nameof(pixels));
-        }
-
-        return new BitArray(pixels);
-    }
+    private static int WordCount(int length) => (length + BitsPerWord - 1) / BitsPerWord;
 
     private static void ValidateSize(int width, int height) {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(width, 0);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(height, 0);
     }
 
-    private static int[] ToWords(BitArray bits) {
-        var packed = new int[(bits.Length + 31) / 32];
-        bits.CopyTo(packed, 0);
-        return packed;
-    }
-
-    private static int PopCount(int[] words) {
+    private static int PopCount(uint[] words) {
         var count = 0;
         foreach (var word in words) {
-            count += BitOperations.PopCount((uint)word);
+            count += BitOperations.PopCount(word);
         }
 
         return count;
