@@ -410,7 +410,9 @@ public partial class ScoutingBoard : ComponentBase {
         var existing = board?.Entries.Select(e => e.PlayerId).ToHashSet() ?? [];
         var dialogResult = await DialogService.ShowDialogAsync<ScoutingBulkAddDialog>(options => {
             options.Modal = true;
-            options.Width = "640px";
+            // Grow to fill wide screens (better room for the resolved-preview grid) while staying
+            // within the viewport on narrow ones.
+            options.Width = "min(1000px, 92vw)";
             options.Parameters.Add(nameof(ScoutingBulkAddDialog.Content), new ScoutingBulkAddDialog.Args {
                 ExistingPlayerIds = existing,
             });

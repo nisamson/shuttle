@@ -12,8 +12,9 @@ namespace Shuttle.WebClient.Components.Scouting;
 /// <summary>
 /// Dialog for bulk-adding players to a scouting board. The user pastes player names and/or ids (one
 /// per line); the dialog resolves them via <c>QUERY /players/lookup</c> and shows a preview of the
-/// matched players (plus any not-found or ambiguous inputs) before the caller commits the add. It
-/// closes with the resolved player ids, leaving the caller to perform the bulk add.
+/// matched players (plus any not-found or ambiguous inputs) before the caller commits the add. The
+/// footer's "Add players" action resolves the input if needed and then closes with the resolved
+/// player ids, leaving the caller to perform the bulk add.
 /// </summary>
 public partial class ScoutingBulkAddDialog : FluentDialogInstance {
     [Inject] private IShuttlePlayerClient PlayerClient { get; set; } = null!;
@@ -50,23 +51,33 @@ public partial class ScoutingBulkAddDialog : FluentDialogInstance {
     // user is nudged to disambiguate (by id) rather than silently dropping an ambiguous name.
     private bool CanAdd => result is not null && result.Ambiguous.Count == 0 && result.Resolved.Count > 0;
 
-    private string AddButtonLabel {
-        get {
-            var count = result?.Resolved.Count ?? 0;
-            return count > 0 ? $"Add {count} player{(count == 1 ? string.Empty : "s")}" : "Add players";
-        }
-    }
-
     protected override void OnInitializeDialog(DialogOptionsHeader header, DialogOptionsFooter footer) {
         header.Title = "Bulk add players";
-        // The add flow closes via the in-body "Add" button; the footer only offers a way to back out.
-        footer.PrimaryAction.Visible = false;
+        // "Add players" (primary) sits next to "Close" (secondary) in the footer; it resolves the
+        // pasted input if the user hasn't previewed yet, then commits the add when everything resolves.
+        footer.PrimaryAction.Visible = true;
+        footer.PrimaryAction.Label = "Add players";
         footer.SecondaryAction.Visible = true;
         footer.SecondaryAction.Label = "Close";
     }
 
     protected override async Task OnActionClickedAsync(bool primary) {
-        await DialogInstance.CancelAsync();
+        if (!primary) {
+            await DialogInstance.CancelAsync();
+            return;
+        }
+
+        // Resolve on demand so the user can add straight from the paste box without first clicking
+        // "Resolve preview". If anything is ambiguous (or nothing resolved), stay open so the body can
+        // surface the ambiguity/warnings instead of silently dropping input.
+        if (result is null && !string.IsNullOrWhiteSpace(rawText)) {
+            await ResolveAsync();
+        }
+
+        if (CanAdd && result is not null) {
+            var ids = result.Resolved.Select(r => r.PlayerId).ToList();
+            await DialogInstance.CloseAsync(new Result { PlayerIds = ids });
+        }
     }
 
     private async Task ResolveAsync() {
@@ -111,13 +122,11 @@ public partial class ScoutingBulkAddDialog : FluentDialogInstance {
         return trimmed.Length == 0 ? id : $"{trimmed}\n{id}";
     }
 
-    private async Task AddAsync() {
-        if (!CanAdd || result is null) {
-            return;
-        }
-
-        var ids = result.Resolved.Select(r => r.PlayerId).ToList();
-        await DialogInstance.CloseAsync(new Result { PlayerIds = ids });
+    // Clears a stale preview when the paste box changes, so a subsequent "Add players" re-resolves the
+    // edited input rather than committing the previous resolution.
+    private void InvalidatePreview() {
+        result = null;
+        resolveError = null;
     }
 
     // Splits the textarea into ids and names: a line that parses as a positive integer is treated as a
