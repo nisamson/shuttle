@@ -30,6 +30,22 @@ public partial class ScoutingBulkAddDialog : FluentDialogInstance {
 
     private IQueryable<PlayerLookupMatch> ResolvedRows => (result?.Resolved ?? []).AsQueryable();
 
+    // Built-in FluentDataGrid client-side sorts over the resolved preview rows. Position sorts by the
+    // raw PlayerPosition enum value to match the server's ordering (see PlayerController), and every
+    // sort adds a PlayerId tiebreak so ties keep a stable order. Kept internal so the ordering is
+    // unit-testable via GridSort.Apply without rendering the FluentUI dialog host.
+    internal static readonly GridSort<PlayerLookupMatch> NameSort =
+        GridSort<PlayerLookupMatch>.ByAscending(p => p.Name).ThenAscending(p => p.PlayerId);
+
+    internal static readonly GridSort<PlayerLookupMatch> PositionSort =
+        GridSort<PlayerLookupMatch>.ByAscending(p => p.Position).ThenAscending(p => p.PlayerId);
+
+    internal static readonly GridSort<PlayerLookupMatch> DraftSeasonSort =
+        GridSort<PlayerLookupMatch>.ByAscending(p => p.DraftSeason).ThenAscending(p => p.PlayerId);
+
+    internal static readonly GridSort<PlayerLookupMatch> TotalTpeSort =
+        GridSort<PlayerLookupMatch>.ByAscending(p => p.TotalTpe).ThenAscending(p => p.PlayerId);
+
     // Enabled only once resolution succeeded with at least one player and no ambiguous names, so the
     // user is nudged to disambiguate (by id) rather than silently dropping an ambiguous name.
     private bool CanAdd => result is not null && result.Ambiguous.Count == 0 && result.Resolved.Count > 0;
