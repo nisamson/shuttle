@@ -403,7 +403,7 @@
       }
     },
     {
-      "key": "Poiint Shooter",
+      "key": "Point Shooter",
       "group": "role",
       "kind": "integer",
       "bounds": {
