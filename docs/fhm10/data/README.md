@@ -2,8 +2,9 @@
 
 [Kaitai Struct](https://kaitai.io) (`.ksy`) descriptions of the
 Franchise Hockey Manager 10 save-folder `*.dat` binary formats. These specs
-describe **only the on-disk wire format** so the files can be parsed by any
-Kaitai-supported language.
+describe the on-disk wire format so the files can be parsed by any
+Kaitai-supported language. The structure of the save files was determined through
+byte-comparison of save files after changes in-game.
 
 ## Format basics
 
