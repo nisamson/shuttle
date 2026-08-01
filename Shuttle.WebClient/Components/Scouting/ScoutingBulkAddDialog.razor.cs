@@ -57,6 +57,9 @@ public partial class ScoutingBulkAddDialog : FluentDialogInstance {
         // pasted input if the user hasn't previewed yet, then commits the add when everything resolves.
         footer.PrimaryAction.Visible = true;
         footer.PrimaryAction.Label = "Add players";
+        // The dialog is dominated by a multi-line paste box, so Enter must insert a newline rather
+        // than submit; clearing the default "Enter" shortcut stops it triggering the add.
+        footer.PrimaryAction.ShortCut = string.Empty;
         footer.SecondaryAction.Visible = true;
         footer.SecondaryAction.Label = "Close";
     }
