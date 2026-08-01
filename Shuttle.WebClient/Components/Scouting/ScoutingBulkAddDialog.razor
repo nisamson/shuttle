@@ -53,7 +53,7 @@
 
             @if (result.Resolved.Count > 0) {
                 <FluentText Weight="TextWeight.Bold">@result.Resolved.Count player(s) resolved</FluentText>
-                <FluentDataGrid Items="@ResolvedRows" TGridItem="PlayerLookupMatch" ResizableColumns="true">
+                <FluentDataGrid Items="@ResolvedRows" TGridItem="PlayerLookupMatch">
                     <TemplateColumn Title="Player" TGridItem="PlayerLookupMatch" Sortable="true" SortBy="@NameSort">
                         <ShuttleLink Href="@Routes.Players.Player(context.PlayerId)" target="_blank" rel="noopener noreferrer">@context.Name</ShuttleLink>
                         @if (Content.ExistingPlayerIds.Contains(context.PlayerId)) {
