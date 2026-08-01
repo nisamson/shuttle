@@ -35,15 +35,14 @@ seq:
 types:
   tactic_system:
     doc: |
-      One selectable tactic system for a given tactical zone. Serialized by
-      `TacticPreset_writeToStream` (@140662320) in field order p[1], p[0],
-      name(p+2), p[4], p[5].
+      One selectable tactic system for a given tactical zone. Serialized in
+      field order: global_id, zone_group_id, name, rating_a, rating_b.
     seq:
       - id: global_id
         type: s4
         doc: |
-          Globally-unique sequential id (0..num_records-1 in the save;
-          in-memory p[1] @0x04). This is the value a team's per-zone tactic
+          Globally-unique sequential id (0..num_records-1 in the save).
+          This is the value a team's per-zone tactic
           selector stores in teams.dat (confirmed by byte-diff: an in-game
           Cycle->Triangle OZ-attack change flipped the selector 12 -> 16, the
           global_ids of those two systems, not their within-group ordinals
@@ -53,7 +52,7 @@ types:
         enum: tactic_zone
         doc: |
           Tactical zone this system belongs to (0..11), confirmed against the
-          in-game tactics screen (in-memory p[0] @0x00). Records are grouped
+          in-game tactics screen. Records are grouped
           contiguously by this value; a zone's selector byte in teams.dat
           indexes the members that share this id. The file is ordered by
           strength state then phase of play. Member counts per group in the
@@ -68,14 +67,14 @@ types:
       - id: rating_a
         type: s4
         doc: |
-          Aggressiveness / risk descriptor, 1..5 (in-memory p[4] @0x10).
+          Aggressiveness / risk descriptor, 1..5.
           Strongly evidenced by self-describing groups, e.g. group 8:
           "Pursue Aggressively"=5, "Stand your Ground"=3, "Back Up"=1; group 11:
           "Counterattack"=5, "Puck Possession"=3, "Dump and Retreat"=1.
       - id: rating_b
         type: s4
         doc: |
-          Second 1..5 descriptor (in-memory p[5] @0x14): a
+          Second 1..5 descriptor: a
           spread-vs-compactness axis. High (5) = the system spreads players
           across the ice (perimeter / passive-deep / wide coverage); low (1) =
           it collapses toward the puck or net (tight / direct / net-front).

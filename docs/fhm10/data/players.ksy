@@ -39,11 +39,10 @@ types:
   # ---- Confirmed record sub-structures (reference / documentation only) ----
 
   # The 58 one-byte rating attributes (values 0..50, almost always 0..20).
-  # Listed here in their exact on-disk read order, which is a fixed scramble of
-  # the in-memory offsets 0x2c0..0x2f9 (hidden attributes first, then visible
-  # mental/physical, then on-ice skill and goalie attributes). A skater row
-  # fills only skater attributes and a goaltender row only goalie attributes;
-  # the unused subset reads 0.
+  # Listed here in their exact on-disk read order (hidden attributes first, then
+  # visible mental/physical, then on-ice skill and goalie attributes). A skater
+  # row fills only skater attributes and a goaltender row only goalie
+  # attributes; the unused subset reads 0.
   rating_attributes:
     seq:
       - id: big_games

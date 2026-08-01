@@ -31,7 +31,7 @@ types:
       - id: record_index
         type: s4
     seq:
-      - id: unknown_738
+      - id: unknown_1
         type: s4
         -doc: opaque
       - id: team_id
@@ -40,56 +40,56 @@ types:
         type: fhm_common::qstring
       - id: name_2
         type: fhm_common::qstring
-      - id: flag_750
+      - id: flag_1
         type: u1
         -doc: opaque
       - id: name_3
         type: fhm_common::qstring
       - id: name_4
         type: fhm_common::qstring
-      - id: flag_768
+      - id: flag_2
         type: u1
         -doc: opaque
-      - id: unknown_4a8
+      - id: unknown_2
         type: s4
         -doc: opaque
-      - id: unknown_4ac
+      - id: unknown_3
         type: s4
         -doc: opaque
-      - id: unknown_76c
+      - id: unknown_4
         type: s4
         -doc: opaque
-      - id: unknown_770
+      - id: unknown_5
         type: s4
         -doc: opaque
-      - id: unknown_774
+      - id: unknown_6
         type: s4
         -doc: opaque
-      - id: unknown_778
+      - id: unknown_7
         type: s4
         -doc: opaque
-      - id: unknown_7b8
+      - id: unknown_8
         type: u2
         -doc: opaque
-      - id: unknown_7ba
+      - id: unknown_9
         type: u2
         -doc: opaque
-      - id: unknown_7bc
+      - id: unknown_10
         type: s4
         -doc: opaque
-      - id: unknown_7c8
+      - id: unknown_11
         type: s4
         -doc: opaque
-      - id: unknown_7cc
+      - id: unknown_12
         type: s4
         -doc: opaque
-      - id: unknown_7d0
+      - id: unknown_13
         type: s4
         -doc: opaque
-      - id: unknown_7c0
+      - id: unknown_14
         type: s4
         -doc: opaque
-      - id: unknown_7c4
+      - id: unknown_15
         type: s4
         -doc: opaque
       - id: tactics_count
@@ -136,7 +136,7 @@ types:
       the 21 line-units); each block = 8 BE u2 values (0..4, alphabetical) + 8 u1
       per-tendency override toggles (0/1), and each line also has a separate
       per-line "use settings" u1 flag after its own selector array. NOTE: the
-      field breakdown below is an inferred Ghidra-derived guess and does not
+      field breakdown below is an inferred guess and does not
       match the observed on-disk layout; trust FHM10-teams-dat-format.md for the
       confirmed tendency/selector encoding.
     seq:
@@ -148,52 +148,52 @@ types:
         type: fhm_common::qstring
       - id: name_3
         type: fhm_common::qstring
-      - id: unknown_90
+      - id: unknown_16
         type: s4
         -doc: opaque
-      - id: unknown_94
+      - id: unknown_17
         type: s4
         -doc: opaque
-      - id: unknown_98
+      - id: unknown_18
         type: s4
         -doc: opaque
-      - id: unknown_9c
+      - id: unknown_19
         type: s4
         -doc: opaque
-      - id: unknown_a0
+      - id: unknown_20
         type: s4
         -doc: opaque
-      - id: flag_b0
+      - id: flag_3
         type: u1
         -doc: opaque
-      - id: flag_b2
+      - id: flag_4
         type: u1
         -doc: opaque
-      - id: flag_b1
+      - id: flag_5
         type: u1
         -doc: opaque
       - id: primary_slider_values
         size: 22
         -doc: opaque
-      - id: flag_e8
+      - id: flag_6
         type: u1
         -doc: opaque
-      - id: flag_e9
+      - id: flag_7
         type: u1
         -doc: opaque
-      - id: unknown_a4
+      - id: unknown_21
         type: s4
         -doc: opaque
-      - id: unknown_a8
+      - id: unknown_22
         type: s4
         -doc: opaque
-      - id: unknown_ac
+      - id: unknown_23
         type: s4
         -doc: opaque
-      - id: unknown_04
+      - id: unknown_24
         type: u2
         -doc: opaque
-      - id: unknown_06
+      - id: unknown_25
         type: s4
         -doc: opaque
       - id: paired_values_a
@@ -202,22 +202,22 @@ types:
       - id: paired_values_b
         size: 6
         -doc: opaque
-      - id: unknown_b8
+      - id: unknown_26
         type: s4
         -doc: opaque
-      - id: unknown_bc
+      - id: unknown_27
         type: s4
         -doc: opaque
-      - id: unknown_c0
+      - id: unknown_28
         type: u2
         -doc: opaque
       - id: paired_values_c
         size: 22
         -doc: opaque
-      - id: flag_b3
+      - id: flag_8
         type: u1
         -doc: opaque
-      - id: unknown_e6
+      - id: unknown_29
         type: u2
         -doc: opaque
       - id: zone_system_selectors
@@ -229,16 +229,16 @@ types:
       - id: unit_id
         type: u2
         -doc: Unit id or line index.
-      - id: unknown_02
+      - id: unknown_30
         type: s4
         -doc: opaque
       - id: leading_slots
         size: 42
         -doc: opaque
-      - id: unknown_32
+      - id: unknown_31
         type: s4
         -doc: opaque
-      - id: unknown_36
+      - id: unknown_32
         type: s4
         -doc: opaque
       - id: interleaved_slots
@@ -247,7 +247,7 @@ types:
       - id: slot_flags
         size: 17
         -doc: opaque
-      - id: unknown_08
+      - id: unknown_33
         type: u2
         -doc: opaque
 
