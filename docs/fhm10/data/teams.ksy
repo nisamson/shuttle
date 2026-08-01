@@ -125,6 +125,20 @@ types:
         -doc: End offset of this record in the observed container.
 
   tactic:
+    doc: |
+      Empirically (byte-diff of real saves): the 8 team-wide "Tactical Tendencies"
+      serialize as 8 consecutive big-endian u2 in ALPHABETICAL order —
+      Aggressiveness, Attacking, Backchecking, Hitting, Passing, Pressure,
+      Shooting, Tempo — each 0..4 (5-step UI slider; default 2). They sit just
+      after the 12-entry per-zone selector array (each selector = a global_id
+      into team_tactics.dat). The team-wide block is followed by a contiguous
+      array of 22 x 24-byte tendency blocks (block 0 = team-wide, blocks 1..21 =
+      the 21 line-units); each block = 8 BE u2 values (0..4, alphabetical) + 8 u1
+      per-tendency override toggles (0/1), and each line also has a separate
+      per-line "use settings" u1 flag after its own selector array. NOTE: the
+      field breakdown below is an inferred Ghidra-derived guess and does not
+      match the observed on-disk layout; trust FHM10-teams-dat-format.md for the
+      confirmed tendency/selector encoding.
     seq:
       - id: tactic_id
         type: s4
