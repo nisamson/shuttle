@@ -36,7 +36,7 @@ They are not version-gated across multiple save revisions.
 | `players.ksy` | `players.dat` | Container (`format_version`, `player_count`) parsed to EOF; player records kept opaque (no per-record length; full record order not pinned). Confirmed sub-structures documented as reference types (`rating_attributes`, `player_role_instance`, `special_ability_list`, `player_leading_fields`). |
 | `player_roles.ksy` | `player_roles.dat` | Full parse — 32 role records. |
 | `teams.ksy` | `teams.dat` | Full parse — 9 team records (embedded tactic + line-unit sub-types). |
-| `team_tactics.ksy` | `team_tactics.dat` | Full parse — 72 tactic presets. |
+| `team_tactics.ksy` | `team_tactics.dat` | Full parse — 72 built-in per-zone tactic-system options across 12 confirmed tactical-zone groups (`zone_group_id` enum). Static built-in catalogue (identical across `rs_one`/`rs_two` backups); supplies the per-zone system display names. |
 | `leagues.ksy` | `leagues.dat` | Full parse — 1 league (early fields decoded; league body opaque to EOF; single-league only, see the spec's LIMITATION note). |
 | `trade.ksy` | `trade.dat` | Full parse — container + reusable trade record types (0 records in the save). |
 | `trade_history.ksy` | `trade_history.dat` | Full parse — reuses `trade`'s history-entry type (0 records in the save). |
