@@ -1,0 +1,7 @@
+.players-pager {
+    width: 100%;
+}
+
+.players-pager ::deep .fluent-paginator {
+    width: 100%;
+}

@@ -1,0 +1,188 @@
+name: Release (Deploy to Production)
+
+# Manual-only production deployment. Deploys the stack in the required, non-negotiable order:
+#   1. Database migrations (Shuttle.EFCore) via dotnet-ef
+#   2. Backend (Shuttle.Api) via the Aspire AppHost -> Azure App Service
+#   3. SPA (Shuttle.WebClient, Blazor WASM) -> Azure Static Web Apps
+#
+# Auth is OIDC federated credentials (no stored client secret) — see docs/deployment-ci.md for the
+# one-time prerequisite setup (app registration, roles, prod DB user, secrets, environment).
+#
+# Check the 'dry_run' input to validate without changing anything: it lists migrations, emits the
+# idempotent migration SQL, runs `aspire publish`, and publishes the SPA — applying/deploying nothing
+# — and uploads the generated SQL + Aspire manifest as a 'release-dry-run' artifact for review.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy" to confirm a production deployment (ignored for a dry run).'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Dry run: connect + list migrations, aspire publish, and publish the SPA. Applies/deploys nothing.'
+        type: boolean
+        required: false
+        default: false
+
+# Never cancel an in-flight deployment; queue instead so a half-applied deploy can finish.
+concurrency:
+  group: release-production
+  cancel-in-progress: false
+
+permissions:
+  id-token: write   # required for azure/login OIDC token exchange
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  # Production Azure targets (source of truth: Shuttle.Backend.Aspire/appsettings.json + docs/deployment-ci.md)
+  AZURE_RESOURCE_GROUP: shlanalyticswest
+  AZURE_LOCATION: westus3
+  SWA_APP_NAME: shuttle-spa
+  # Prod database (dev is ShuttleDev). Migrations are applied out-of-band, never at app startup.
+  SHUTTLESQLSERVER_DATABASE: Shuttle
+  SHUTTLESQLSERVER_HOST: shuttle3.database.windows.net
+  # Aspire AppHost parameters that would otherwise be prompted for interactively.
+  UMI_NAME: shl-app-umi
+
+jobs:
+  deploy:
+    name: Deploy production stack
+    runs-on: ubuntu-latest
+    environment: production   # gated + branch-locked to main (see docs/deployment-ci.md)
+    steps:
+      - name: Guard against confirmation typo
+        if: ${{ inputs.dry_run != true && inputs.confirm != 'deploy' }}
+        run: |
+          echo "::error::Deployment not confirmed. Re-run and type 'deploy' in the confirm input (or check 'dry_run')."
+          exit 1
+
+      - name: Guard against non-main ref
+        if: ${{ github.ref != 'refs/heads/main' }}
+        env:
+          TRIGGER_REF: ${{ github.ref }}
+        run: |
+          echo "::error::Releases may only run from the main branch (got ${TRIGGER_REF})."
+          exit 1
+
+      # Third-party actions are pinned to full commit SHAs (not mutable tags) so a compromised
+      # upstream tag cannot inject code into this privileged production deploy. The trailing
+      # comment records the human-readable version each SHA corresponds to.
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+
+      - name: Azure login (OIDC)
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # dotnet-ef is pinned via the committed .config/dotnet-tools.json manifest (dotnet tool
+      # restore), and the SWA CLI via the committed package-lock.json (npm ci below). Only the
+      # Aspire CLI is installed ad-hoc, but with an explicit pinned version.
+      - name: Restore pinned .NET tools (dotnet-ef)
+        run: dotnet tool restore
+
+      - name: Install Aspire CLI (pinned)
+        run: |
+          dotnet tool install --global Aspire.Cli --version 13.4.6
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: Install pinned Node tooling (SWA CLI)
+        run: npm ci
+
+      # dotnet ef / aspire build the projects but do not restore first, so restore the whole
+      # solution once up front (also runs NuGetAudit, failing fast on vulnerable packages).
+      - name: Restore solution
+        run: dotnet restore
+
+      # ── Step 1: Database migrations (prod Shuttle DB) ────────────────────────────────
+      # DesignTimeContextFactory builds the connection from SHUTTLESQLSERVER_DATABASE/HOST
+      # (set above) and authenticates with ActiveDirectoryDefault, which resolves the OIDC
+      # service principal from the azure/login environment (see docs/deployment-ci.md).
+      # Assert the intended prod target from the env values we control, rather than parsing
+      # the connection string echoed by the design-time factory into the (public) build log.
+      - name: Verify production database target
+        run: |
+          if [ "$SHUTTLESQLSERVER_DATABASE" != "Shuttle" ] || \
+             [ "$SHUTTLESQLSERVER_HOST" != "shuttle3.database.windows.net" ]; then
+            echo "::error::Migration target is not the production Shuttle database."
+            exit 1
+          fi
+
+      - name: Migrations — list
+        run: |
+          dotnet ef migrations list \
+            --project Shuttle.EFCore --startup-project Shuttle.Api --no-color
+
+      # Dry run only: emit the idempotent SQL that `database update` would apply, for review.
+      # Uploaded as an artifact below. Applies nothing.
+      - name: Migrations — script (dry run)
+        if: ${{ inputs.dry_run == true }}
+        run: |
+          dotnet ef migrations script --idempotent --no-color \
+            --project Shuttle.EFCore --startup-project Shuttle.Api \
+            --output migration.sql
+
+      - name: Migrations — apply
+        if: ${{ inputs.dry_run != true }}
+        run: |
+          dotnet ef database update \
+            --project Shuttle.EFCore --startup-project Shuttle.Api
+
+      # ── Step 2: Backend (Aspire AppHost -> Azure App Service) ────────────────────────
+      # Reuses the existing deploy script (cleans bin/obj, then `aspire deploy`). Runs fully
+      # non-interactively: AppHost parameters and Azure provisioning config come from env
+      # (Parameters__* / Azure__*). Docker is preinstalled on ubuntu-latest; the image is
+      # built on the runner and pushed to ACR (SP has AcrPush). On a dry run the script runs
+      # `aspire publish` instead (generates the deployment manifest; mutates no Azure resources).
+      - name: Deploy backend (Shuttle.Api)
+        shell: pwsh
+        env:
+          Parameters__shuttleRg: ${{ env.AZURE_RESOURCE_GROUP }}
+          Parameters__appInsightsName: ${{ secrets.APP_INSIGHTS_NAME }}
+          Parameters__umiName: ${{ env.UMI_NAME }}
+          Azure__SubscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          Azure__TenantId: ${{ secrets.AZURE_TENANT_ID }}
+          Azure__ResourceGroup: ${{ env.AZURE_RESOURCE_GROUP }}
+          Azure__Location: ${{ env.AZURE_LOCATION }}
+          Azure__CredentialSource: AzureCli
+          Azure__AllowResourceGroupCreation: 'false'
+        run: ./scripts/Deploy-BackendAspire.ps1 ${{ inputs.dry_run == true && '-DryRun' || '' }} --non-interactive
+
+      # ── Step 3: SPA (Blazor WASM -> Azure Static Web Apps) ───────────────────────────
+      # Reuses the existing deploy script: dotnet publish -c Release, then SWA CLI deploy.
+      # The deployment token is fetched via `az staticwebapp secrets list` (SP is Contributor
+      # on the resource group), so no extra secret is required. On a dry run the script only
+      # publishes (validates the build) and skips token resolution + the SWA deploy.
+      - name: Deploy SPA (Shuttle.WebClient)
+        shell: pwsh
+        run: >
+          ./scripts/Deploy-WebClientSwa.ps1
+          ${{ inputs.dry_run == true && '-DryRun' || format('-AppName ''{0}'' -ResourceGroup ''{1}''', env.SWA_APP_NAME, env.AZURE_RESOURCE_GROUP) }}
+
+      # Dry run only: publish the generated review artifacts (idempotent migration SQL + the
+      # Aspire deployment manifest) so they can be inspected before a real deployment.
+      - name: Upload dry-run artifacts
+        if: ${{ inputs.dry_run == true }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-dry-run
+          path: |
+            migration.sql
+            Shuttle.Backend.Aspire/aspire-output/**
+          if-no-files-found: warn
+          retention-days: 7

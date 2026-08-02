@@ -1,0 +1,53 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div @ref="container" class="back-to-top">
+    <FluentButton Appearance="ButtonAppearance.Primary"
+                  Title="Back to the top"
+                  aria-label="Back to the top"
+                  OnClick="ScrollToTopAsync">
+        <FluentIcon Value="@(new Icons.Regular.Size24.ArrowUp())"/>
+        Back to the top
+    </FluentButton>
+</div>
+
+@code {
+    /// <summary>Scroll distance in pixels before the button appears.</summary>
+    [Parameter]
+    public int Threshold { get; set; } = 300;
+
+    private ElementReference container;
+    private IJSObjectReference? module;
+    private IJSObjectReference? instance;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender) {
+        if (!firstRender) {
+            return;
+        }
+
+        module = await JS.InvokeAsync<IJSObjectReference>(
+            "import", "./Components/BackToTopButton.razor.js");
+        instance = await module.InvokeAsync<IJSObjectReference>("initialize", container, Threshold);
+    }
+
+    private async Task ScrollToTopAsync() {
+        if (instance is not null) {
+            await instance.InvokeVoidAsync("scrollToTop");
+        }
+    }
+
+    public async ValueTask DisposeAsync() {
+        try {
+            if (instance is not null) {
+                await instance.InvokeVoidAsync("dispose");
+                await instance.DisposeAsync();
+            }
+
+            if (module is not null) {
+                await module.DisposeAsync();
+            }
+        } catch (JSDisconnectedException) {
+            // The circuit/runtime is already gone; nothing to clean up.
+        }
+    }
+}

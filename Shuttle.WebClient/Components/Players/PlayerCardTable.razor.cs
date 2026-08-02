@@ -1,0 +1,95 @@
+using Microsoft.AspNetCore.Components;
+using Microsoft.FluentUI.AspNetCore.Components;
+using Shuttle.Models.Players;
+using Shuttle.Shl.Api.Models.Portal.V1;
+using Shuttle.WebClient.Models;
+
+namespace Shuttle.WebClient.Components.Players;
+
+/// <summary>
+/// Reusable table that renders a list of <see cref="PlayerCard"/>s with links to each player's
+/// profile. When <see cref="SortChanged"/> is wired the sortable column headers become clickable and
+/// raise sort requests to the parent (server-side sorting); otherwise the headers are static, so the
+/// component can also present plain player lists elsewhere on the site.
+/// </summary>
+public partial class PlayerCardTable : ComponentBase {
+    /// <summary>The players to display.</summary>
+    [Parameter] public IReadOnlyList<PlayerCard>? Players { get; set; }
+
+    /// <summary>Whether a load is in progress (shows a spinner row).</summary>
+    [Parameter] public bool Loading { get; set; }
+
+    /// <summary>The currently active sort field, if any.</summary>
+    [Parameter] public PlayerSortField? SortField { get; set; }
+
+    /// <summary>Whether the active sort is descending.</summary>
+    [Parameter] public bool SortDescending { get; set; }
+
+    /// <summary>Raised when the user clicks a sortable header. When unset, sorting is disabled.</summary>
+    [Parameter] public EventCallback<PlayerTableSort> SortChanged { get; set; }
+
+    /// <summary>
+    /// When set, usernames belonging to this user id render as plain text instead of a profile link.
+    /// Used on the user profile page so a user's own players don't link back to the same page.
+    /// </summary>
+    [Parameter] public int? SuppressUserLinkFor { get; set; }
+
+    /// <summary>When <c>true</c>, renders a leading multi-select checkbox column.</summary>
+    [Parameter] public bool Selectable { get; set; }
+
+    /// <summary>The currently selected players (two-way bindable via <c>@bind-SelectedPlayers</c>).</summary>
+    [Parameter] public IEnumerable<PlayerCard> SelectedPlayers { get; set; } = [];
+
+    /// <summary>Raised when the selection changes.</summary>
+    [Parameter] public EventCallback<IEnumerable<PlayerCard>> SelectedPlayersChanged { get; set; }
+
+    private bool Sortable => SortChanged.HasDelegate;
+
+    // Per-column pixel minimums keep the table readable on mobile; fr shares expand it when there's room.
+    private const string BaseColumns =
+        "minmax(140px, 1.5fr) minmax(130px, 1.5fr) minmax(60px, 0.6fr) minmax(90px, 0.9fr) " +
+        "minmax(80px, 0.8fr) minmax(70px, 0.8fr) minmax(110px, 1fr) minmax(90px, 0.9fr) minmax(180px, 2fr)";
+
+    private string GridColumns => Selectable ? $"auto {BaseColumns}" : BaseColumns;
+
+    private string GridStyle => Selectable ? "min-width: 990px;" : "min-width: 950px;";
+
+    /// <summary>The rows rendered by the grid, in the order supplied by the parent (no local sorting).</summary>
+    private IQueryable<PlayerCard> Rows => (Players ?? []).AsQueryable();
+
+    private async Task ToggleSort(PlayerSortField field) {
+        if (!Sortable) {
+            return;
+        }
+
+        // Same column flips direction; a new column starts ascending.
+        var descending = SortField == field && !SortDescending;
+        await SortChanged.InvokeAsync(new PlayerTableSort(field, descending));
+    }
+
+    private string SortIndicator(PlayerSortField field) =>
+        SortField == field ? (SortDescending ? " \u25be" : " \u25b4") : string.Empty;
+
+    private static string PlayerRoute(int playerId) => Routes.Players.Player(playerId);
+
+    private static string UserRoute(int userId) => Routes.Users.User(userId);
+
+    private static BadgeColor StatusColor(PlayerStatus status) => status switch {
+        PlayerStatus.Active => BadgeColor.Success,
+        PlayerStatus.Retired => BadgeColor.Subtle,
+        PlayerStatus.Pending => BadgeColor.Warning,
+        PlayerStatus.Denied => BadgeColor.Danger,
+        _ => BadgeColor.Subtle,
+    };
+
+    private static string StatusText(PlayerStatus status) => status switch {
+        PlayerStatus.Active => "Active",
+        PlayerStatus.Retired => "Retired",
+        PlayerStatus.Pending => "Pending",
+        PlayerStatus.Denied => "Denied",
+        _ => status.ToString(),
+    };
+
+    /// <summary>A sort request raised by a column header.</summary>
+    public readonly record struct PlayerTableSort(PlayerSortField Field, bool Descending);
+}

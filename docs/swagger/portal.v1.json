@@ -1,0 +1,1961 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "description": "This is the API documentation for the Simulation Hockey League API. You can find out more about the SHL at [simulationhockey.com](https://simulationhockey.com/index.php). This API is a work in progress so expect future changes.",
+    "version": "1.0",
+    "title": "Simulation Hockey League",
+    "contact": {
+      "email": "simulationhockeysite@gmail.com"
+    },
+    "license": {
+      "name": "MIT License",
+      "url": "https://mit-license.org/"
+    }
+  },
+  "host": "portal.simulationhockey.com",
+  "basePath": "/api/v1",
+  "tags": [
+    {
+      "name": "Players"
+    },
+    {
+      "name": "Update Events"
+    },
+    {
+      "name": "TPE Events"
+    },
+    {
+      "name": "Bank"
+    },
+    {
+      "name": "Managers",
+      "description": "GM and Co-GM info for each team"
+    },
+    {
+      "name": "History",
+      "description": "Historical Data"
+    },
+    {
+      "name": "Hall of Fame",
+      "description": "Hall of Fame Data"
+    },
+    {
+      "name": "Referral",
+      "description": "Referral Data"
+    },
+    {
+      "name": "Analytics",
+      "description": "Analytics Data"
+    },
+    {
+      "name": "Landing Page",
+      "description": "Landing Page endpoints"
+    }
+  ],
+  "schemes": ["https", "http"],
+  "paths": {
+    "/player": {
+      "get": {
+        "tags": ["Players"],
+        "summary": "List of Players",
+        "description": "A listing of players, with attributes and related user information.",
+        "operationId": "getPlayers",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "pid",
+            "description": "Player Update ID",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "uid",
+            "description": "User ID",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "teamID",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "leagueID",
+            "description": "League ID: 0 = SHL, 1 =  SMJHL, 2 = IIHF. IIHF must be used in tandem with a teamID (IIHF country ID).",
+            "in": "query",
+            "type": "number",
+            "enum": [0, 1, 2]
+          },
+          {
+            "name": "teamRightsID",
+            "description": "SHL Rights Team ID",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "type": "string",
+            "enum": ["pending", "denied", "active", "retired"]
+          },
+          {
+            "name": "notStatus",
+            "in": "query",
+            "type": "string",
+            "enum": ["pending", "denied", "active", "retired"]
+          },
+          {
+            "name": "minSeason",
+            "description": "Lowest player Draft Season to return. Ex: a value of 70 will return 70 and above.",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "maxSeason",
+            "description": "Highest player Draft Season to return. Ex: a value of 70 will return 70 and below.",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "minAppliedTPE",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "maxAppliedTPE",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "sendDownsForTeam",
+            "description": "Takes an SHL Team ID and returns players eligible to be sent down to SMJHL",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "taskStatus",
+            "description": "Player Task Status Eligibility",
+            "in": "query",
+            "type": "number",
+            "enum": ["Draftee Free Agent", "SMJHL Rookie", "SHL/Send-down"]
+          },
+          {
+            "name": "draftSeason",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Player"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/updateevents": {
+      "get": {
+        "tags": ["Update Events"],
+        "summary": "List of Update Events",
+        "description": "Player update history for things like attributes, player data or status changes",
+        "operationId": "getUpdateEvents",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "pid",
+            "description": "Player Update ID",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "uid",
+            "description": "User ID",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "change",
+            "in": "query",
+            "type": "string",
+            "enum": [
+              "status",
+              "render",
+              "name",
+              "position",
+              "currentLeague",
+              "currentTeamID",
+              "shlRightsTeamID",
+              "any attribute name in camelCase"
+            ]
+          },
+          {
+            "name": "status",
+            "description": "Status of Update Event",
+            "in": "query",
+            "type": "string",
+            "enum": ["pending", "denied", "approved", "NotRequired"]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/UpdateEvent"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/updateevents/filework": {
+      "get": {
+        "tags": ["Update Events"],
+        "summary": "Filework API",
+        "description": "Filework API for use by Filework Team",
+        "operationId": "getFilework",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "pid",
+            "description": "Player Update ID",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "description": "League",
+            "in": "query",
+            "type": "string",
+            "enum": ["SHL", "SMJHL"]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/LastWeekUpdate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tpeevents": {
+      "get": {
+        "tags": ["TPE Events"],
+        "summary": "List of TPE Events",
+        "description": "Player TPE events for things like PTs, activity checks, trainings, coaching, regressions or retirement",
+        "operationId": "getTPEEvents",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "pid",
+            "description": "Player Update ID",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "uid",
+            "description": "User ID",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "taskGroupID",
+            "description": "Task Group ID",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/TPEEvent"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tpeevents/timeline": {
+      "get": {
+        "tags": ["TPE Events"],
+        "summary": "TPE Event Timeline",
+        "description": "Player TPE events over time, with a running total of earned TPE up to that date, grouped by day",
+        "operationId": "getTPETimeline",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "pid",
+            "description": "Player Update ID",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "peak",
+            "description": "Return only the players peak TPE",
+            "in": "query",
+            "type": "boolean"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/TPETimeline"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manager": {
+      "get": {
+        "tags": ["Managers"],
+        "summary": "Manager Info",
+        "description": "A list of Managers by league, or can be used as a check against a user to check which team they manager",
+        "operationId": "getManagers",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "uid",
+            "description": "User ID",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "description": "League ID",
+            "in": "query",
+            "type": "number",
+            "enum": [0, 1]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Managers"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bank/transactions/summary": {
+      "get": {
+        "tags": ["Bank"],
+        "summary": "Bank Transaction Summaries",
+        "description": "Returns a List of Bank Transactions, with a single summary record for Groups",
+        "operationId": "getTransactionSummaries",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "user",
+            "description": "User ID for Requester/Reviewer/Payee for Transaction",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "type",
+            "description": "Transaction Type",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "status",
+            "description": "Transaction Status",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "requester",
+            "description": "User ID for Requester",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "reviewer",
+            "description": "User ID for Reviewer",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "payee",
+            "description": "User ID for Payee",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "date",
+            "description": "Date for Requested/Reviewed/Paid date for Transaction",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "submitDate",
+            "description": "Date for Requested date for Transaction",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "approvedDate",
+            "description": "Date for Reviewed date for Transaction",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "teamID",
+            "description": "Team ID for Payee",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "description": "League for Payee",
+            "in": "query",
+            "type": "string",
+            "enum": ["SHL", "SMJHL"]
+          },
+          {
+            "name": "groupID",
+            "description": "Group ID for transactions",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "showCards",
+            "description": "To return card transactions. Will not return cards by default",
+            "in": "query",
+            "type": "boolean",
+            "enum": [true]
+          },
+          {
+            "name": "showActivities",
+            "description": "To return player activities such as training, seasonal coaching and redistribution. Will not return activities by default",
+            "in": "query",
+            "type": "boolean",
+            "enum": [true]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/BankTransactionSummary"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bank/transactions": {
+      "get": {
+        "tags": ["Bank"],
+        "summary": "Individual Bank Transaction or Group Transactions",
+        "description": "Returns either an individual transaction with an ID, or returns all transactions within a Group",
+        "operationId": "getTransactions",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "id",
+            "description": "Transaction ID",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "groupID",
+            "description": "Transaction Group ID",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/BankTransaction"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/history/achievement-info": {
+      "get": {
+        "tags": ["History"],
+        "summary": "Lookup Table for Achievements",
+        "description": "Lookup table that converts Achievement ID values to their name values",
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Achievements"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/history/draft": {
+      "get": {
+        "tags": ["History"],
+        "summary": "Historical Draft Data",
+        "description": "Historical Draft data including position, round, team, etc",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "pid",
+            "description": "Player Update ID",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "uid",
+            "description": "User ID",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "season",
+            "description": "Season Number",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "teamID",
+            "description": "Team ID (Requires leagueID as well)",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "leagueID",
+            "description": "User ID",
+            "in": "query",
+            "type": "number",
+            "enum": [0, 1]
+          },
+          {
+            "name": "isExpansion",
+            "description": "if it expansion draft or not: ex. seasons(5,10,25,46,56,60,75)",
+            "in": "query",
+            "type": "boolean",
+            "enum": [true, false]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Draft"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/history/player": {
+      "get": {
+        "tags": ["History"],
+        "summary": "Historical Player Achievement Data",
+        "description": "Historical Player Achievement data including nominations and awards won",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "pid",
+            "description": "Player Update ID",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "uid",
+            "description": "User ID",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "season",
+            "description": "Season Number",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "teamID",
+            "description": "Team ID (Requires leagueID as well)",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "leagueID",
+            "description": "User ID",
+            "in": "query",
+            "type": "number",
+            "enum": [0, 1, 2, 3]
+          },
+          {
+            "name": "achievementID",
+            "description": "Achievement ID (see /history/achievement-info) (Requires leagueID as well)",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "fhmID",
+            "description": "FHM ID (Requires leagueID as well)",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/PlayerAchievements"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/history/team": {
+      "get": {
+        "tags": ["History"],
+        "summary": "Historical Team Achievement Data",
+        "description": "Historical Team Achievement data including Cups and Medals",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "season",
+            "description": "Season Number",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "teamID",
+            "description": "Team ID (Requires leagueID as well)",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "leagueID",
+            "description": "User ID",
+            "in": "query",
+            "type": "number",
+            "enum": [0, 1, 2, 3]
+          },
+          {
+            "name": "achievementID",
+            "description": "Achievement ID (see /history/achievement-info) (Requires leagueID as well)",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/TeamAchievements"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/history/user-achievement": {
+      "get": {
+        "tags": ["History"],
+        "summary": "Historical User Achievement Data",
+        "description": "Historical User Achievement data including nominations and awards won. SHL & SMJHL Only",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "uid",
+            "description": "User ID",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "season",
+            "description": "Season Number",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "teamID",
+            "description": "Team ID (Requires leagueID as well)",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "leagueID",
+            "description": "league ID",
+            "in": "query",
+            "type": "number",
+            "enum": [0, 1]
+          },
+          {
+            "name": "achievementID",
+            "description": "Achievement ID (see /history/achievement-info) (Requires leagueID as well)",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/UserAchievements"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/HOF": {
+      "get": {
+        "tags": ["Hall of Fame"],
+        "summary": "Hall of Fame Data",
+        "description": "Historical Hall of Fame Data",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "hofID",
+            "description": "Hall of Fame ID for each player/user",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "playerID",
+            "description": "playerID",
+            "in": "query",
+            "type": "number",
+            "enum": [0, 1]
+          },
+          {
+            "name": "playerUpdateID",
+            "description": "playerUpateID or null if player was not in the portal",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "leagueID",
+            "description": "leagueID (pairs with playerID)",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "designation",
+            "description": "F(Forward), D(Defense), G(Goalie), GM, or Owner",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "seasonInducted",
+            "description": "season the player has been inducted",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/HOF"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/referrals": {
+      "get": {
+        "tags": ["Referral"],
+        "summary": "Referral Data for the user",
+        "description": "Referral Data for the user on the user page",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "uid",
+            "description": "User ID (required)",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Referral"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analytics/earned-tpe": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "TPE Earned",
+        "description": "TPE Earning endpoints for analytics page and team pages",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "playerUpdateID",
+            "description": "player ID of the user",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "season",
+            "description": "The Season the TPE is earned",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "currentLeague",
+            "description": "Current League the player is in",
+            "in": "query",
+            "type": "string",
+            "enum": ["SHL", "SMJHL"]
+          },
+          {
+            "name": "currentTeamID",
+            "description": "Team ID that the player is on and prospects the team is on (must be used in tandem with currentLeague)",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "draftSeason",
+            "description": "The Draft season the player is in",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "userID",
+            "description": "user ID of the user behind the player",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/tpe earned"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analytics/position-tracker": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Position Tracker",
+        "description": "Endpoint for the number of players in each position",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "currentLeague",
+            "description": "current League you want to query (SHL or SMJHL)",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "activeStatus",
+            "description": "active status of the player you want to query (active, inactive)",
+            "in": "query",
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/position-tracker"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analytics/team-tracker": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Team Tracker",
+        "description": "Endpoint for the average forward, defense, goalie, skaters(F+D), and team TPE for each team",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "currentLeague",
+            "description": "current League you want to query (SHL or SMJHL)",
+            "in": "query",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/team-tracker"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analytics/": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Weekly AC Training",
+        "description": "The leagues Activity Check & Weekly Training Data",
+        "produces": ["application/json"],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/weeklyACTraining"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/landing-page/checklist": {
+      "get": {
+        "tags": ["Landing Page"],
+        "summary": "Checklist",
+        "description": "Checklist for certain users",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "userID",
+            "description": "user ID of the user",
+            "in": "query",
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "description": "league for what tasks are for i.e (-1 is anyone can do. 0 is SHL only tasks. 1 is SMJHL only tasks",
+            "in": "query",
+            "type": "number",
+            "enum": [-1, 0, 1]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Checklist"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/landing-page/tasks": {
+      "get": {
+        "tags": ["Landing Page"],
+        "summary": "Tasks",
+        "description": "All Available Tasks",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "league",
+            "description": "league for what tasks are for i.e (-1 is anyone can do. 0 is SHL only tasks. 1 is SMJHL only tasks",
+            "in": "query",
+            "type": "number",
+            "enum": [-1, 0, 1]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Tasks"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "Player": {
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "number"
+        },
+        "username": {
+          "type": "string",
+          "example": "Forum Username"
+        },
+        "pid": {
+          "type": "number"
+        },
+        "creationDate": {
+          "type": "string"
+        },
+        "retirementDate": {
+          "type": "string",
+          "nullable": true
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "denied", "active", "retired"]
+        },
+        "name": {
+          "type": "string",
+          "example": "Player Name"
+        },
+        "position": {
+          "type": "string",
+          "enum": [
+            "Center",
+            "Left Wing",
+            "Right Wing",
+            "Goalie",
+            "Left Defense",
+            "Right Defense"
+          ]
+        },
+        "handedness": {
+          "type": "string",
+          "enum": ["Left", "Right"]
+        },
+        "recruiter": {
+          "type": "string",
+          "nullable": true
+        },
+        "render": {
+          "type": "string",
+          "nullable": true
+        },
+        "jerseyNumber": {
+          "type": "number"
+        },
+        "height": {
+          "type": "string"
+        },
+        "weight": {
+          "type": "number"
+        },
+        "birthplace": {
+          "type": "string"
+        },
+        "totalTPE": {
+          "type": "number"
+        },
+        "currentLeague": {
+          "type": "string",
+          "nullable": true,
+          "enum": ["SMJHL", "SHL"]
+        },
+        "currentTeamID": {
+          "type": "number",
+          "nullable": true
+        },
+        "shlRightsTeamID": {
+          "type": "number",
+          "nullable": true
+        },
+        "iihfNation": {
+          "type": "string",
+          "nullable": true
+        },
+        "draftSeason": {
+          "type": "number",
+          "nullable": true
+        },
+        "bankedTPE": {
+          "type": "number"
+        },
+        "appliedTPE": {
+          "type": "number"
+        },
+        "positionChanged": {
+          "type": "boolean"
+        },
+        "usedRedistribution": {
+          "type": "number"
+        },
+        "coachingPurchased": {
+          "type": "number"
+        },
+        "trainingPurchased": {
+          "type": "number"
+        },
+        "activityCheckComplete": {
+          "type": "boolean"
+        },
+        "trainingCampComplete": {
+          "type": "boolean"
+        },
+        "bankBalance": {
+          "type": "number"
+        },
+        "taskStatus": {
+          "type": "string",
+          "enum": ["Draftee Free Agent", "SMJHL Rookie", "SHL/Send-down"]
+        },
+        "attributes": {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/SkaterAttributes"
+            },
+            {
+              "$ref": "#/definitions/GoalieAttributes"
+            }
+          ]
+        }
+      }
+    },
+    "SkaterAttributes": {
+      "type": "object",
+      "properties": {
+        "screening": {
+          "type": "number"
+        },
+        "gettingOpen": {
+          "type": "number"
+        },
+        "passing": {
+          "type": "number"
+        },
+        "puckhandling": {
+          "type": "number"
+        },
+        "shootingAccuracy": {
+          "type": "number"
+        },
+        "shootingRange": {
+          "type": "number"
+        },
+        "offensiveRead": {
+          "type": "number"
+        },
+        "checking": {
+          "type": "number"
+        },
+        "hitting": {
+          "type": "number"
+        },
+        "positioning": {
+          "type": "number"
+        },
+        "stickchecking": {
+          "type": "number"
+        },
+        "shotBlocking": {
+          "type": "number"
+        },
+        "faceoffs": {
+          "type": "number"
+        },
+        "defensiveRead": {
+          "type": "number"
+        },
+        "acceleration": {
+          "type": "number"
+        },
+        "agility": {
+          "type": "number"
+        },
+        "balance": {
+          "type": "number"
+        },
+        "speed": {
+          "type": "number"
+        },
+        "strength": {
+          "type": "number"
+        },
+        "stamina": {
+          "type": "number"
+        },
+        "fighting": {
+          "type": "number"
+        },
+        "aggression": {
+          "type": "number"
+        },
+        "bravery": {
+          "type": "number"
+        },
+        "determination": {
+          "type": "number"
+        },
+        "teamPlayer": {
+          "type": "number"
+        },
+        "leadership": {
+          "type": "number"
+        },
+        "temperament": {
+          "type": "number"
+        },
+        "professionalism": {
+          "type": "number"
+        }
+      }
+    },
+    "GoalieAttributes": {
+      "type": "object",
+      "properties": {
+        "blocker": {
+          "type": "number"
+        },
+        "glove": {
+          "type": "number"
+        },
+        "passing": {
+          "type": "number"
+        },
+        "pokeCheck": {
+          "type": "number"
+        },
+        "positioning": {
+          "type": "number"
+        },
+        "rebound": {
+          "type": "number"
+        },
+        "recovery": {
+          "type": "number"
+        },
+        "puckhandling": {
+          "type": "number"
+        },
+        "lowShots": {
+          "type": "number"
+        },
+        "reflexes": {
+          "type": "number"
+        },
+        "skating": {
+          "type": "number"
+        },
+        "aggression": {
+          "type": "number"
+        },
+        "mentalToughness": {
+          "type": "number"
+        },
+        "determination": {
+          "type": "number"
+        },
+        "teamPlayer": {
+          "type": "number"
+        },
+        "leadership": {
+          "type": "number"
+        },
+        "goaltenderStamina": {
+          "type": "number"
+        },
+        "professionalism": {
+          "type": "number"
+        }
+      }
+    },
+    "UpdateEvent": {
+      "type": "object",
+      "properties": {
+        "eventID": {
+          "type": "number"
+        },
+        "playerUpdateID": {
+          "type": "number"
+        },
+        "attributeChanged": {
+          "type": "string",
+          "enum": [
+            "status",
+            "render",
+            "name",
+            "position",
+            "currentLeague",
+            "currentTeamID",
+            "shlRightsTeamID",
+            "any attribute name in camelCase"
+          ]
+        },
+        "oldValue": {
+          "type": "string",
+          "example": "Old Name"
+        },
+        "newValue": {
+          "type": "string",
+          "example": "New Name"
+        },
+        "eventDate": {
+          "type": "string",
+          "description": "Date Submitted"
+        },
+        "performedByID": {
+          "type": "number",
+          "description": "User ID of submitter"
+        },
+        "performedBy": {
+          "type": "string",
+          "description": "Username of submitter"
+        },
+        "approvedByID": {
+          "type": "number",
+          "nullable": true,
+          "description": "User ID of approver"
+        },
+        "approvedBy": {
+          "type": "string",
+          "nullable": true,
+          "description": "Username of approver"
+        },
+        "approvalDate": {
+          "type": "string",
+          "nullable": true,
+          "description": "Date of approval"
+        }
+      }
+    },
+    "LastWeekUpdate": {
+      "type": "object",
+      "properties": {
+        "playerUpdateID": { "type": "number" },
+        "name": { "type": "string" },
+        "currentLeague": { "type": "string", "enum": ["SHL", "SMJHL"] },
+        "team_name": { "type": "string" },
+        "attributeChanged": { "type": "string" },
+        "oldValue": { "type": "string" },
+        "newValue": { "type": "string" },
+        "eventDate": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "TPEEvent": {
+      "type": "object",
+      "properties": {
+        "taskID": {
+          "type": "number"
+        },
+        "pid": {
+          "type": "number"
+        },
+        "playerName": {
+          "type": "string",
+          "description": "Player Name"
+        },
+        "taskDescription": {
+          "type": "string"
+        },
+        "taskType": {
+          "type": "string"
+        },
+        "submissionDate": {
+          "type": "string",
+          "description": "Date Submitted"
+        },
+        "submittedByID": {
+          "type": "number",
+          "description": "User ID of submitter"
+        },
+        "submittedBy": {
+          "type": "string",
+          "description": "Username of submitter"
+        },
+        "taskGroupID": {
+          "type": "number",
+          "description": "Group ID for TPE Submissions"
+        }
+      }
+    },
+    "TPETimeline": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Player Name"
+        },
+        "taskDate": {
+          "type": "string"
+        },
+        "totalTPE": {
+          "type": "number",
+          "description": "A running total of TPE up to this records taskDate"
+        }
+      }
+    },
+    "Managers": {
+      "type": "object",
+      "properties": {
+        "leagueID": {
+          "type": "number"
+        },
+        "teamID": {
+          "type": "number"
+        },
+        "gmID": {
+          "type": "number"
+        },
+        "gmUsername": {
+          "type": "string"
+        },
+        "cogmID": {
+          "type": "number"
+        },
+        "cogmUsername": {
+          "type": "string"
+        }
+      }
+    },
+    "BankTransaction": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "uid": {
+          "type": "number"
+        },
+        "username": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "denied", "reversed", "completed"]
+        },
+        "type": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string",
+          "nullable": true
+        },
+        "amount": {
+          "type": "number"
+        },
+        "submitByID": {
+          "type": "number"
+        },
+        "submitBy": {
+          "type": "string"
+        },
+        "submitByDate": {
+          "type": "string"
+        },
+        "approvedByID": {
+          "type": "number",
+          "nullable": true
+        },
+        "approvedBy": {
+          "type": "string",
+          "nullable": true
+        },
+        "approvedDate": {
+          "type": "string",
+          "nullable": true
+        },
+        "groupID": {
+          "type": "number",
+          "nullable": true
+        },
+        "groupName": {
+          "type": "string",
+          "nullable": true
+        },
+        "reversedByID": {
+          "type": "number",
+          "nullable": true
+        },
+        "reversedBy": {
+          "type": "string",
+          "nullable": true
+        },
+        "reversedDate": {
+          "type": "string",
+          "nullable": true
+        }
+      }
+    },
+    "BankTransactionSummary": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "Individual Transaction ID or Group ID"
+        },
+        "recipient": {
+          "type": "string",
+          "description": "Denotes whether record represents an individual transaction or a Transaction Group",
+          "enum": ["GROUP", "INDIVIDUAL"]
+        },
+        "amount": {
+          "type": "number"
+        },
+        "type": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "denied", "reversed", "completed", "mixed"]
+        },
+        "name": {
+          "type": "string",
+          "description": "Either description (for individual transactions) or Group Name"
+        },
+        "submitBy": {
+          "type": "string"
+        },
+        "submitByDate": {
+          "type": "string"
+        },
+        "approvedBy": {
+          "type": "string",
+          "nullable": true
+        },
+        "approvedDate": {
+          "type": "string",
+          "nullable": true
+        },
+        "reversedBy": {
+          "type": "string",
+          "nullable": true
+        },
+        "reversedDate": {
+          "type": "string",
+          "nullable": true
+        }
+      }
+    },
+    "Achievements": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "Draft": {
+      "type": "object",
+      "properties": {
+        "playerUpdateID": {
+          "type": "number"
+        },
+        "playerName": {
+          "type": "string"
+        },
+        "userID": {
+          "type": "number"
+        },
+        "leagueID": {
+          "type": "number"
+        },
+        "seasonID": {
+          "type": "number"
+        },
+        "teamID": {
+          "type": "number"
+        },
+        "round": {
+          "type": "number"
+        },
+        "draftNumber": {
+          "type": "number"
+        },
+        "isExpansion": {
+          "type": "boolean"
+        }
+      }
+    },
+    "PlayerAchievements": {
+      "type": "object",
+      "properties": {
+        "playerUpdateID": {
+          "type": "number"
+        },
+        "playerName": {
+          "type": "string"
+        },
+        "fhmID": {
+          "type": "number"
+        },
+        "leagueID": {
+          "type": "number"
+        },
+        "seasonID": {
+          "type": "number"
+        },
+        "teamID": {
+          "type": "number"
+        },
+        "achievement": {
+          "type": "number"
+        },
+        "achievementName": {
+          "type": "string"
+        },
+        "achievementDescription": {
+          "type": "string"
+        },
+        "isAward": {
+          "type": "boolean",
+          "description": "Is this an individual award?"
+        },
+        "won": {
+          "type": "boolean",
+          "description": "For an individual award, did they win?"
+        }
+      }
+    },
+    "TeamAchievements": {
+      "type": "object",
+      "properties": {
+        "teamID": {
+          "type": "number"
+        },
+        "leagueID": {
+          "type": "number"
+        },
+        "seasonID": {
+          "type": "number"
+        },
+        "achievement": {
+          "type": "number"
+        },
+        "achievementName": {
+          "type": "string"
+        },
+        "achievementDescription": {
+          "type": "string"
+        }
+      }
+    },
+    "UserAchievements": {
+      "type": "object",
+      "properties": {
+        "userID": {
+          "type": "number"
+        },
+        "teamID": {
+          "type": "number"
+        },
+        "leagueID": {
+          "type": "number"
+        },
+        "seasonID": {
+          "type": "number"
+        },
+        "achievement": {
+          "type": "number"
+        },
+        "achievementName": {
+          "type": "string"
+        },
+        "achievementDescription": {
+          "type": "string"
+        }
+      }
+    },
+    "HOF": {
+      "type": "object",
+      "properties": {
+        "hofID": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "playerID": {
+          "type": "number"
+        },
+        "userID": {
+          "type": "number"
+        },
+        "playerUpdateID": {
+          "type": "number"
+        },
+        "leagueID": {
+          "type": "number"
+        },
+        "designation": {
+          "type": "string"
+        },
+        "bannerImage": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "seasonInducted": {
+          "type": "number"
+        }
+      }
+    },
+    "Referral": {
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "number"
+        },
+        "username": {
+          "type": "string"
+        },
+        "pid": {
+          "type": "number"
+        },
+        "creationDate": {
+          "type": "date"
+        },
+        "status": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "totalTPE": {
+          "type": "number"
+        }
+      }
+    },
+    "tpe earned": {
+      "type": "object",
+      "properties": {
+        "playerUpdateID": {
+          "type": "number"
+        },
+        "season": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "position": {
+          "type": "string"
+        },
+        "currentLeague": {
+          "type": "string",
+          "enum": ["SMJHL", "SHL"]
+        },
+        "currentTeamID": {
+          "type": "number"
+        },
+        "shlRightsTeamID": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string"
+        },
+        "draftSeason": {
+          "type": "number"
+        },
+        "userID": {
+          "type": "number"
+        },
+        "username": {
+          "type": "string"
+        },
+        "earnedTPE": {
+          "type": "number"
+        },
+        "rank": {
+          "type": "number"
+        },
+        "regression": {
+          "type": "number"
+        },
+        "activitycheck": {
+          "type": "number"
+        },
+        "training": {
+          "type": "number"
+        },
+        "trainingcamp": {
+          "type": "number"
+        },
+        "coaching": {
+          "type": "number"
+        },
+        "pt": {
+          "type": "number"
+        },
+        "fantasy": {
+          "type": "number"
+        },
+        "recruitment": {
+          "type": "number"
+        },
+        "correction": {
+          "type": "number"
+        },
+        "other": {
+          "type": "number"
+        }
+      }
+    },
+    "position-tracker": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "type": "string"
+        },
+        "total": {
+          "type": "number"
+        }
+      }
+    },
+    "team-tracker": {
+      "type": "object",
+      "properties": {
+        "currentTeamID": {
+          "type": "number"
+        },
+        "average_forward_tpe": {
+          "type": "number"
+        },
+        "average_defense_tpe": {
+          "type": "number"
+        },
+        "average_goalie_tpe": {
+          "type": "number"
+        },
+        "average_skater_tpe": {
+          "type": "number"
+        },
+        "average_tpe": {
+          "type": "number"
+        }
+      }
+    },
+    "weeklyACTraining": {
+      "type": "object",
+      "properties": {
+        "year": {
+          "type": "number"
+        },
+        "Week": {
+          "type": "number"
+        },
+        "ACNum": {
+          "type": "number"
+        },
+        "TrainingNum": {
+          "type": "number"
+        },
+        "WeekStartDate": {
+          "type": "date"
+        }
+      }
+    },
+    "Checklist": {
+      "type": "object",
+      "properties": {
+        "userID": {
+          "type": "number"
+        },
+        "playerUpdateID": {
+          "type": "number"
+        },
+        "tid": {
+          "type": "number"
+        },
+        "league": {
+          "type": "number",
+          "enum": [-1, 0, 1]
+        },
+        "subject": {
+          "type": "string"
+        },
+        "dueDate": {
+          "type": "string"
+        },
+        "complete": {
+          "type": "string"
+        }
+      }
+    },
+    "Tasks": {
+      "type": "object",
+      "properties": {
+        "tid": {
+          "type": "number"
+        },
+        "league": {
+          "type": "number",
+          "enum": [-1, 0, 1]
+        },
+        "fid": {
+          "type": "number"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "firstpost": {
+          "type": "number"
+        },
+        "dueDate": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "externalDocs": {
+    "description": "Find out more about Swagger",
+    "url": "http://swagger.io"
+  }
+}

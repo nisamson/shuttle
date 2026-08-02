@@ -1,0 +1,43 @@
+@page "/users"
+@using Shuttle.Models.Users
+@using Shuttle.WebClient.Components.Users
+
+<PageTitle>Users</PageTitle>
+
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="16">
+    <FluentText Size="TextSize.Size700" Weight="TextWeight.Bold">Users</FluentText>
+
+    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText>Jump to a user:</FluentText>
+        <FluentAutocomplete TOption="UserSuggestion"
+                            TValue="string"
+                            Width="320px"
+                            Placeholder="Search by username"
+                            OnOptionsSearch="OnJumpSearch"
+                            OptionText="@(u => u.Username)"
+                            OptionValue="@(u => u.UserId.ToString())"
+                            SelectedItem="jumpSelection"
+                            SelectedItemChanged="OnJumpSelected"/>
+    </FluentStack>
+
+    <UserSearchFilters OnSearch="OnSearch" OnReset="OnReset" Busy="loading" Initial="query" CanSearchDiscord="isAuthenticated"/>
+
+    @if (errorMessage is not null) {
+        <FluentText Color="Color.Error">@errorMessage</FluentText>
+    }
+
+    <div class="users-pager">
+        <FluentPaginator State="pagination" CurrentPageIndexChanged="OnPageChanged"/>
+    </div>
+
+    <UserCardTable Users="results"
+                   Loading="loading"
+                   ShowDiscord="isAuthenticated"
+                   SortField="query.SortBy"
+                   SortDescending="query.SortDescending"
+                   SortChanged="OnSortChanged"/>
+
+    <div class="users-pager">
+        <FluentPaginator State="pagination" CurrentPageIndexChanged="OnPageChanged"/>
+    </div>
+</FluentStack>

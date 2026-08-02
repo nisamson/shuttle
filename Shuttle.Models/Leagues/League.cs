@@ -1,0 +1,5 @@
+﻿namespace Shuttle.Models.Leagues;
+
+public record League(int Id, string Name, string Abbreviation);
+
+public record LeagueSeason(int Id, string Name, string Abbreviation, int Season) : League(Id, Name, Abbreviation);

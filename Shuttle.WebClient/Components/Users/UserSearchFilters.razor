@@ -1,0 +1,37 @@
+@using Shuttle.Models.Users
+
+<div class="user-filters">
+    <div class="filter-row">
+        <div class="filter-field grow">
+            <label>Username</label>
+            <FluentAutocomplete TOption="UserSuggestion"
+                                TValue="string"
+                                Width="100%"
+                                Placeholder="Search by username"
+                                OnOptionsSearch="OnNameSearch"
+                                OptionText="@(u => u.Username)"
+                                OptionValue="@(u => u.UserId.ToString())"
+                                SelectedItem="selectedUser"
+                                SelectedItemChanged="OnNameSelected"/>
+        </div>
+    </div>
+
+    @if (CanSearchDiscord) {
+        <div class="filter-field">
+            <FluentSwitch @bind-Value="searchDiscord">Also search Discord names</FluentSwitch>
+        </div>
+    }
+
+    <div class="filter-actions">
+        <FluentButton Appearance="ButtonAppearance.Primary" OnClick="SearchAsync" Disabled="Busy">Search</FluentButton>
+        <FluentButton Appearance="ButtonAppearance.Outline" OnClick="ResetAsync" Disabled="Busy">Reset</FluentButton>
+    </div>
+</div>
+
+@code {
+    private async Task OnKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e) {
+        if (e.Key == "Enter") {
+            await SearchAsync();
+        }
+    }
+}

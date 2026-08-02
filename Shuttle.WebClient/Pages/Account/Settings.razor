@@ -1,0 +1,51 @@
+@page "/account/settings"
+@using Microsoft.AspNetCore.Authorization
+@using Shuttle.WebClient.Models
+@attribute [Authorize]
+
+<PageTitle>Account Settings</PageTitle>
+
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="16">
+    <h1>Account Settings</h1>
+
+    @if (loading) {
+        <FluentSpinner/>
+    } else if (loadError is not null) {
+        <FluentMessageBar Title="Couldn't load your account" Intent="MessageBarIntent.Error">
+            @loadError
+        </FluentMessageBar>
+    } else {
+        <FluentCard Style="width: 100%; max-width: 32rem;">
+            <EditForm Model="model" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator/>
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="12">
+                    <div style="width: 100%;">
+                        <label>Account ID</label>
+                        <FluentText Block="true">@AccountId</FluentText>
+                    </div>
+
+                    <div style="width: 100%;">
+                        <label>Username</label>
+                        <FluentTextInput @bind-Value="model.Username" Style="width: 100%;"/>
+                        <ValidationMessage For="() => model.Username"/>
+                    </div>
+
+                    @if (saved) {
+                        <FluentMessageBar Title="Saved" Intent="MessageBarIntent.Success">
+                            Your username has been updated.
+                        </FluentMessageBar>
+                    }
+                    @if (saveError is not null) {
+                        <FluentMessageBar Title="Couldn't save" Intent="MessageBarIntent.Error">
+                            @saveError
+                        </FluentMessageBar>
+                    }
+
+                    <FluentButton Type="ButtonType.Submit" Appearance="ButtonAppearance.Primary" Disabled="saving">
+                        Save
+                    </FluentButton>
+                </FluentStack>
+            </EditForm>
+        </FluentCard>
+    }
+</FluentStack>

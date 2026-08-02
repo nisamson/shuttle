@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shuttle - The SHL Analysis Site</title>
+    <base href="/" />
+    <link rel="preload" id="webassembly" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" type="image/png" href="favicon.ico" />
+    <link href="Shuttle.WebClient.styles.css" rel="stylesheet" />
+    <script type="importmap"></script>
+    <script src="js/storageEvent.js"></script>
+    <script src="js/forceCacheBootResources.js"></script>
+</head>
+
+<body>
+    <div id="app">
+        <svg class="loading-progress">
+            <circle r="40%" cx="50%" cy="50%" />
+            <circle r="40%" cx="50%" cy="50%" />
+        </svg>
+        <div class="loading-progress-text"></div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss">🗙</span>
+    </div>
+    <!--
+      These _content scripts are cached with a bounded max-age by staticwebapp.config.json. They
+      load by their stable (non-fingerprinted) URL: the #[.{fingerprint}] placeholder is not
+      expanded for _content RCL assets, and classic <script> tags don't consult the importmap.
+      Caching turns a per-load 304 revalidation -- which blocks startup because these execute
+      before Blazor boots -- into a cache hit for the duration of the window. A bounded window
+      (rather than `immutable`) is used precisely because the URL is not fingerprinted, so a
+      redeploy that changes the file is still picked up once the window lapses.
+    -->
+    <script src="_content/Microsoft.Authentication.WebAssembly.Msal/AuthenticationService.js"></script>
+    <script src="_content/Plotly.Blazor/plotly-3.5.0.min.js"></script>
+    <script src="_content/Plotly.Blazor/plotly-interop-7.1.0.js"></script>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+</body>
+
+</html>

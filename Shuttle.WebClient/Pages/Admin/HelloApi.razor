@@ -1,0 +1,12 @@
+@page "/admin/hello"
+@using Microsoft.AspNetCore.Authorization
+@using Shuttle.WebClient.Components.Dev
+@using Shuttle.WebClient.Models
+@attribute [Authorize(Roles = RoleNames.Admin)]
+
+<PageTitle>Admin &mdash; API Check</PageTitle>
+
+<FluentStack Orientation="Orientation.Vertical">
+    <h1>API Check</h1>
+    <HelloApiView/>
+</FluentStack>

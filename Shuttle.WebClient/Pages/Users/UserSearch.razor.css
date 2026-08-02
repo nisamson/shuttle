@@ -1,0 +1,7 @@
+.users-pager {
+    width: 100%;
+}
+
+.users-pager ::deep .fluent-paginator {
+    width: 100%;
+}

@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+        <!--
+          Drop the ICU globalization payload from the WASM boot set: the app formats every
+          user-facing date/number with InvariantCulture (see DateDisplayExtensions and the USD
+          currency culture in PlayerProfile), so it needs no culture-specific data. This also makes
+          output identical for every visitor instead of varying with the browser's culture.
+        -->
+        <InvariantGlobalization>true</InvariantGlobalization>
+    </PropertyGroup>
+
+    <!--
+      Offline test run mode. In .NET 10 a standalone WASM app resolves its environment from the
+      boot manifest baked at build time (there is no reliable Blazor-Environment header from the
+      dev server), so we bake "Testing" into the app whenever the fake backend is requested. That
+      makes HostEnvironment.Environment == "Testing", which loads wwwroot/appsettings.Testing.json
+      (Testing:FakeBackend=true) and activates the fake client + fake auth in Program.cs. Triggered
+      either by the TestServer launch profile (ASPNETCORE_ENVIRONMENT=Testing, imported by MSBuild)
+      or explicitly via -p:ShuttleFakeBackend=true. Never set in normal Debug/Release builds, so the
+      production app is unaffected.
+    -->
+    <PropertyGroup Condition="'$(ShuttleFakeBackend)' == 'true' or '$(ASPNETCORE_ENVIRONMENT)' == 'Testing'">
+        <WasmApplicationEnvironmentName>Testing</WasmApplicationEnvironmentName>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="AccessibleColors" />
+        <PackageReference Include="Blazor.LocalStorage.WebAssembly" />
+        <PackageReference Include="Markdig" />
+        <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+        <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.Authentication.WebAssembly.Msal" />
+        <PackageReference Include="Microsoft.FluentUI.AspNetCore.Components" />
+        <PackageReference Include="Microsoft.FluentUI.AspNetCore.Components.Icons" />
+        <PackageReference Include="Plotly.Blazor" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Shuttle.Api.Client\Shuttle.Api.Client.csproj" />
+        <ProjectReference Include="..\Shuttle.Models\Shuttle.Models.csproj" />
+        <ProjectReference Include="..\Shuttle.WebClient.Shared\Shuttle.WebClient.Shared.csproj" />
+        <ProjectReference Include="..\Shuttle.WebClient.Testing\Shuttle.WebClient.Testing.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="Shuttle.WebClient.Tests" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <AdditionalFiles Include="Components\Options\ShuttleOptionsContext.razor" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Components\Services\" />
+      <Folder Include="Services\Events\" />
+    </ItemGroup>
+</Project>

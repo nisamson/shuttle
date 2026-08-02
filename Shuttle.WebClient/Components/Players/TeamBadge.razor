@@ -1,0 +1,10 @@
+@using Shuttle.Models.Leagues
+
+@if (Team is not null) {
+    <FluentBadge id="@AnchorId" style="@BadgeStyle">@Team.Abbreviation</FluentBadge>
+    <FluentTooltip Anchor="@AnchorId">@Tooltip</FluentTooltip>
+} else if (TeamId is int id) {
+    <FluentBadge Appearance="BadgeAppearance.Outline">#@id</FluentBadge>
+} else {
+    <span>—</span>
+}

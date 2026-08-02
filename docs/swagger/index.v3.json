@@ -1,0 +1,662 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "description": "This is the V3 API documentation for the Simulation Hockey League API. You can find out more about the SHL at [simulationhockey.com](https://simulationhockey.com/index.php).",
+    "version": "3.0.0",
+    "title": "Simulation Hockey League V3",
+    "contact": {
+      "email": "simulationhockeysite@gmail.com"
+    },
+    "license": {
+      "name": "MIT License",
+      "url": "https://mit-license.org/"
+    }
+  },
+  "host": "index.simulationhockey.com",
+  "basePath": "/api/v3",
+  "tags": [
+    {
+      "name": "schedule",
+      "description": "Game schedule and stats"
+    }
+  ],
+  "schemes": ["https", "http"],
+  "paths": {
+    "/schedule/game/boxscore/summary": {
+      "get": {
+        "tags": ["schedule"],
+        "summary": "Get game boxscore summary",
+        "description": "Returns a summary of the game including period scores, shots, team stats, shot quality metrics, and three stars",
+        "operationId": "getBoxscoreSummary",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "gameid",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/BoxscoreSummary"
+            }
+          }
+        }
+      }
+    },
+    "/schedule/game/boxscore/goalies": {
+      "get": {
+        "tags": ["schedule"],
+        "summary": "Get boxscore goalie stats",
+        "description": "Returns detailed goalie statistics from a game's boxscore",
+        "operationId": "getBoxscoreGoalies",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "gameid",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "away": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/BoxscoreGoalie"
+                  }
+                },
+                "home": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/BoxscoreGoalie"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedule/game/boxscore/scoring": {
+      "get": {
+        "tags": ["schedule"],
+        "summary": "Get boxscore scoring details",
+        "description": "Returns all goals scored in the game with scorer and assist information including shot quality metrics",
+        "operationId": "getBoxscoreScoring",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "gameid",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/BoxscoreScoring"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedule/game/boxscore/skaters": {
+      "get": {
+        "tags": ["schedule"],
+        "summary": "Get boxscore skater stats",
+        "description": "Returns detailed statistics for all skaters in the game including on/off ice stats, zone starts, and shot quality metrics",
+        "operationId": "getBoxscoreSkaters",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "gameid",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "required": true,
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "away": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/BoxscoreSkater"
+                  }
+                },
+                "home": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/BoxscoreSkater"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "BoxscoreSummary": {
+      "type": "object",
+      "properties": {
+        "summary": {
+          "type": "object",
+          "properties": {
+            "home": {
+              "$ref": "#/definitions/TeamSummaryStats"
+            },
+            "away": {
+              "$ref": "#/definitions/TeamSummaryStats"
+            }
+          }
+        },
+        "stars": {
+          "type": "object",
+          "properties": {
+            "star1": {
+              "$ref": "#/definitions/StarPlayer"
+            },
+            "star2": {
+              "$ref": "#/definitions/StarPlayer"
+            },
+            "star3": {
+              "$ref": "#/definitions/StarPlayer"
+            }
+          }
+        },
+        "periodByPeriodStats": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "home": {
+                "type": "object",
+                "properties": {
+                  "goals": {
+                    "type": "number"
+                  },
+                  "shots": {
+                    "type": "number"
+                  }
+                }
+              },
+              "away": {
+                "type": "object",
+                "properties": {
+                  "goals": {
+                    "type": "number"
+                  },
+                  "shots": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "TeamSummaryStats": {
+      "type": "object",
+      "properties": {
+        "shots": {
+          "type": "number",
+          "example": 32
+        },
+        "shot_attempts": {
+          "type": "number",
+          "description": "Total shot attempts including blocked and missed shots",
+          "example": 45
+        },
+        "pim": {
+          "type": "number",
+          "example": 8
+        },
+        "hits": {
+          "type": "number",
+          "example": 24
+        },
+        "giveaways": {
+          "type": "number",
+          "example": 12
+        },
+        "takeaways": {
+          "type": "number",
+          "example": 8
+        },
+        "faceoffWins": {
+          "type": "number",
+          "example": 28
+        },
+        "powerPlayGoals": {
+          "type": "number",
+          "example": 1
+        },
+        "powerPlayOpportunities": {
+          "type": "number",
+          "example": 3
+        },
+        "sq0": {
+          "type": "number",
+          "description": "Shot quality tier 0 (lowest quality) shots",
+          "example": 10
+        },
+        "sq1": {
+          "type": "number",
+          "description": "Shot quality tier 1 shots",
+          "example": 12
+        },
+        "sq2": {
+          "type": "number",
+          "description": "Shot quality tier 2 shots",
+          "example": 8
+        },
+        "sq3": {
+          "type": "number",
+          "description": "Shot quality tier 3 shots",
+          "example": 5
+        },
+        "sq4": {
+          "type": "number",
+          "description": "Shot quality tier 4 (highest quality) shots",
+          "example": 2
+        }
+      }
+    },
+    "BoxscoreScoring": {
+      "type": "object",
+      "properties": {
+        "period": {
+          "type": "number",
+          "example": 1
+        },
+        "time": {
+          "type": "number",
+          "example": 840
+        },
+        "readableTime": {
+          "type": "string",
+          "example": "14:00"
+        },
+        "teamAbbr": {
+          "type": "string",
+          "example": "BUF"
+        },
+        "scorer": {
+          "$ref": "#/definitions/ScoringPlayer"
+        },
+        "primaryAssist": {
+          "$ref": "#/definitions/ScoringPlayer"
+        },
+        "secondaryAssist": {
+          "$ref": "#/definitions/ScoringPlayer"
+        },
+        "goalType": {
+          "type": "string",
+          "enum": ["ES", "PP", "SH", "ES, ENG"],
+          "example": "ES"
+        },
+        "shotQuality": {
+          "type": "number",
+          "description": "Shot quality tier (0-4) with 4 being highest quality",
+          "minimum": 0,
+          "maximum": 4,
+          "example": 2
+        }
+      }
+    },
+    "BoxscoreGoalie": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "example": "John Smith"
+        },
+        "id": {
+          "type": "number",
+          "example": 123
+        },
+        "isHomeTeam": {
+          "type": "number",
+          "enum": [0, 1],
+          "example": 1
+        },
+        "teamID": {
+          "type": "number",
+          "example": 1
+        },
+        "shotsAgainst": {
+          "type": "number",
+          "example": 32
+        },
+        "goalsAgainst": {
+          "type": "number",
+          "example": 2
+        },
+        "saves": {
+          "type": "number",
+          "example": 30
+        },
+        "savePct": {
+          "type": "number",
+          "format": "float",
+          "example": 0.938
+        },
+        "pim": {
+          "type": "number",
+          "example": 2
+        },
+        "gameRating": {
+          "type": "number",
+          "example": 85
+        },
+        "minutesPlayed": {
+          "type": "string",
+          "example": "60:00"
+        }
+      }
+    },
+    "ScoringPlayer": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "example": "Smith"
+        },
+        "id": {
+          "type": "number",
+          "example": 123
+        }
+      }
+    },
+    "StarPlayer": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 123
+        },
+        "name": {
+          "type": "string",
+          "example": "John Smith"
+        },
+        "team": {
+          "type": "number",
+          "example": 1
+        }
+      }
+    },
+    "BoxscoreSkater": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "example": "John Smith"
+        },
+        "id": {
+          "type": "number",
+          "example": 123
+        },
+        "isHomeTeam": {
+          "type": "number",
+          "enum": [0, 1],
+          "example": 1
+        },
+        "teamID": {
+          "type": "number",
+          "example": 1
+        },
+        "goals": {
+          "type": "number",
+          "example": 1
+        },
+        "assists": {
+          "type": "number",
+          "example": 2
+        },
+        "plusMinus": {
+          "type": "number",
+          "example": 1
+        },
+        "pim": {
+          "type": "number",
+          "example": 2
+        },
+        "shots": {
+          "type": "number",
+          "example": 4
+        },
+        "faceoffs": {
+          "type": "number",
+          "example": 15
+        },
+        "faceoffWins": {
+          "type": "number",
+          "example": 9
+        },
+        "hits": {
+          "type": "number",
+          "example": 3
+        },
+        "blocks": {
+          "type": "number",
+          "example": 2
+        },
+        "giveaways": {
+          "type": "number",
+          "example": 1
+        },
+        "takeaways": {
+          "type": "number",
+          "example": 2
+        },
+        "timeOnIce": {
+          "type": "string",
+          "example": "18:45"
+        },
+        "ppTimeOnIce": {
+          "type": "string",
+          "example": "02:30"
+        },
+        "shTimeOnIce": {
+          "type": "string",
+          "example": "01:45"
+        },
+        "shifts": {
+          "type": "number",
+          "example": 22
+        },
+        "gameRating": {
+          "type": "number",
+          "example": 85
+        },
+        "offensiveGameRating": {
+          "type": "number",
+          "example": 82
+        },
+        "defensiveGameRating": {
+          "type": "number",
+          "example": 88
+        },
+        "team_shots_on": {
+          "type": "number",
+          "description": "Team shots on goal while player is on ice",
+          "example": 15
+        },
+        "team_shots_against_on": {
+          "type": "number",
+          "description": "Opponent shots on goal while player is on ice",
+          "example": 12
+        },
+        "team_shots_missed_on": {
+          "type": "number",
+          "description": "Team missed shots while player is on ice",
+          "example": 5
+        },
+        "team_shots_missed_against_on": {
+          "type": "number",
+          "description": "Opponent missed shots while player is on ice",
+          "example": 4
+        },
+        "team_shots_blocked_on": {
+          "type": "number",
+          "description": "Team shots blocked while player is on ice",
+          "example": 3
+        },
+        "team_shots_blocked_against_on": {
+          "type": "number",
+          "description": "Opponent shots blocked while player is on ice",
+          "example": 2
+        },
+        "team_goals_on": {
+          "type": "number",
+          "description": "Team goals while player is on ice",
+          "example": 2
+        },
+        "team_goals_against_on": {
+          "type": "number",
+          "description": "Opponent goals while player is on ice",
+          "example": 1
+        },
+        "team_shots_off": {
+          "type": "number",
+          "description": "Team shots on goal while player is off ice",
+          "example": 20
+        },
+        "team_shots_against_off": {
+          "type": "number",
+          "description": "Opponent shots on goal while player is off ice",
+          "example": 18
+        },
+        "team_shots_missed_off": {
+          "type": "number",
+          "description": "Team missed shots while player is off ice",
+          "example": 8
+        },
+        "team_shots_missed_against_off": {
+          "type": "number",
+          "description": "Opponent missed shots while player is off ice",
+          "example": 7
+        },
+        "team_shots_blocked_off": {
+          "type": "number",
+          "description": "Team shots blocked while player is off ice",
+          "example": 4
+        },
+        "team_shots_blocked_against_off": {
+          "type": "number",
+          "description": "Opponent shots blocked while player is off ice",
+          "example": 3
+        },
+        "team_goals_off": {
+          "type": "number",
+          "description": "Team goals while player is off ice",
+          "example": 1
+        },
+        "team_goals_against_off": {
+          "type": "number",
+          "description": "Opponent goals while player is off ice",
+          "example": 1
+        },
+        "oz_starts": {
+          "type": "number",
+          "description": "Offensive zone faceoff starts",
+          "example": 8
+        },
+        "nz_starts": {
+          "type": "number",
+          "description": "Neutral zone faceoff starts",
+          "example": 6
+        },
+        "dz_starts": {
+          "type": "number",
+          "description": "Defensive zone faceoff starts",
+          "example": 4
+        },
+        "team_oz_starts": {
+          "type": "number",
+          "description": "Team total offensive zone faceoff starts",
+          "example": 25
+        },
+        "team_nz_starts": {
+          "type": "number",
+          "description": "Team total neutral zone faceoff starts",
+          "example": 20
+        },
+        "team_dz_starts": {
+          "type": "number",
+          "description": "Team total defensive zone faceoff starts",
+          "example": 15
+        },
+        "sq0": {
+          "type": "number",
+          "description": "Shot quality tier 0 (lowest quality) shots",
+          "example": 1
+        },
+        "sq1": {
+          "type": "number",
+          "description": "Shot quality tier 1 shots",
+          "example": 2
+        },
+        "sq2": {
+          "type": "number",
+          "description": "Shot quality tier 2 shots",
+          "example": 1
+        },
+        "sq3": {
+          "type": "number",
+          "description": "Shot quality tier 3 shots",
+          "example": 0
+        },
+        "sq4": {
+          "type": "number",
+          "description": "Shot quality tier 4 (highest quality) shots",
+          "example": 0
+        }
+      }
+    }
+  }
+}

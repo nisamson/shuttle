@@ -1,0 +1,99 @@
+using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
+using Refit;
+
+namespace Shuttle.Api.Client;
+
+/// <summary>
+/// Registration helpers and shared serialization settings for the Shuttle backend API Refit
+/// clients. Usable from the Blazor WebClient and any other consumer of <c>Shuttle.Api</c>.
+/// </summary>
+public static class ShuttleApiClientExtensions {
+    /// <summary>
+    /// System.Text.Json options used for all Shuttle API clients.
+    /// <para>
+    /// Uses <see cref="JsonSerializerDefaults.Web"/> (camelCase, case-insensitive) and relies on the
+    /// per-type <c>[JsonConverter]</c> attributes declared on the shared models (e.g.
+    /// <c>PlayerPosition</c>, <c>PlayerStatus</c>, <c>PlayerAttributes</c>). We deliberately do NOT
+    /// use Refit's default options: those register a global
+    /// <see cref="System.Text.Json.Serialization.JsonStringEnumConverter"/> which takes precedence
+    /// over type-level <c>[JsonConverter]</c> attributes and hijacks enums whose spaced string values
+    /// it cannot parse (e.g. "Right Defense").
+    /// </para>
+    /// </summary>
+    public static readonly JsonSerializerOptions JsonSerializerOptions = new(JsonSerializerDefaults.Web);
+
+    private static RefitSettings CreateRefitSettings() =>
+        new() {
+            ContentSerializer = new SystemTextJsonContentSerializer(JsonSerializerOptions),
+            // Multiselect query collections (e.g. PlayerSearchQuery.Statuses) serialize as repeated
+            // keys: ?statuses=Active&statuses=Retired.
+            CollectionFormat = CollectionFormat.Multi,
+        };
+
+    /// <summary>
+    /// Registers the Shuttle backend API Refit clients pointed at <paramref name="baseAddress"/>
+    /// (e.g. the value of <c>Api:BaseUrl</c>). Returns the <see cref="IHttpClientBuilder"/> for the
+    /// player client so callers can chain additional configuration such as auth message handlers.
+    /// </summary>
+    public static IHttpClientBuilder AddShuttleApiClient(this IServiceCollection services, Uri baseAddress) {
+        return services.AddRefitClient<IShuttlePlayerClient>(CreateRefitSettings())
+            .ConfigureHttpClient(c => c.BaseAddress = baseAddress);
+    }
+
+    /// <summary>
+    /// Registers the Shuttle backend API user Refit client (<see cref="IShuttleUserClient"/>) pointed
+    /// at <paramref name="baseAddress"/> (e.g. the value of <c>Api:BaseUrl</c>). Returns the
+    /// <see cref="IHttpClientBuilder"/> so callers can chain additional configuration such as an auth
+    /// message handler (needed for the backend to surface Discord names to authenticated callers).
+    /// </summary>
+    public static IHttpClientBuilder AddShuttleUserClient(this IServiceCollection services, Uri baseAddress) {
+        return services.AddRefitClient<IShuttleUserClient>(CreateRefitSettings())
+            .ConfigureHttpClient(c => c.BaseAddress = baseAddress);
+    }
+
+    /// <summary>
+    /// Registers the Shuttle backend API league/team Refit client (<see cref="IShuttleLeagueClient"/>)
+    /// pointed at <paramref name="baseAddress"/> (e.g. the value of <c>Api:BaseUrl</c>). The team
+    /// endpoints are public, so no auth message handler is required. Returns the
+    /// <see cref="IHttpClientBuilder"/> so callers can chain additional configuration.
+    /// </summary>
+    public static IHttpClientBuilder AddShuttleLeagueClient(this IServiceCollection services, Uri baseAddress) {
+        return services.AddRefitClient<IShuttleLeagueClient>(CreateRefitSettings())
+            .ConfigureHttpClient(c => c.BaseAddress = baseAddress);
+    }
+
+    /// <summary>
+    /// Registers the Shuttle backend API development-only debug Refit client
+    /// (<see cref="IShuttleDebugClient"/>) pointed at <paramref name="baseAddress"/> (e.g. the value
+    /// of <c>Api:BaseUrl</c>). Returns the <see cref="IHttpClientBuilder"/> so callers can chain an
+    /// auth message handler (the debug endpoints require an authenticated caller).
+    /// </summary>
+    public static IHttpClientBuilder AddShuttleDebugClient(this IServiceCollection services, Uri baseAddress) {
+        return services.AddRefitClient<IShuttleDebugClient>(CreateRefitSettings())
+            .ConfigureHttpClient(c => c.BaseAddress = baseAddress);
+    }
+
+    /// <summary>
+    /// Registers the Shuttle backend API scouting Refit client (<see cref="IShuttleScoutingClient"/>)
+    /// pointed at <paramref name="baseAddress"/> (e.g. the value of <c>Api:BaseUrl</c>). Every scouting
+    /// endpoint requires an authenticated caller, so callers must chain an access-token message
+    /// handler. Returns the <see cref="IHttpClientBuilder"/> for that chaining.
+    /// </summary>
+    public static IHttpClientBuilder AddShuttleScoutingClient(this IServiceCollection services, Uri baseAddress) {
+        return services.AddRefitClient<IShuttleScoutingClient>(CreateRefitSettings())
+            .ConfigureHttpClient(c => c.BaseAddress = baseAddress);
+    }
+
+    /// <summary>
+    /// Registers the Shuttle backend API recruitment Refit client
+    /// (<see cref="IShuttleRecruitmentClient"/>) pointed at <paramref name="baseAddress"/> (e.g. the
+    /// value of <c>Api:BaseUrl</c>). The recruitment endpoints are public, so no auth message handler
+    /// is required. Returns the <see cref="IHttpClientBuilder"/> so callers can chain additional
+    /// configuration.
+    /// </summary>
+    public static IHttpClientBuilder AddShuttleRecruitmentClient(this IServiceCollection services, Uri baseAddress) {
+        return services.AddRefitClient<IShuttleRecruitmentClient>(CreateRefitSettings())
+            .ConfigureHttpClient(c => c.BaseAddress = baseAddress);
+    }
+}
