@@ -14,7 +14,7 @@ This finds record boundaries from the data instead: every record begins with
                         (0, 1, 2, ... count-1) in every save inspected
   team_id      (s4)  -- canonical team id, independent of record_index and NOT
                         unique (a user-created club can reuse an id, e.g. 0)
-  name (QString), name_2 (QString), flag (u1), name_3 (QString), name_4 (QString)
+  internal_code (QString), internal_code_2 (QString), flag (u1), city (QString), nickname (QString)
 This tool anchors on the dense index AND on the identity strings (abbreviation /
 city / nickname). That extra identity requirement is why it only fully enumerates
 a save whose teams all carry those strings (e.g. a fresh fictional league): in a
@@ -26,10 +26,11 @@ robust splitter should key on the dense record_index alone.
 Do NOT bound records on the fixed 32-byte tail that closes most records: it is
 merely the finance section's DEFAULT values (a 9999 cap + 100,000,000 budget)
 and is absent on any team whose finances were edited, so splitting on it merges
-the following record into the edited one. name and name_2 are two SEPARATE inline
-fields that coincide for most teams but diverge for relocated/renamed franchises
-(and can differ entirely from the displayed abbreviation, which lives deeper in
-the record), so the split does not assume they are equal.
+the following record into the edited one. internal_code and internal_code_2 are
+two SEPARATE inline fields that coincide for most teams but diverge for
+relocated/renamed franchises (and can differ entirely from the displayed
+abbreviation, which lives deeper in the record), so the split does not assume
+they are equal.
 """
 from __future__ import annotations
 import argparse
@@ -61,11 +62,11 @@ def find_record_starts(d: bytes) -> list[tuple[int, str]]:
     A record begins with a strong multi-field signature:
       record_index (s4)  -- a dense 0-based index equal to the record's position
       team_id      (s4)  -- canonical id (>= 0; not unique across edited saves)
-      name      (QString)  -- short upper-case abbreviation, e.g. "ATL"
-      name_2    (QString)  -- second short QString (NOT required to equal name)
+      internal_code   (QString)  -- short upper-case abbreviation, e.g. "ATL"
+      internal_code_2 (QString)  -- second short QString (NOT required to equal internal_code)
       flag      (u1)       -- 0/1
-      name_3    (QString)  -- city
-      name_4    (QString)  -- nickname
+      city      (QString)  -- city
+      nickname  (QString)  -- nickname
     This keys on the index being the next expected value 0,1,2,... AND on the
     identity strings being present. The index itself is dense in every save, so
     the desync in a real-league save comes from the identity requirement, not the

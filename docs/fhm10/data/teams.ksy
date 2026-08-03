@@ -63,52 +63,55 @@ types:
           fields look identical; a fictional save (ids 10..18 against indices
           0..8) and the reused id 0 above both prove they are separate fields.
           Use record_index, not team_id, as the unique per-record key.
-      - id: name
+      - id: internal_code
         type: fhm_common::qstring
         -doc: |
           Leading internal short-code (e.g. "ATL"). Separate inline field from
-          name_2. Byte-diff proved this is NOT the user-facing abbreviation: an
-          in-game abbreviation edit ("ATL"->"ZZZ") left both name and name_2
-          unchanged and instead rewrote a THIRD abbreviation copy deep in the
-          record (~record+2266, in a later sub-block). name/name_2 are an
-          internal pair that merely coincide with the abbreviation value here.
-          A one-day sim advance (which rewrote teams.dat) did NOT sync name to
-          the edited abbreviation, confirming it is a frozen internal code, not
-          a live mirror of the user-facing abbreviation. A second, independent
-          confirmation: a user-created club shown in-game as "SAC" stores the
-          frozen internal code "BKW" in name/name_2, while the editable "SAC"
-          appears only as the deeper repeated copies (first at ~record+0xa8),
-          so name/name_2 can differ completely from the displayed abbreviation.
-      - id: name_2
+          internal_code_2. Byte-diff proved this is NOT the user-facing
+          abbreviation: an in-game abbreviation edit ("ATL"->"ZZZ") left both
+          internal_code and internal_code_2 unchanged and instead rewrote a THIRD
+          abbreviation copy deep in the record (~record+2266, in a later
+          sub-block). internal_code/internal_code_2 are an internal pair that
+          merely coincide with the abbreviation value here. A one-day sim advance
+          (which rewrote teams.dat) did NOT sync internal_code to the edited
+          abbreviation, confirming it is a frozen internal code, not a live mirror
+          of the user-facing abbreviation. A second, independent confirmation: a
+          user-created club shown in-game as "SAC" stores the frozen internal code
+          "BKW" in internal_code/internal_code_2, while the editable "SAC" appears
+          only as the deeper repeated copies (first at ~record+0xa8), so
+          internal_code/internal_code_2 can differ completely from the displayed
+          abbreviation.
+      - id: internal_code_2
         type: fhm_common::qstring
         -doc: |
-          Second leading short-code field, a distinct inline QString from name
-          (proven by the byte layout: index+team_id precede it, so it is not a
-          container-level map key; and by the abbreviation-edit byte-diff, which
-          touched neither name nor name_2). It equals name for most teams, but
-          the two DO diverge in a full real-league save for franchises with a
-          relocation/rename history -- observed pairs (name / name_2) include
-          WPG/ATL, OAL/CLE and AND/ANA -- which proves they are genuinely
-          separate fields rather than one value stored twice. The divergence
-          direction is not consistent (in some pairs name is the current code and
-          name_2 an older one; in others the reverse), so the precise role of
-          each is not pinned down. The team-edit screen exposes no field holding
-          either value (city, nickname, and the editable abbreviation are all
-          elsewhere), so name/name_2 appear to be purely internal, non-UI codes,
-          plausibly an internal lookup/short code kept separate from the editable
-          display abbreviation.
+          Second leading short-code field, a distinct inline QString from
+          internal_code (proven by the byte layout: index+team_id precede it, so
+          it is not a container-level map key; and by the abbreviation-edit
+          byte-diff, which touched neither internal_code nor internal_code_2). It
+          equals internal_code for most teams, but the two DO diverge in a full
+          real-league save for franchises with a relocation/rename history --
+          observed pairs (internal_code / internal_code_2) include WPG/ATL,
+          OAL/CLE and AND/ANA -- which proves they are genuinely separate fields
+          rather than one value stored twice. The divergence direction is not
+          consistent (in some pairs internal_code is the current code and
+          internal_code_2 an older one; in others the reverse), so the precise
+          role of each is not pinned down. The team-edit screen exposes no field
+          holding either value (city, nickname, and the editable abbreviation are
+          all elsewhere), so internal_code/internal_code_2 appear to be purely
+          internal, non-UI codes, plausibly an internal lookup/short code kept
+          separate from the editable display abbreviation.
       - id: flag_1
         type: u1
         -doc: |
           Single-byte flag, observed = 1 for every team in the fictional save;
           role unconfirmed.
-      - id: name_3
+      - id: city
         type: fhm_common::qstring
         -doc: |
           Team city / location name (the editable "city" field, e.g. "Atlanta",
-          "Los Angeles"). Editable in-game and distinct from the internal
-          name/name_2 codes and the location_id index below.
-      - id: name_4
+          "Los Angeles"). Editable in-game and distinct from the
+          internal_code/internal_code_2 codes and the location_id index below.
+      - id: nickname
         type: fhm_common::qstring
         -doc: |
           Team nickname / mascot name (the editable "nickname" field, e.g.

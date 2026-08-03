@@ -20,9 +20,9 @@ record's inline `record_index` is the dense sequence 0..8.
 
 ## Teams
 
-Identity and structure. `code` is the frozen internal short-code (`name` ==
-`name_2` for every IMPEX team); `abbrev` is the separate user-facing editable
-abbreviation stored deeper in the record.
+Identity and structure. `code` is the frozen internal short-code
+(`internal_code` == `internal_code_2` for every IMPEX team); `abbrev` is the
+separate user-facing editable abbreviation stored deeper in the record.
 
 | idx | team_id | code | abbrev | City | Nickname | location_id |
 | --: | --: | --- | --- | --- | --- | --: |
@@ -41,10 +41,11 @@ abbreviation stored deeper in the record.
 > This save is exactly why the two fields must not be conflated — in a stock
 > real-league save they happen to coincide, but here they clearly diverge.
 
-> **Editable abbreviation is not `name`/`name_2`.** Team 1's frozen internal code
-> is `ATL`, but its user-facing abbreviation is `ZZZ` (a deliberate in-game edit).
-> The edit rewrote only the deeper repeated abbreviation copies, leaving
-> `name`/`name_2` untouched — confirming they are frozen internal codes.
+> **Editable abbreviation is not `internal_code`/`internal_code_2`.** Team 1's
+> frozen internal code is `ATL`, but its user-facing abbreviation is `ZZZ` (a
+> deliberate in-game edit). The edit rewrote only the deeper repeated
+> abbreviation copies, leaving `internal_code`/`internal_code_2` untouched —
+> confirming they are frozen internal codes.
 
 ## League structure
 
