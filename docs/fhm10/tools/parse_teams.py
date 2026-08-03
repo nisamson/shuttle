@@ -10,14 +10,19 @@ teams.ksy skipped each record's undecoded trailing block by hard-coding absolute
 end offsets measured from one specific save, so it cannot parse any other save.
 
 This finds record boundaries from the data instead: every record begins with
-  unknown_1 (s4)  -- a sequential 0-based record index (0, 1, 2, ...)
+  unknown_1 (s4)  -- a team identifier (in a real save it equals team_id and is
+                     sparse; only in a small fictional save is it a dense 0..N-1
+                     range, which is what this tool currently keys on)
   team_id   (s4)
   name (QString), name_2 (QString), flag (u1), name_3 (QString), name_4 (QString)
-Anchoring on the sequential index (0..count-1) is a robust record-start
-signature, so records can be split into [start_k, start_{k+1}) (the last to EOF)
-without decoding the trailing finance/history block. NOTE: name and name_2 are
-two SEPARATE inline fields that merely coincide (both the team abbreviation) in
-observed saves; the split does not assume they are equal.
+This tool anchors on the dense index, so it works on a save whose team ids form
+a contiguous 0..count-1 range (e.g. a fresh fictional league). For an arbitrary
+real-league save the robust anchor is the twin-abbreviation record signature
+(name / name_2 both short alpha codes, then flag, city, nickname); the index is
+NOT a reliable positional counter there because it tracks the sparse team-id
+space. NOTE: name and name_2 are two SEPARATE inline fields that coincide for
+most teams but diverge for relocated/renamed franchises, so the split does not
+assume they are equal.
 """
 from __future__ import annotations
 import argparse
@@ -47,21 +52,20 @@ def find_record_starts(d: bytes) -> list[tuple[int, str]]:
     """Locate team-record starts from the data.
 
     A record begins with a strong multi-field signature:
-      unknown_1 (s4)  -- a sequential 0-based record index (0, 1, 2, ...)
+      unknown_1 (s4)  -- a team identifier; a dense 0..N-1 range only in a save
+                         whose team ids are contiguous (see module docstring)
       team_id   (s4)  -- team id (>= 0; the first team in a real save is id 0)
       name      (QString)  -- short upper-case abbreviation, e.g. "ATL"
       name_2    (QString)  -- second short QString (NOT required to equal name)
       flag      (u1)       -- 0/1
       name_3    (QString)  -- city
       name_4    (QString)  -- nickname
-    Anchoring on the sequential index (rather than name == name_2, which can
-    diverge for relocated/renamed franchises in a real-league save) keeps this
-    robust for the common case. LIMITATION: in a large real-league save some
-    records use non-standard short codes (or name != name_2) that this strict
-    header filter will not recognise; because advancement is a linear
-    forward-scan for the next expected index, an unrecognised record desyncs the
-    walk. This tool therefore targets clean saves; decoding arbitrary
-    full-league saves needs a relaxed header filter.
+    This keys on the index being the next expected value 0,1,2,..., which holds
+    when team ids are contiguous. LIMITATION: in a real-league save the index
+    tracks the sparse team-id space (gaps), and some records use non-standard
+    short codes (or name != name_2), so the expected-index walk desyncs. This
+    tool therefore targets contiguous/fictional saves; decoding an arbitrary
+    full-league save needs the twin-abbreviation anchor with a relaxed filter.
     """
     starts: list[tuple[int, str]] = []
     o = 8  # after version_tag + count

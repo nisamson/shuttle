@@ -34,22 +34,26 @@ types:
       - id: unknown_1
         type: s4
         -doc: |
-          Sequential 0-based record index within the container (0, 1, 2, ...).
-          Confirmed dense across every record of a fictional 9-team save; this
-          makes the container a plain positional counted list (version, count,
-          records), NOT a QMap/QHash keyed by abbreviation. Used as the portable
-          record-start anchor (see ../tools/parse_teams.py). Distinct from
-          team_id: in the 9-team save the indexes are 0..8 while the team_ids are
-          13,11,12,15,14,10,16,17,18, so this field is the file position, not the
-          id. (In a full real-league save the two happen to coincide only because
-          that save stores teams in strict team_id order, i.e. team_id k at
-          position k.)
+          A team identifier, NOT a record position. In a full real-league save
+          this equals the team's id and is therefore sparse (values follow the
+          team-id space, e.g. 0, 3, 5, 8, ... with gaps where ids are unused);
+          a byte scan of the first record's span confirms no hidden record fills
+          those gaps, so the container is NOT a dense positional list and this
+          field cannot be used as a 0..count-1 counter. In a small fictional
+          9-team save the ids happen to be the dense range 0..8, which earlier
+          made it look positional. Coincides with team_id (below) in a real
+          save; the two only diverge in the fictional save (see team_id). Do not
+          rely on this as a record-start anchor for arbitrary saves -- use the
+          twin-abbreviation record signature instead (see ../tools/parse_teams.py).
       - id: team_id
         type: s4
         -doc: |
-          Stable team identifier, distinct from the positional unknown_1 index
-          (see above). Can be 0 (the first team in a real-league save has
-          team_id 0), so record-start heuristics must accept team_id >= 0.
+          A second team identifier. Equals unknown_1 in a full real-league save
+          (both hold the recognizable team id, e.g. Montreal = 0, and it can be
+          0, so heuristics must accept team_id >= 0). In the fictional 9-team
+          save it instead holds a higher, unsorted range (10..18) while unknown_1
+          holds 0..8, proving the two are distinct id fields; which one the game
+          treats as the canonical team id is not yet resolved.
       - id: name
         type: fhm_common::qstring
         -doc: |
@@ -90,48 +94,90 @@ types:
       - id: flag_2
         type: u1
         -doc: opaque
-      - id: unknown_2
+      - id: affiliate_parent_id
         type: s4
-        -doc: opaque
-      - id: unknown_3
+        -doc: |
+          Parent team id for a minor-league affiliate, or -1 for a top-level
+          (NHL) club. Confirmed across every AHL affiliate in a real-league save:
+          each affiliate's value is exactly its parent NHL club's team_id (e.g.
+          the Laval/Montreal, Providence/Boston, Rochester/Buffalo, Hershey/
+          Washington affiliates all point at their parent's id; an expansion
+          parent shows a correspondingly high id).
+      - id: affiliate_parent_id_2
         type: s4
-        -doc: opaque
-      - id: unknown_4
+        -doc: |
+          Secondary team reference (possibly a lower-league / ECHL affiliate
+          link). -1 (unused) for every team in the saves inspected.
+      - id: league_tier
         type: s4
-        -doc: opaque
-      - id: unknown_5
+        -doc: |
+          League tier / status. 0 = top league (NHL), 1 = minor-league affiliate
+          (AHL) -- every affiliate carries 1 and a non-negative affiliate_parent_id.
+          A defunct/relocated franchise record was observed with -1. Best read as
+          a small tier/status enum.
+      - id: conference
         type: s4
-        -doc: opaque
-      - id: unknown_6
+        -doc: |
+          Conference index: 0 = Eastern, 1 = Western. Verified against the known
+          alignment of a real-league save (every Eastern club is 0, every Western
+          club is 1). Together with division below it identifies the four NHL
+          divisions.
+      - id: division
         type: s4
-        -doc: opaque
-      - id: unknown_7
+        -doc: |
+          Division index within the conference (0 or 1). Combined with conference
+          it uniquely selects the four divisions and matches the known alignment
+          of every team in a real-league save: (E,0)=Atlantic, (E,1)=Metropolitan,
+          (W,0)=Pacific, (W,1)=Central.
+      - id: location_id
         type: s4
-        -doc: opaque
+        -doc: |
+          City / location identifier. Stable per city: the same city yields the
+          same value across unrelated saves (e.g. Montreal, Ottawa, Calgary, New
+          York and Los Angeles each reuse a fixed value, and both New York clubs
+          share one). Likely an index into a city/geography table.
       - id: unknown_8
         type: u2
-        -doc: opaque
+        -doc: |
+          Small per-team value (observed range ~2-5 for top clubs, lower for
+          affiliates); varies within a division so it is not the division id.
+          Unconfirmed -- possibly a prestige/reputation rating.
       - id: unknown_9
         type: u2
-        -doc: opaque
-      - id: unknown_10
+        -doc: |
+          Small per-team value (observed range ~0-4). Varies within a division;
+          role unconfirmed (possibly a secondary rating).
+      - id: finance_1
         type: s4
-        -doc: opaque
-      - id: unknown_11
+        -doc: |
+          Large monetary value (franchise cash / value). Real-league clubs are
+          in the ~55-137 million range and affiliates around ~0.6-1.3 million,
+          with the wealthiest markets highest -- consistent with a cash or
+          franchise-value figure in whole currency units.
+      - id: finance_2
         type: s4
-        -doc: opaque
-      - id: unknown_12
+        -doc: |
+          Secondary monetary value (e.g. an operating budget), smaller than
+          finance_1: single-digit-millions for top clubs, hundreds of thousands
+          for affiliates.
+      - id: finance_3
         type: s4
-        -doc: opaque
+        -doc: |
+          Sparse monetary value; 0 for most teams, a small positive amount for a
+          few. Role unconfirmed (debt / bonus / adjustment).
       - id: unknown_13
         type: s4
-        -doc: opaque
+        -doc: |
+          An id that usually equals this record's team_id, with a few outliers
+          holding a larger unrelated value; role not pinned down.
       - id: unknown_14
         type: s4
-        -doc: opaque
-      - id: unknown_15
+        -doc: 0 for every team observed (reserved / unused).
+      - id: finance_4
         type: s4
-        -doc: opaque
+        -doc: |
+          Sparse monetary value; 0 for most teams (including all affiliates), a
+          small positive amount for some top clubs. Role unconfirmed.
       - id: tactics_count
         type: s4
         -doc: Number of non-null tactic records.
