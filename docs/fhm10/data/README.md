@@ -63,6 +63,11 @@ Decoded-data walkthroughs applying these specs to concrete saves live in
   `teams.ksy` header field decoded for a small, fully fictional 9-team
   single-league save (clean ground truth: contiguous records, no real-world
   franchises, `record_index` and `team_id` deliberately divergent).
+- [`real-league-history-decoded.md`](../examples/real-league-history-decoded.md)
+  — the per-season franchise-history array (`opaque_tail` item 3) decoded and
+  validated for an Original Six club with 118 seasons of history: standings,
+  wins/losses/ties/OTL, points, goals for/against, attendance, and the
+  made-playoffs / championship-won flags.
 
 ## Opaque regions
 

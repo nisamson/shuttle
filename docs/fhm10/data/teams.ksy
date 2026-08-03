@@ -270,12 +270,40 @@ types:
           3. A per-season franchise-history array: one repeating record per
              season from the franchise's founding year to the present (e.g. ~117
              records for an Original Six team founded in 1909). Each record is a
-             fixed stride (~190 bytes for that team) and begins with a `u2 year`
-             followed by the team's identity that season as QStrings
-             (city / nickname / abbreviation) and a block of numeric season
-             stats (win/loss/points/finish-type values, not yet individually
-             labelled). Because identity strings are stored per season, this is
-             where historical relocations/renames are recoverable.
+             fixed stride (~190 bytes for a team that never relocates -- the
+             stride is constant only because its three identity QStrings keep a
+             constant length) and begins with a `s4 year` followed by the team's
+             identity that season as QStrings (city / nickname / abbreviation)
+             and a ~134-byte numeric stat block. Because identity strings are
+             stored per season, this is where historical relocations/renames are
+             recoverable.
+
+             The numeric stat block is big-endian (like the rest of the Qt
+             file). Confirmed fields, at offsets relative to the start of the
+             stat block (i.e. after the year + 3 QStrings), big-endian `u2`
+             unless noted:
+
+               +20  u1  made-playoffs flag (1 = qualified for the postseason)
+               +21  u1  championship-won flag (1 = won a championship that
+                        season -- the league title and/or the cup; in the early
+                        NHA/NHL era a league title without the cup also sets it)
+               +23  finish / final standing (1 = first)
+               +25  wins
+               +27  losses
+               +29  ties (0 in the modern OTL era)
+               +33  overtime losses (0 before the OTL era)
+               +39  points  (== 2*wins + ties + overtime_losses)
+               +57  average home attendance (pegs at arena capacity for a
+                        sold-out season; 0 for a no-crowd season)
+               +65  goals for
+               +67  goals against
+
+             A lockout/cancelled season (e.g. 2004-05) stores an all-zero stat
+             block. Offsets between the confirmed fields (e.g. +31, +35..+38,
+             +41..+56, +59..+64, +69+) hold further per-season figures that are
+             not yet individually labelled. See ../tools/decode_team_history.py
+             for a decoder and ../examples/real-league-history-decoded.md for a
+             validated Montreal example.
           4. Franchise-lineage identity sub-blocks for predecessor franchises
              (defunct/relocated teams folded into this record's history) and
              external reference URL QStrings.
