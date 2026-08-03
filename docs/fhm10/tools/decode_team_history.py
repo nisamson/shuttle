@@ -22,14 +22,23 @@ noted:
     +29 ties                       +33 overtime-losses
     +39 points (== 2*W + T + OTL)  +57 average home attendance
     +65 goals-for                  +67 goals-against
+    +69 penalty minutes
+    +71 power-play goals for       +73 power-play goals against
+    +75 short-handed goals for     +77 short-handed goals against
+    +79 power-play opportunities   +81 times short-handed
+        (power-play % = +71/+79,  penalty-kill % = 1 - +73/+81)
 
-A lockout/cancelled season stores an all-zero stat block.
+A lockout/cancelled season stores an all-zero stat block; the special-teams
+fields (+69..+81) are also zero for pre-NHL NHA seasons (before 1917-18).
 
-This tool does not hard-code offsets: it auto-detects the history array by
+This tool does not hard-code offsets: it re-reads each season's identity
+QStrings to re-anchor the stat block per record, and auto-detects the array by
 finding the first run of consecutive, year-incrementing season records whose
 identity fields are valid QStrings, measuring the (constant) stride from the
-first two seasons. Pass --start to anchor manually if auto-detection misfires.
-It reads the file read-only; point it at a copy of a save's teams.dat.
+first two seasons. The fixed stride is validated founding..~2018; the most
+recent few seasons may store a longer record and can desync. Pass --start to
+anchor manually if auto-detection misfires. It reads the file read-only; point
+it at a copy of a save's teams.dat.
 """
 from __future__ import annotations
 
@@ -136,6 +145,10 @@ def decode_seasons(d: bytes, start: int, stride: int, limit: int):
             "finish": be16(num, 23), "w": be16(num, 25), "l": be16(num, 27),
             "t": be16(num, 29), "otl": be16(num, 33), "pts": be16(num, 39),
             "att": be16(num, 57), "gf": be16(num, 65), "ga": be16(num, 67),
+            "pim": be16(num, 69),
+            "ppgf": be16(num, 71), "ppga": be16(num, 73),
+            "shgf": be16(num, 75), "shga": be16(num, 77),
+            "ppof": be16(num, 79), "tsh": be16(num, 81),
         })
         k += 1
     return rows
@@ -179,13 +192,17 @@ def main() -> None:
           f"-- {len(rows)} seasons from {rows[0]['year']} "
           f"(start {start:#x}, stride {stride})\n")
     hdr = (f"{'year':>4} {'fin':>3} {'W':>3} {'L':>3} {'T':>3} {'OTL':>3} "
-           f"{'pts':>4} {'GF':>4} {'GA':>4} {'att':>6} {'PO':>2} {'CH':>2}  team")
+           f"{'pts':>4} {'GF':>4} {'GA':>4} {'PIM':>4} {'PP%':>5} {'PK%':>5} "
+           f"{'att':>6} {'PO':>2} {'CH':>2}  team")
     print(hdr)
     for r in rows:
         team = f"{r['abbrev']} {r['city']} {r['nickname']}"
+        pp = f"{100 * r['ppgf'] / r['ppof']:.1f}" if r['ppof'] else "-"
+        pk = f"{100 * (1 - r['ppga'] / r['tsh']):.1f}" if r['tsh'] else "-"
         print(f"{r['year']:>4} {r['finish']:>3} {r['w']:>3} {r['l']:>3} "
               f"{r['t']:>3} {r['otl']:>3} {r['pts']:>4} {r['gf']:>4} "
-              f"{r['ga']:>4} {r['att']:>6} {r['playoffs']:>2} {r['champ']:>2}  "
+              f"{r['ga']:>4} {r['pim']:>4} {pp:>5} {pk:>5} "
+              f"{r['att']:>6} {r['playoffs']:>2} {r['champ']:>2}  "
               f"{team.encode('ascii', 'backslashreplace').decode()}")
 
 

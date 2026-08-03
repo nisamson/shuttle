@@ -297,13 +297,30 @@ types:
                         sold-out season; 0 for a no-crowd season)
                +65  goals for
                +67  goals against
+               +69  penalty minutes (0 in the pre-NHL NHA era, i.e. before
+                        1917-18, when the stat was not tracked)
+               +71  power-play goals for
+               +73  power-play goals against
+               +75  short-handed goals for
+               +77  short-handed goals against
+               +79  power-play opportunities for   (power-play % = +71 / +79)
+               +81  times short-handed             (penalty-kill % = 1 - +73 / +81)
 
              A lockout/cancelled season (e.g. 2004-05) stores an all-zero stat
-             block. Offsets between the confirmed fields (e.g. +31, +35..+38,
-             +41..+56, +59..+64, +69+) hold further per-season figures that are
-             not yet individually labelled. See ../tools/decode_team_history.py
-             for a decoder and ../examples/real-league-history-decoded.md for a
-             validated Montreal example.
+             block. The special-teams fields (+69..+81) are also zero for
+             pre-NHL NHA seasons. Offsets between the confirmed fields (e.g. +31,
+             +35..+38, +41..+56, +59..+64, +83+) hold further per-season figures
+             that are not yet individually labelled. See
+             ../tools/decode_team_history.py for a decoder and
+             ../examples/real-league-history-decoded.md for a validated Montreal
+             example.
+
+             Stride caveat: the fixed ~190-byte stride is measured from the
+             first two seasons and validated founding..~2018; the most recent
+             few seasons appear to store a longer per-season record, so a fixed
+             stride desyncs there. A robust reader should re-read each season's
+             identity QStrings to re-anchor the stat block per record rather than
+             assume a constant stride throughout.
           4. Franchise-lineage identity sub-blocks for predecessor franchises
              (defunct/relocated teams folded into this record's history) and
              external reference URL QStrings.

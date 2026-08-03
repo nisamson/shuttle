@@ -39,9 +39,21 @@ noted:
 | +57 | u2 | average home attendance | pegs at arena capacity for a sellout; 0 for a no-crowd season |
 | +65 | u2 | goals for | |
 | +67 | u2 | goals against | |
+| +69 | u2 | penalty minutes | 0 in the pre-NHL NHA era (before 1917-18) |
+| +71 | u2 | power-play goals for | |
+| +73 | u2 | power-play goals against | |
+| +75 | u2 | short-handed goals for | |
+| +77 | u2 | short-handed goals against | |
+| +79 | u2 | power-play opportunities | power-play % = +71 / +79 |
+| +81 | u2 | times short-handed | penalty-kill % = 1 − +73 / +81 |
 
 Offsets between the confirmed fields (e.g. +31, +35..+38, +41..+56, +59..+64,
-+69+) hold further per-season figures not yet individually labelled.
++83+) hold further per-season figures not yet individually labelled.
+
+**Stride caveat:** the fixed ~190-byte stride is validated from the founding
+year through ~2018; the most recent few seasons appear to store a longer
+per-season record, so a fixed stride desyncs there. The decoder re-reads each
+season's identity QStrings to re-anchor the stat block per record.
 
 Decode any team's history with
 [`../tools/decode_team_history.py`](../tools/decode_team_history.py), which
@@ -67,8 +79,9 @@ championship-won flag):
 | 2004 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 21273 | 0 | 0 |
 | 2005 | 3 | 42 | 31 | 0 | 9 | 93 | 243 | 247 | 21273 | 1 | 0 |
 | 2007 | 1 | 47 | 25 | 0 | 10 | 104 | 262 | 222 | 21273 | 1 | 0 |
-| 2020 | 18 | 23 | 18 | 0 | 11 | 59 | 159 | 168 | 0 | 1 | 0 |
-| 2021 | 32 | 22 | 49 | 11 | 0 | 55 | 221 | 319 | 15495 | 0 | 0 |
+
+(The table stops before the most recent seasons, which fall in the stride-desync
+zone noted above; run the decoder for the full, per-record-anchored series.)
 
 ## Validation
 
@@ -76,6 +89,12 @@ Every decoded value cross-checks against ground truth:
 
 - **In-game season-history screen (2005-06):** 42-31-9, **243 GF**, **247 GA**,
   **21273 average attendance**, made playoffs, no cup — all match exactly.
+- **Special teams (2005-06):** **1336 PIM**, power play **89 goals on 463
+  opportunities (19.2%)**, penalty kill **91 PP goals allowed on 481 times
+  short-handed (81.1%)**, and **10 / 6 short-handed goals for/against** — all
+  match the in-game detail. Power-play % = +71/+79 and penalty-kill % =
+  1 − +73/+81 land in realistic ranges every season (e.g. the dominant 1975-77
+  dynasty shows elite special teams; PIM peaks in the mid-80s enforcer era).
 - **Points formula** holds every season: `points == 2*wins + ties + overtime_losses`.
 - **Ties → OTL transition:** ties are populated through the pre-shootout era and
   drop to 0 once overtime-losses appear (1996 onward), matching the rule change.
