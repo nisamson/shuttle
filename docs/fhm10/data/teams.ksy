@@ -288,11 +288,16 @@ types:
                         season -- the league title and/or the cup; in the early
                         NHA/NHL era a league title without the cup also sets it)
                +23  finish / final standing (1 = first)
-               +25  wins
-               +27  losses
+               +25  regulation wins
+               +27  losses (regulation -- the displayed "L" column)
                +29  ties (0 in the modern OTL era)
+               +31  overtime wins   (0 in older seed seasons; see below)
                +33  overtime losses (0 before the OTL era)
-               +39  points  (== 2*wins + ties + overtime_losses)
+               +35  shootout wins   (0 in older seed seasons)
+               +37  shootout losses (0 in older seed seasons)
+               +39  points
+                        (== 2*(reg_wins + ot_wins + so_wins) + ties
+                            + (ot_losses + so_losses))
                +57  average home attendance (pegs at arena capacity for a
                         sold-out season; 0 for a no-crowd season)
                +65  goals for
@@ -306,21 +311,39 @@ types:
                +79  power-play opportunities for   (power-play % = +71 / +79)
                +81  times short-handed             (penalty-kill % = 1 - +73 / +81)
 
+             The displayed standings line is
+               W = +25 + +31 + +35   (reg + OT + shootout wins)
+               L = +27               (regulation losses)
+               OTL = +33 + +37       (OT + shootout losses)
+             and total games = W + L + OTL.
+
+             Older/seed seasons collapse the record into aggregates: +25 holds
+             ALL wins and +33 holds ALL overtime/shootout losses, with the
+             overtime/shootout split fields (+31, +35, +37) left at zero -- so
+             the simpler `points == 2*(+25) + ties + (+33)` also holds for them.
+             The split fields only populate for the recent seasons the save
+             stores in full detail (2019 onward in the reference save; the save's
+             own simulation, whose results diverge from real history, begins a
+             few seasons later). The two real COVID seasons (2019-20 paused,
+             2020-21 shortened) carry irregular breakdowns that do not reconcile
+             with the points formula.
+
              A lockout/cancelled season (e.g. 2004-05) stores an all-zero stat
              block. The special-teams fields (+69..+81) are also zero for
-             pre-NHL NHA seasons. Offsets between the confirmed fields (e.g. +31,
-             +35..+38, +41..+56, +59..+64, +83+) hold further per-season figures
-             that are not yet individually labelled. See
-             ../tools/decode_team_history.py for a decoder and
-             ../examples/real-league-history-decoded.md for a validated Montreal
-             example.
+             pre-NHL NHA seasons. Offsets between the confirmed fields (e.g. +41,
+             +43..+56, +59..+64, +83+) hold further per-season figures that are
+             not yet individually labelled. See ../tools/decode_team_history.py
+             for a decoder and ../examples/real-league-history-decoded.md for a
+             validated Montreal example.
 
-             Stride caveat: the fixed ~190-byte stride is measured from the
-             first two seasons and validated founding..~2018; the most recent
-             few seasons appear to store a longer per-season record, so a fixed
-             stride desyncs there. A robust reader should re-read each season's
-             identity QStrings to re-anchor the stat block per record rather than
-             assume a constant stride throughout.
+             Stride note: the per-season stride is a constant ~190 bytes for a
+             team whose three identity QStrings keep a constant length (measured
+             from the first two seasons and validated founding..present). A
+             robust reader should still re-read each season's identity QStrings
+             to re-anchor the stat block per record rather than assume a fixed
+             stride, so it also handles a franchise whose identity string lengths
+             change (a relocation/rename shifts the stat block within its
+             record).
           4. Franchise-lineage identity sub-blocks for predecessor franchises
              (defunct/relocated teams folded into this record's history) and
              external reference URL QStrings.

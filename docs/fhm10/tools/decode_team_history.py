@@ -18,9 +18,12 @@ block (i.e. immediately after the three identity QStrings), big-endian u2 unless
 noted:
 
     +20 u1 made-playoffs flag      +21 u1 championship-won flag
-    +23 finish/standing            +25 wins        +27 losses
-    +29 ties                       +33 overtime-losses
-    +39 points (== 2*W + T + OTL)  +57 average home attendance
+    +23 finish/standing
+    +25 regulation wins            +27 losses (regulation, the "L" column)
+    +29 ties                       +31 overtime wins
+    +33 overtime losses            +35 shootout wins        +37 shootout losses
+    +39 points (== 2*(reg_W + OT_W + SO_W) + T + (OT_L + SO_L))
+    +57 average home attendance
     +65 goals-for                  +67 goals-against
     +69 penalty minutes
     +71 power-play goals for       +73 power-play goals against
@@ -28,15 +31,19 @@ noted:
     +79 power-play opportunities   +81 times short-handed
         (power-play % = +71/+79,  penalty-kill % = 1 - +73/+81)
 
-A lockout/cancelled season stores an all-zero stat block; the special-teams
-fields (+69..+81) are also zero for pre-NHL NHA seasons (before 1917-18).
+The displayed record is W = +25+31+35, L = +27, OTL = +33+37. Older/seed seasons
+collapse the record into +25 (all wins) and +33 (all OTL) with the OT/shootout
+split fields (+31/+35/+37) zero; those split fields only populate for the recent
+seasons stored in full detail (and for the save's own simulated seasons). A
+lockout/cancelled season stores an all-zero stat block; the special-teams fields
+(+69..+81) are also zero for pre-NHL NHA seasons (before 1917-18).
 
 This tool does not hard-code offsets: it re-reads each season's identity
 QStrings to re-anchor the stat block per record, and auto-detects the array by
 finding the first run of consecutive, year-incrementing season records whose
 identity fields are valid QStrings, measuring the (constant) stride from the
-first two seasons. The fixed stride is validated founding..~2018; the most
-recent few seasons may store a longer record and can desync. Pass --start to
+first two seasons. Re-anchoring per record means it also handles a franchise
+whose identity string lengths change (a relocation/rename). Pass --start to
 anchor manually if auto-detection misfires. It reads the file read-only; point
 it at a copy of a save's teams.dat.
 """
@@ -142,8 +149,10 @@ def decode_seasons(d: bytes, start: int, stride: int, limit: int):
             "city": names[0], "nickname": names[1], "abbrev": names[2],
             "playoffs": num[20] if len(num) > 20 else -1,
             "champ": num[21] if len(num) > 21 else -1,
-            "finish": be16(num, 23), "w": be16(num, 25), "l": be16(num, 27),
-            "t": be16(num, 29), "otl": be16(num, 33), "pts": be16(num, 39),
+            "finish": be16(num, 23),
+            "regw": be16(num, 25), "l": be16(num, 27), "t": be16(num, 29),
+            "otw": be16(num, 31), "otl": be16(num, 33),
+            "sow": be16(num, 35), "sol": be16(num, 37), "pts": be16(num, 39),
             "att": be16(num, 57), "gf": be16(num, 65), "ga": be16(num, 67),
             "pim": be16(num, 69),
             "ppgf": be16(num, 71), "ppga": be16(num, 73),
@@ -197,10 +206,12 @@ def main() -> None:
     print(hdr)
     for r in rows:
         team = f"{r['abbrev']} {r['city']} {r['nickname']}"
+        w = r['regw'] + r['otw'] + r['sow']
+        otl = r['otl'] + r['sol']
         pp = f"{100 * r['ppgf'] / r['ppof']:.1f}" if r['ppof'] else "-"
         pk = f"{100 * (1 - r['ppga'] / r['tsh']):.1f}" if r['tsh'] else "-"
-        print(f"{r['year']:>4} {r['finish']:>3} {r['w']:>3} {r['l']:>3} "
-              f"{r['t']:>3} {r['otl']:>3} {r['pts']:>4} {r['gf']:>4} "
+        print(f"{r['year']:>4} {r['finish']:>3} {w:>3} {r['l']:>3} "
+              f"{r['t']:>3} {otl:>3} {r['pts']:>4} {r['gf']:>4} "
               f"{r['ga']:>4} {r['pim']:>4} {pp:>5} {pk:>5} "
               f"{r['att']:>6} {r['playoffs']:>2} {r['champ']:>2}  "
               f"{team.encode('ascii', 'backslashreplace').decode()}")

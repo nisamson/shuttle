@@ -31,11 +31,14 @@ noted:
 | +20 | u1 | made-playoffs flag | 1 = qualified for the postseason |
 | +21 | u1 | championship-won flag | 1 = won a championship (league title and/or cup) |
 | +23 | u2 | finish / final standing | 1 = first |
-| +25 | u2 | wins | |
-| +27 | u2 | losses | |
+| +25 | u2 | regulation wins | all wins in older/seed seasons (see below) |
+| +27 | u2 | losses | regulation losses — the displayed "L" column |
 | +29 | u2 | ties | 0 in the modern OTL era |
-| +33 | u2 | overtime losses | 0 before the OTL era |
-| +39 | u2 | points | `== 2*wins + ties + overtime_losses` |
+| +31 | u2 | overtime wins | 0 in older/seed seasons |
+| +33 | u2 | overtime losses | all OTL in older/seed seasons |
+| +35 | u2 | shootout wins | 0 in older/seed seasons |
+| +37 | u2 | shootout losses | 0 in older/seed seasons |
+| +39 | u2 | points | `== 2*(regW+OTW+SOW) + ties + (OTL+SOL)` |
 | +57 | u2 | average home attendance | pegs at arena capacity for a sellout; 0 for a no-crowd season |
 | +65 | u2 | goals for | |
 | +67 | u2 | goals against | |
@@ -47,13 +50,26 @@ noted:
 | +79 | u2 | power-play opportunities | power-play % = +71 / +79 |
 | +81 | u2 | times short-handed | penalty-kill % = 1 − +73 / +81 |
 
-Offsets between the confirmed fields (e.g. +31, +35..+38, +41..+56, +59..+64,
-+83+) hold further per-season figures not yet individually labelled.
+The displayed standings line is **W** = +25 + +31 + +35 (reg + OT + shootout
+wins), **L** = +27, **OTL** = +33 + +37. Offsets between the confirmed fields
+(e.g. +41..+56, +59..+64, +83+) hold further per-season figures not yet
+individually labelled.
 
-**Stride caveat:** the fixed ~190-byte stride is validated from the founding
-year through ~2018; the most recent few seasons appear to store a longer
-per-season record, so a fixed stride desyncs there. The decoder re-reads each
-season's identity QStrings to re-anchor the stat block per record.
+**Seed vs. simulated seasons:** older/seed seasons collapse the record into
+aggregates — +25 holds *all* wins and +33 holds *all* overtime/shootout losses,
+with the split fields (+31/+35/+37) left at zero — so the simpler
+`points == 2*(+25) + ties + (+33)` also holds for them. The OT/shootout split
+only populates for the recent seasons the save stores in full detail (2019
+onward in this save's seed) and for the save's own **simulated** seasons, whose
+results diverge from real history and begin a few seasons later (2023-24 here).
+The presence of nonzero +31/+35/+37 is therefore a practical discriminator
+between a collapsed seed season and a fully-detailed/simulated one.
+
+**Stride:** the per-season stride is a constant **190 bytes** end-to-end
+(founding through the present) because MTL's identity strings never change
+length. The decoder still re-reads each season's identity QStrings to re-anchor
+the stat block per record, so it also handles a franchise whose identity string
+lengths change (a relocation/rename shifts the stat block within its record).
 
 Decode any team's history with
 [`../tools/decode_team_history.py`](../tools/decode_team_history.py), which
@@ -79,9 +95,12 @@ championship-won flag):
 | 2004 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 21273 | 0 | 0 |
 | 2005 | 3 | 42 | 31 | 0 | 9 | 93 | 243 | 247 | 21273 | 1 | 0 |
 | 2007 | 1 | 47 | 25 | 0 | 10 | 104 | 262 | 222 | 21273 | 1 | 0 |
+| 2023 | 6 | 35 | 40 | 0 | 7 | 77 | 230 | 264 | 20998 | 0 | 0 |
+| 2024 | 8 | 33 | 40 | 0 | 9 | 75 | 241 | 286 | 20869 | 0 | 0 |
 
-(The table stops before the most recent seasons, which fall in the stride-desync
-zone noted above; run the decoder for the full, per-record-anchored series.)
+(The `W`/`OTL` columns already fold in the OT/shootout split — e.g. 2024-25's
+33 wins = 27 reg + 3 OT + 3 SO and 9 OTL = 2 OT + 7 SO losses. Run the decoder
+for the full, per-record-anchored series.)
 
 ## Validation
 
@@ -89,13 +108,23 @@ Every decoded value cross-checks against ground truth:
 
 - **In-game season-history screen (2005-06):** 42-31-9, **243 GF**, **247 GA**,
   **21273 average attendance**, made playoffs, no cup — all match exactly.
+- **Modern standings split (2024-25):** the in-game record **33-40-9, 75 pts,
+  241 GF, 286 GA, 50 PPG** reconciles exactly — 33 W = 27 reg + 3 OT + 3 SO
+  (+25/+31/+35), 40 L (+27), 9 OTL = 2 OT + 7 SO losses (+33/+37), and
+  `points = 2*(27+3+3) + 0 + (2+7) = 75`.
 - **Special teams (2005-06):** **1336 PIM**, power play **89 goals on 463
   opportunities (19.2%)**, penalty kill **91 PP goals allowed on 481 times
   short-handed (81.1%)**, and **10 / 6 short-handed goals for/against** — all
   match the in-game detail. Power-play % = +71/+79 and penalty-kill % =
   1 − +73/+81 land in realistic ranges every season (e.g. the dominant 1975-77
   dynasty shows elite special teams; PIM peaks in the mid-80s enforcer era).
-- **Points formula** holds every season: `points == 2*wins + ties + overtime_losses`.
+- **Points formula** holds every season: `points == 2*(regW+OTW+SOW) + ties + (OTL+SOL)`
+  (the two real COVID seasons, 2019-20 paused and 2020-21 shortened, carry
+  irregular truncated records that are the only exceptions).
+- **Seed vs. simulated:** the OT/shootout split fields (+31/+35/+37) are zero for
+  older seed seasons (which collapse into +25/+33) and populate only for the
+  recent fully-detailed seasons and the save's own simulated seasons (2023-24
+  onward here), whose results diverge from real NHL history.
 - **Ties → OTL transition:** ties are populated through the pre-shootout era and
   drop to 0 once overtime-losses appear (1996 onward), matching the rule change.
 - **Lockout/cancelled season (2004-05):** stored as an all-zero stat block.
