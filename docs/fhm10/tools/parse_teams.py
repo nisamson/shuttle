@@ -10,19 +10,26 @@ teams.ksy skipped each record's undecoded trailing block by hard-coding absolute
 end offsets measured from one specific save, so it cannot parse any other save.
 
 This finds record boundaries from the data instead: every record begins with
-  unknown_1 (s4)  -- a team identifier (in a real save it equals team_id and is
-                     sparse; only in a small fictional save is it a dense 0..N-1
-                     range, which is what this tool currently keys on)
-  team_id   (s4)
+  record_index (s4)  -- a DENSE 0-based index equal to the record's position
+                        (0, 1, 2, ... count-1) in every save inspected
+  team_id      (s4)  -- canonical team id, independent of record_index and NOT
+                        unique (a user-created club can reuse an id, e.g. 0)
   name (QString), name_2 (QString), flag (u1), name_3 (QString), name_4 (QString)
-This tool anchors on the dense index, so it works on a save whose team ids form
-a contiguous 0..count-1 range (e.g. a fresh fictional league). For an arbitrary
-real-league save the robust anchor is the twin-abbreviation record signature
-(name / name_2 both short alpha codes, then flag, city, nickname); the index is
-NOT a reliable positional counter there because it tracks the sparse team-id
-space. NOTE: name and name_2 are two SEPARATE inline fields that coincide for
-most teams but diverge for relocated/renamed franchises, so the split does not
-assume they are equal.
+This tool anchors on the dense index AND on the identity strings (abbreviation /
+city / nickname). That extra identity requirement is why it only fully enumerates
+a save whose teams all carry those strings (e.g. a fresh fictional league): in a
+real-league save most records are minor-league affiliates or placeholder /
+expansion slots that have no identity strings, so the identity-gated walk
+desyncs and skips them -- NOT because the index is sparse (it is dense). A fully
+robust splitter should key on the dense record_index alone.
+
+Do NOT bound records on the fixed 32-byte tail that closes most records: it is
+merely the finance section's DEFAULT values (a 9999 cap + 100,000,000 budget)
+and is absent on any team whose finances were edited, so splitting on it merges
+the following record into the edited one. name and name_2 are two SEPARATE inline
+fields that coincide for most teams but diverge for relocated/renamed franchises
+(and can differ entirely from the displayed abbreviation, which lives deeper in
+the record), so the split does not assume they are equal.
 """
 from __future__ import annotations
 import argparse
@@ -52,20 +59,23 @@ def find_record_starts(d: bytes) -> list[tuple[int, str]]:
     """Locate team-record starts from the data.
 
     A record begins with a strong multi-field signature:
-      unknown_1 (s4)  -- a team identifier; a dense 0..N-1 range only in a save
-                         whose team ids are contiguous (see module docstring)
-      team_id   (s4)  -- team id (>= 0; the first team in a real save is id 0)
+      record_index (s4)  -- a dense 0-based index equal to the record's position
+      team_id      (s4)  -- canonical id (>= 0; not unique across edited saves)
       name      (QString)  -- short upper-case abbreviation, e.g. "ATL"
       name_2    (QString)  -- second short QString (NOT required to equal name)
       flag      (u1)       -- 0/1
       name_3    (QString)  -- city
       name_4    (QString)  -- nickname
-    This keys on the index being the next expected value 0,1,2,..., which holds
-    when team ids are contiguous. LIMITATION: in a real-league save the index
-    tracks the sparse team-id space (gaps), and some records use non-standard
-    short codes (or name != name_2), so the expected-index walk desyncs. This
-    tool therefore targets contiguous/fictional saves; decoding an arbitrary
-    full-league save needs the twin-abbreviation anchor with a relaxed filter.
+    This keys on the index being the next expected value 0,1,2,... AND on the
+    identity strings being present. The index itself is dense in every save, so
+    the desync in a real-league save comes from the identity requirement, not the
+    index: affiliate / placeholder / expansion records carry no abbreviation,
+    city or nickname yet still occupy a full record, so the identity-gated walk
+    skips them and the expected-index check then fails at the next real team.
+    This tool therefore fully enumerates only saves where every team has identity
+    strings (fictional leagues); a robust full-league splitter should follow the
+    dense record_index alone (each record's [start, next_start) extent) rather
+    than gating on identity.
     """
     starts: list[tuple[int, str]] = []
     o = 8  # after version_tag + count

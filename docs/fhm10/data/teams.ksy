@@ -28,32 +28,41 @@ seq:
 types:
   team_record:
     params:
-      - id: record_index
+      - id: array_index
         type: s4
     seq:
-      - id: unknown_1
+      - id: record_index
         type: s4
         -doc: |
-          A team identifier, NOT a record position. In a full real-league save
-          this equals the team's id and is therefore sparse (values follow the
-          team-id space, e.g. 0, 3, 5, 8, ... with gaps where ids are unused);
-          a byte scan of the first record's span confirms no hidden record fills
-          those gaps, so the container is NOT a dense positional list and this
-          field cannot be used as a 0..count-1 counter. In a small fictional
-          9-team save the ids happen to be the dense range 0..8, which earlier
-          made it look positional. Coincides with team_id (below) in a real
-          save; the two only diverge in the fictional save (see team_id). Do not
-          rely on this as a record-start anchor for arbitrary saves -- use the
-          twin-abbreviation record signature instead (see ../tools/parse_teams.py).
+          Dense 0-based record index: this record's own position in the array
+          (0, 1, 2, ... count-1), stored inline at the start of every record.
+          Verified to equal the array position for 100% of records in BOTH a
+          fictional save and a full real-league save once records are split on
+          their true boundaries (see the record-boundary note on
+          ../tools/parse_teams.py). The value never has gaps.
+
+          An earlier analysis mistook this for a "sparse team id" because a
+          record splitter that keyed on the display-name/abbreviation signature
+          silently skipped the many records that carry no such identity strings
+          (minor-league affiliates, placeholder/expansion slots). With those
+          records omitted the surviving indices looked like 0, 3, 5, 8, ...;
+          re-splitting on the real per-record boundary restores the dense
+          sequence and exposes the skipped teams (e.g. an NHL club's AHL/ECHL
+          affiliates sit at the indices in the "gaps"). This is the reliable
+          record-start anchor; it is a distinct value from team_id below.
       - id: team_id
         type: s4
         -doc: |
-          A second team identifier. Equals unknown_1 in a full real-league save
-          (both hold the recognizable team id, e.g. Montreal = 0, and it can be
-          0, so heuristics must accept team_id >= 0). In the fictional 9-team
-          save it instead holds a higher, unsorted range (10..18) while unknown_1
-          holds 0..8, proving the two are distinct id fields; which one the game
-          treats as the canonical team id is not yet resolved.
+          Canonical team id, a value independent of record_index above. It is
+          NOT guaranteed unique and NOT a record counter: a user-created team can
+          reuse an id already in use (observed: a created NHL club "Sacramento
+          Express" carries team_id 0, the same id as Montreal, while its
+          record_index is a distinct large value). In a default real-league save
+          the ids happen to be assigned in step with the record order, so
+          team_id == record_index for stock teams, which previously made the two
+          fields look identical; a fictional save (ids 10..18 against indices
+          0..8) and the reused id 0 above both prove they are separate fields.
+          Use record_index, not team_id, as the unique per-record key.
       - id: name
         type: fhm_common::qstring
         -doc: |
@@ -65,7 +74,11 @@ types:
           internal pair that merely coincide with the abbreviation value here.
           A one-day sim advance (which rewrote teams.dat) did NOT sync name to
           the edited abbreviation, confirming it is a frozen internal code, not
-          a live mirror of the user-facing abbreviation.
+          a live mirror of the user-facing abbreviation. A second, independent
+          confirmation: a user-created club shown in-game as "SAC" stores the
+          frozen internal code "BKW" in name/name_2, while the editable "SAC"
+          appears only as the deeper repeated copies (first at ~record+0xa8),
+          so name/name_2 can differ completely from the displayed abbreviation.
       - id: name_2
         type: fhm_common::qstring
         -doc: |
@@ -97,17 +110,27 @@ types:
       - id: affiliate_parent_id
         type: s4
         -doc: |
-          Parent team id for a minor-league affiliate, or -1 for a top-level
-          (NHL) club. Confirmed across every AHL affiliate in a real-league save:
-          each affiliate's value is exactly its parent NHL club's team_id (e.g.
-          the Laval/Montreal, Providence/Boston, Rochester/Buffalo, Hershey/
-          Washington affiliates all point at their parent's id; an expansion
-          parent shows a correspondingly high id).
+          Parent-organization link for a minor-league affiliate, or -1 for a
+          top-level (NHL) club. This holds the parent's RECORD_INDEX (the
+          record_index field above), NOT its team_id. It always points at the
+          top of the affiliation chain -- the senior (NHL) club -- even from the
+          lowest (ECHL) tier. Confirmed on default real-league affiliates (each
+          AHL club points at its NHL parent) and decisively on a user-built
+          three-tier farm system where both the AHL and the ECHL affiliate carry
+          the NHL club's record_index while that club's team_id is a different
+          (and non-unique) value. Because it references record_index, resolve it
+          against record_index -- resolving against team_id is ambiguous (ids can
+          repeat, e.g. a created club reusing id 0).
       - id: affiliate_parent_id_2
         type: s4
         -doc: |
-          Secondary team reference (possibly a lower-league / ECHL affiliate
-          link). -1 (unused) for every team in the saves inspected.
+          Intermediate-parent link: the RECORD_INDEX of the affiliate one tier
+          up, populated on the lowest tier of a multi-level farm system and -1
+          otherwise. Observed on an ECHL club whose affiliate_parent_id is the
+          NHL org and whose affiliate_parent_id_2 is the AHL club sitting between
+          them (chain: NHL -> AHL -> ECHL). It is -1 for top-level clubs and for
+          affiliates with no team below them, which is why saves without a
+          three-tier user chain show it unused everywhere.
       - id: league
         type: s4
         -doc: |
@@ -236,22 +259,43 @@ types:
           4. Franchise-lineage identity sub-blocks for predecessor franchises
              (defunct/relocated teams folded into this record's history) and
              external reference URL QStrings.
+          5. A finance/settings block whose final ~32 bytes are constant for a
+             team left at default money (bytes `00*8 27 0F 00*5 05 F5 E1 00 00*7
+             01 FF FF FF FF` = a 9999 cap and a 100,000,000 budget). This tail is
+             a defaults artifact, not a record terminator -- an edited-finance
+             team lacks it (see record_end_pos).
 
           These bounds come from a full real-league save whose deeper history
           exercises the block; a fictional league populates only a subset.
+
+          Record count: the container's `count` header slightly exceeds the
+          number of records recoverable by identity signature, because most
+          records are minor-league affiliates or placeholder/expansion slots that
+          carry no display strings yet still occupy a full record (with the dense
+          record_index). Splitting on record_index -- not on identity strings --
+          accounts for them.
     instances:
       record_end_pos:
-        value: "record_index == 0 ? 4722 : (record_index == 1 ? 10295 : (record_index == 2 ? 15031 : (record_index == 3 ? 19765 : (record_index == 4 ? 24476 : (record_index == 5 ? 29197 : (record_index == 6 ? 33898 : (record_index == 7 ? 38607 : _root._io.size)))))))"
+        value: "array_index == 0 ? 4722 : (array_index == 1 ? 10295 : (array_index == 2 ? 15031 : (array_index == 3 ? 19765 : (array_index == 4 ? 24476 : (array_index == 5 ? 29197 : (array_index == 6 ? 33898 : (array_index == 7 ? 38607 : _root._io.size)))))))"
         -doc: |
           End offset of this record. These are ABSOLUTE offsets measured from one
           specific reference save, so this spec only parses that exact file.
           Because team records carry no length prefix, the portable way to bound
           a record is the record-START signature: every record begins with
-          unknown_1 = a sequential 0-based index (0, 1, 2, ...), then team_id
-          (s4), then the abbreviation/city/nickname QStrings. Anchoring on that
-          sequential index yields each record's [start, next_start) extent on ANY
-          save without decoding the trailing block. See
-          ../tools/parse_teams.py for the data-driven boundary finder.
+          record_index = a dense sequential 0-based index (0, 1, 2, ...), then
+          team_id (s4), then the abbreviation/city/nickname QStrings. Anchoring on
+          that sequential index yields each record's [start, next_start) extent on
+          ANY save without decoding the trailing block. See ../tools/parse_teams.py
+          for the data-driven boundary finder.
+
+          Do NOT try to terminate a record on the fixed 32-byte tail that closes
+          most records (bytes `00*8 27 0F 00*5 05 F5 E1 00 00*7 01 FF FF FF FF`):
+          that block is just this finance section's DEFAULT values (a 9999 cap and
+          100,000,000 budget), present only on teams left at those defaults. A team
+          whose finances were edited (observed: a user-created club with a
+          10,000,000 budget) has a different tail and no such marker, so splitting
+          on it silently merges the following record into the edited one. The dense
+          record_index start signature is the only robust boundary.
 
   tactic:
     doc: |
