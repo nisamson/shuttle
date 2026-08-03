@@ -108,27 +108,36 @@ types:
         -doc: |
           Secondary team reference (possibly a lower-league / ECHL affiliate
           link). -1 (unused) for every team in the saves inspected.
-      - id: league_tier
+      - id: league
         type: s4
         -doc: |
-          League tier / status. 0 = top league (NHL), 1 = minor-league affiliate
-          (AHL) -- every affiliate carries 1 and a non-negative affiliate_parent_id.
-          A defunct/relocated franchise record was observed with -1. Best read as
-          a small tier/status enum.
+          Index of the league the team plays in, as a small 0-based value (with
+          -1 for a defunct/relocated franchise record). Top of the team's
+          structural hierarchy: league -> conference -> division. Verified in a
+          real-league save where 0 is the senior league and 1 its affiliate
+          league (NHL/AHL) -- every affiliate is in league 1 and carries a
+          non-negative affiliate_parent_id -- but the field is a generic league
+          index, not tied to any particular league's identity or count.
       - id: conference
         type: s4
         -doc: |
-          Conference index: 0 = Eastern, 1 = Western. Verified against the known
-          alignment of a real-league save (every Eastern club is 0, every Western
-          club is 1). Together with division below it identifies the four NHL
-          divisions.
+          Conference index within the team's league (0-based): the middle level
+          of the league -> conference -> division hierarchy. Generic -- it
+          identifies which conference the team belongs to, and combined with
+          division below uniquely selects the team's sub-group. Verified against
+          a real-league save where the values 0/1 correspond to the two known
+          conferences (Eastern/Western), but the field carries only the index,
+          not any particular league's conference names or count.
       - id: division
         type: s4
         -doc: |
-          Division index within the conference (0 or 1). Combined with conference
-          it uniquely selects the four divisions and matches the known alignment
-          of every team in a real-league save: (E,0)=Atlantic, (E,1)=Metropolitan,
-          (W,0)=Pacific, (W,1)=Central.
+          Division index within the team's conference (0-based): the lowest level
+          of the league -> conference -> division hierarchy. Generic --
+          (conference, division) together identify the team's smallest structural
+          bucket. Verified against a real-league save where the (conference,
+          division) pairs reproduce every team's known division exactly, but the
+          field holds only the index, so the number of divisions per conference
+          and their names are league-defined elsewhere, not implied here.
       - id: location_id
         type: s4
         -doc: |
