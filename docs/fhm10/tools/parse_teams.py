@@ -1,0 +1,108 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
+"""Data-driven team-record boundary finder for FHM10 teams.dat.
+
+teams.dat is a Qt QDataStream container: s4 version_tag, s4 count, then `count`
+variable-length team records with no per-record length prefix. The original
+teams.ksy skipped each record's undecoded trailing block by hard-coding absolute
+end offsets measured from one specific save, so it cannot parse any other save.
+
+This finds record boundaries from the data instead: every record begins with
+  unknown_1 (s4)  -- a sequential 0-based record index (0, 1, 2, ...)
+  team_id   (s4)
+  name (QString), name_2 (QString), flag (u1), name_3 (QString), name_4 (QString)
+Anchoring on the sequential index (0..count-1) is a robust record-start
+signature, so records can be split into [start_k, start_{k+1}) (the last to EOF)
+without decoding the trailing finance/history block. NOTE: name and name_2 are
+two SEPARATE inline fields that merely coincide (both the team abbreviation) in
+observed saves; the split does not assume they are equal.
+"""
+from __future__ import annotations
+import argparse
+import struct
+from pathlib import Path
+
+
+def read_qstring(d: bytes, o: int):
+    """Return (text, next_offset) or None if not a valid non-empty QString."""
+    if o + 4 > len(d):
+        return None
+    ln = struct.unpack_from(">i", d, o)[0]
+    if ln <= 0 or o + 4 + ln > len(d) or ln % 2 != 0:
+        return None
+    try:
+        s = d[o + 4:o + 4 + ln].decode("utf-16-be")
+    except UnicodeDecodeError:
+        return None
+    return s, o + 4 + ln
+
+
+def is_abbrev(s: str) -> bool:
+    return 2 <= len(s) <= 4 and s.isascii() and s.isupper() and s.isalpha()
+
+
+def find_record_starts(d: bytes) -> list[tuple[int, str]]:
+    """Locate team-record starts from the data.
+
+    A record begins with a strong multi-field signature:
+      unknown_1 (s4)  -- a sequential 0-based record index (0, 1, 2, ...)
+      team_id   (s4)  -- small positive id
+      name      (QString)  -- short upper-case abbreviation, e.g. "ATL"
+      name_2    (QString)  -- second short QString (NOT required to equal name)
+      flag      (u1)       -- 0/1
+      name_3    (QString)  -- city
+      name_4    (QString)  -- nickname
+    Anchoring on the sequential index (rather than name == name_2, which merely
+    coincides in observed saves) keeps this robust even if a team's short name
+    ever differs from its abbreviation.
+    """
+    starts: list[tuple[int, str]] = []
+    o = 8  # after version_tag + count
+    end = len(d)
+    expected_index = 0
+    while o < end - 24:
+        idx = struct.unpack_from(">i", d, o)[0]
+        team_id = struct.unpack_from(">i", d, o + 4)[0]
+        if idx == expected_index and 0 < team_id < 100000:
+            r1 = read_qstring(d, o + 8)
+            if r1 and is_abbrev(r1[0]):
+                r2 = read_qstring(d, r1[1])
+                if r2 and d[r2[1]] in (0, 1):
+                    r3 = read_qstring(d, r2[1] + 1)  # city
+                    if r3 and r3[0].replace(" ", "").isalpha():
+                        r4 = read_qstring(d, r3[1])  # nickname
+                        if r4:
+                            starts.append((o, r1[0]))
+                            expected_index += 1
+                            o = r4[1]
+                            continue
+        o += 1
+    return starts
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("file", type=Path)
+    args = ap.parse_args()
+    d = args.file.read_bytes()
+    version_tag = struct.unpack_from(">i", d, 0)[0]
+    count = struct.unpack_from(">i", d, 4)[0]
+    print(f"{args.file.name}: {len(d)} bytes  version_tag={version_tag} count={count}")
+
+    starts = find_record_starts(d)
+    print(f"record-start signatures found: {len(starts)} (expected {count})")
+    bounds = [o for o, _ in starts] + [len(d)]
+    for i, (o, abbrev) in enumerate(starts):
+        team_id = struct.unpack_from(">i", d, o + 4)[0]
+        size = bounds[i + 1] - o
+        print(f"  rec {i}: start=0x{o:06x} team_id={team_id:<5} "
+              f"abbrev={abbrev:<4} size={size}")
+    ok = len(starts) == count
+    print("OK" if ok else "!! count mismatch")
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

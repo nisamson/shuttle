@@ -33,13 +33,41 @@ types:
     seq:
       - id: unknown_1
         type: s4
-        -doc: opaque
+        -doc: |
+          Sequential 0-based record index within the container (0, 1, 2, ...).
+          Confirmed across all 9 records; this makes the container a plain
+          positional counted list (version, count, records), NOT a QMap/QHash
+          keyed by abbreviation. Used as the portable record-start anchor
+          (see ../tools/parse_teams.py).
       - id: team_id
         type: s4
       - id: name
         type: fhm_common::qstring
+        -doc: |
+          Leading internal short-code (e.g. "ATL"). Separate inline field from
+          name_2. Byte-diff proved this is NOT the user-facing abbreviation: an
+          in-game abbreviation edit ("ATL"->"ZZZ") left both name and name_2
+          unchanged and instead rewrote a THIRD abbreviation copy deep in the
+          record (~record+2266, in a later sub-block). name/name_2 are an
+          internal pair that merely coincide with the abbreviation value here.
+          A one-day sim advance (which rewrote teams.dat) did NOT sync name to
+          the edited abbreviation, confirming it is a frozen internal code, not
+          a live mirror of the user-facing abbreviation.
       - id: name_2
         type: fhm_common::qstring
+        -doc: |
+          Second leading short-code field, a distinct inline QString from name
+          (proven by the byte layout: index+team_id precede it, so it is not a
+          container-level map key; and by the abbreviation-edit byte-diff, which
+          touched neither name nor name_2). Equal to name in all observed saves,
+          and the two have never been observed to diverge from each other, so
+          their exact roles are not fully pinned down. The team-edit screen
+          exposes no field holding this value (city, nickname, and the editable
+          abbreviation are all elsewhere), so name/name_2 appear to be purely
+          internal, non-UI codes. One possibility is that name/name_2 exist for
+          disambiguation (an internal lookup/short code kept separate from the
+          editable, display abbreviation) -- this is a plausible interpretation,
+          not a confirmed fact.
       - id: flag_1
         type: u1
         -doc: opaque
@@ -118,11 +146,23 @@ types:
         repeat-expr: player_id_list_count
       - id: opaque_tail
         size: record_end_pos - _io.pos
-        -doc: opaque
+        -doc: |
+          Undecoded trailing block after player_id_list (finance / history /
+          appearance data). Not yet field-decoded; consumed as raw bytes up to
+          this record's end offset.
     instances:
       record_end_pos:
         value: "record_index == 0 ? 4722 : (record_index == 1 ? 10295 : (record_index == 2 ? 15031 : (record_index == 3 ? 19765 : (record_index == 4 ? 24476 : (record_index == 5 ? 29197 : (record_index == 6 ? 33898 : (record_index == 7 ? 38607 : _root._io.size)))))))"
-        -doc: End offset of this record in the observed container.
+        -doc: |
+          End offset of this record. These are ABSOLUTE offsets measured from one
+          specific reference save, so this spec only parses that exact file.
+          Because team records carry no length prefix, the portable way to bound
+          a record is the record-START signature: every record begins with
+          unknown_1 = a sequential 0-based index (0, 1, 2, ...), then team_id
+          (s4), then the abbreviation/city/nickname QStrings. Anchoring on that
+          sequential index yields each record's [start, next_start) extent on ANY
+          save without decoding the trailing block. See
+          ../tools/parse_teams.py for the data-driven boundary finder.
 
   tactic:
     doc: |
@@ -137,8 +177,8 @@ types:
       per-tendency override toggles (0/1), and each line also has a separate
       per-line "use settings" u1 flag after its own selector array. NOTE: the
       field breakdown below is an inferred guess and does not
-      match the observed on-disk layout; trust FHM10-teams-dat-format.md for the
-      confirmed tendency/selector encoding.
+      match the observed on-disk layout; trust the byte-diff-confirmed
+      tendency/selector encoding described above over the seq fields.
     seq:
       - id: tactic_id
         type: s4
@@ -225,6 +265,59 @@ types:
         -doc: Per-situation tactic catalogue selector indices.
 
   line_unit:
+    doc: |
+      A team's line-up / depth-chart unit. Confirmed by controlled byte-diff of
+      a real save (swap two players between two 5v5 line slots; the two slot
+      values swapped and nothing else changed): a line_unit is a sequence of
+      length-prefixed QList<s4> situational slot lists, one per game situation,
+      NOT the fixed opaque leading_slots/interleaved_slots blocks guessed
+      earlier. This supersedes that earlier interpretation.
+
+      A unit is exactly 13 consecutive QList<s4> with FIXED per-situation slot
+      counts [12, 8, 10, 10, 12, 6, 8, 6, 8, 6, 5, 5, 2] (identical across all
+      teams; counts are per game-situation, not fill-dependent). AI/other teams
+      leave every slot -1. After the 13 lists come a -1-padded fixed block and
+      then non-line data (season history); that tail is not yet field-decoded.
+
+      Confirmed per-situation map (list index -> situation), grouped into the
+      indicated sub-units. All special-teams indices below were pinned by
+      controlled in-game edits + byte-diff (change one situation's unit in-game,
+      observe which single list index/position moves):
+        *  0 = even-strength FORWARD lines: 4 lines x (LW, C, RW). count 12.
+        *  1 = even-strength DEFENSE pairs: 4 pairs x (LD, RD); empty = (-1,-1).
+               count 8.
+        *  2 = 5-on-4 POWER PLAY: 2 units x (4F + 1D). count 10.
+        *  3 = 5-on-3 POWER PLAY: 2 units x (4F + 1D). count 10. Auto-fills
+               identically to list 2 by default, so the two are byte-identical
+               until edited; list 2 is the one the 5-on-4 PP screen edits.
+        *  4 = 4-on-5 PENALTY KILL: 3 units x (2F + 2D). count 12.
+        *  5 = 3-on-5 PENALTY KILL: 2 units x (1F + 2D). count 6.
+        *  6 = 4-on-4: 2 units x (2F + 2D). count 8.
+        *  7 = 3-on-3 overtime: 2 units x (2F + 1D). count 6.
+        *  8 = 4-on-3 POWER PLAY: 2 units x (3F + 1D). count 8.
+        *  9 = 3-on-4 PENALTY KILL: 2 units x (1F + 2D). count 6. Auto-fills
+               identically to list 5 by default (byte-identical until edited);
+               list 5 is 3-on-5, list 9 is 3-on-4 (confirmed by editing each
+               PK screen and observing which list moved).
+        * 10 = extra attackers (empty-net offense): 5 forwards. count 5.
+        * 11 = shootout order: 5 forwards. count 5.
+        * 12 = goalies: (starter, backup). count 2.
+      Within-unit slot order matches the on-screen unit order (unit 1 first),
+      confirmed for list 2: on-screen unit 1 = positions 0..4, unit 2 = 5..9,
+      first on-screen player = position 0.
+
+      SLOT ENCODING (confirmed): each slot is a big-endian s4 that references a
+      player by that player's 1-based record position in players.dat, i.e.
+      players.dat 0-based record ordinal = slot_value - 1. It is NOT the
+      player_id (players.dat player_id values do not match slot values) and NOT
+      a roster index (values exceed the per-team roster size). A slot value of
+      -1 means the slot is empty.
+
+      Because the surrounding record scaffolding (see team_record.record_end_pos)
+      was derived from a different reference save, the fields below are retained
+      as the raw byte view of that reference save; treat the QList<s4> model and
+      the slot encoding above as the authoritative structure. See the
+      documentation-only line_slot_list type.
     seq:
       - id: unit_id
         type: u2
@@ -234,7 +327,10 @@ types:
         -doc: opaque
       - id: leading_slots
         size: 42
-        -doc: opaque
+        -doc: |
+          Raw view (reference save) of the leading even-strength slot lists.
+          Confirmed content is QList<s4> forwards (LW,C,RW per line) followed by
+          QList<s4> defense (LD,RD per pair); see line_slot_list.
       - id: unknown_31
         type: s4
         -doc: opaque
@@ -243,12 +339,33 @@ types:
         -doc: opaque
       - id: interleaved_slots
         size: 40
-        -doc: opaque
+        -doc: |
+          Raw view (reference save) of the special-teams (PP/PK) slot lists,
+          same s4 slot encoding as the even-strength lists.
       - id: slot_flags
         size: 17
         -doc: opaque
       - id: unknown_33
         type: u2
         -doc: opaque
+
+  # Documentation-only reference type (not wired into the live parse): the
+  # confirmed encoding of one situational slot list inside a line_unit. A
+  # line_unit is a sequence of these. Each entry is a player reference =
+  # (players.dat 1-based record position); -1 = empty slot. Forwards lists group
+  # entries 3 per line (LW, C, RW); defense lists group entries 2 per pair
+  # (LD, RD).
+  line_slot_list:
+    seq:
+      - id: num_slots
+        type: s4
+        -doc: slot count (12 = four forward lines; 8 = four defense pairs)
+      - id: slots
+        type: s4
+        repeat: expr
+        repeat-expr: num_slots
+        -doc: |
+          Player references. slot = players.dat 1-based record position
+          (0-based ordinal + 1); -1 = empty slot.
 
 

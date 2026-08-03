@@ -15,11 +15,20 @@ doc: |
   record sequence cannot be split without a byte-exact record layout, and the
   exact on-disk field order of a full record (bio, contract, status, six season
   stat-line lists, dates and doubles, all under save-version gates) is not fully
-  pinned for this observed `format_version`.
+  pinned for this observed `format_version`. In practice records can be split on
+  the fixed pre-name marker `[65535, -65536, 65536, 0, 0]` that precedes every
+  record's name ids (see `name_block`); the number of markers equals
+  `player_count`.
+
+  Names are NOT stored inline: each record holds s4 `name_id` references into
+  the names.dat master table. A teams.dat line-up slot references a player by
+  the player's 1-based record position in this file (0-based ordinal + 1), not
+  by `player_id`.
 
   The confirmed record sub-structures are provided below as reference `types`
-  (`rating_attributes`, `player_role_instance`, `special_ability_list`) for
-  documentation; they are not wired into the live parse. See the folder README.
+  (`rating_attributes`, `player_role_instance`, `special_ability_list`,
+  `name_block`) for documentation; they are not wired into the live parse. See
+  the folder README.
 seq:
   - id: format_version
     type: s4
@@ -189,8 +198,21 @@ types:
         repeat: expr
         repeat-expr: num_abilities
 
-  # Confirmed leading fields at the start of each player record, in on-disk
-  # read order (documentation only; the record continues beyond these fields).
+  # Leading fields at the start of each player record (documentation only; the
+  # record continues beyond these fields).
+  #
+  # CORRECTION (confirmed by byte inspection of a real format_version 58 save):
+  # a player's names are NOT stored inline as QStrings. They are s4 name_id
+  # references into the names.dat master name table (names.dat name_entry.text
+  # keyed by name_entry.name_id); a text search of players.dat for a player's
+  # name finds nothing. Each record also carries a fixed pre-name marker and,
+  # immediately after the three name ids, the birth date as a QDate. See the
+  # confirmed name_block type below; the field order in player_leading_fields
+  # is the earlier inferred model and is retained only for reference.
+  #
+  # A teams.dat line-up slot (teams.dat line_unit) references a player by the
+  # player's 1-based record position in this file, i.e.
+  # players.dat 0-based record ordinal = slot_value - 1 (NOT the player_id).
   player_leading_fields:
     seq:
       - id: player_id
@@ -199,9 +221,6 @@ types:
         type: s4
       - id: nation_id_2
         type: s4
-      - id: birth_date
-        type: fhm_common::qdate
-        doc: Read as three int32 year/month/day.
       - id: bio_u16
         type: u2
         repeat: expr
@@ -215,17 +234,38 @@ types:
         type: s4
         repeat: expr
         repeat-expr: 2
-      - id: first_name
-        type: fhm_common::qstring
-      - id: last_name
-        type: fhm_common::qstring
-      - id: common_name
-        type: fhm_common::qstring
-      - id: bio_u16_after_name
-        type: u2
+      - id: name_block
+        type: name_block
+        doc: Confirmed pre-name marker + name ids + birth date (see name_block).
       - id: position_ratings
         type: position_list
         doc: Per-position ratings (G, LD, RD, LW, C, RW at even indices).
+
+  # Confirmed name block within a player record (format_version 58), in on-disk
+  # read order. A fixed 5-int marker precedes three name_id references into
+  # names.dat, then the birth date as three int32 (year, month, day).
+  name_block:
+    seq:
+      - id: marker
+        type: s4
+        repeat: expr
+        repeat-expr: 5
+        doc: |
+          Fixed marker, always [65535, -65536, 65536, 0, 0] i.e. bytes
+          0000FFFF FFFF0000 00010000 00000000 00000000. Reliable per-record
+          signature for splitting the variable-length player records.
+      - id: first_name_id
+        type: s4
+        doc: name_id into names.dat (first name); -1 = none.
+      - id: surname_id
+        type: s4
+        doc: name_id into names.dat (surname); -1 = none.
+      - id: common_name_id
+        type: s4
+        doc: name_id into names.dat (common/display name); -1 = none.
+      - id: birth_date
+        type: fhm_common::qdate
+        doc: Read as three int32 year/month/day.
 
   position_list:
     seq:
