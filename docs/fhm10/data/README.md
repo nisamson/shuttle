@@ -54,6 +54,16 @@ They are not version-gated across multiple save revisions.
 "Full parse" means the spec consumes the real file to end-of-file with no
 trailing bytes.
 
+## Worked examples
+
+Decoded-data walkthroughs applying these specs to concrete saves live in
+[`../examples`](../examples):
+
+- [`impex-teams-decoded.md`](../examples/impex-teams-decoded.md) — every
+  `teams.ksy` header field decoded for a small, fully fictional 9-team
+  single-league save (clean ground truth: contiguous records, no real-world
+  franchises, `record_index` and `team_id` deliberately divergent).
+
 ## Opaque regions
 
 Where the byte layout of a nested structure is not fully determined, the spec

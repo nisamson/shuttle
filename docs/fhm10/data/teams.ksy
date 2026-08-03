@@ -99,14 +99,25 @@ types:
           display abbreviation.
       - id: flag_1
         type: u1
-        -doc: opaque
+        -doc: |
+          Single-byte flag, observed = 1 for every team in the fictional save;
+          role unconfirmed.
       - id: name_3
         type: fhm_common::qstring
+        -doc: |
+          Team city / location name (the editable "city" field, e.g. "Atlanta",
+          "Los Angeles"). Editable in-game and distinct from the internal
+          name/name_2 codes and the location_id index below.
       - id: name_4
         type: fhm_common::qstring
+        -doc: |
+          Team nickname / mascot name (the editable "nickname" field, e.g.
+          "Fire Fighters", "Silvertips"). Editable in-game.
       - id: flag_2
         type: u1
-        -doc: opaque
+        -doc: |
+          Single-byte flag, observed = 0 for every team in the fictional save;
+          role unconfirmed.
       - id: affiliate_parent_id
         type: s4
         -doc: |
@@ -200,8 +211,14 @@ types:
       - id: unknown_13
         type: s4
         -doc: |
-          An id that usually equals this record's team_id, with a few outliers
-          holding a larger unrelated value; role not pinned down.
+          An id that tracks this record's record_index, not its team_id. In a
+          stock real-league save (where team_id == record_index) it equals both,
+          which previously made it look like a team_id copy; a fictional save
+          that separates the two fields resolves the ambiguity -- there its
+          values are the dense 0..count-1 sequence, matching record_index and NOT
+          the (10..18) team_ids. A few outliers in the real-league save hold a
+          larger unrelated value, so the exact role is still not pinned down, but
+          for the common case it mirrors record_index.
       - id: unknown_14
         type: s4
         -doc: 0 for every team observed (reserved / unused).
