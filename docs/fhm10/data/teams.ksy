@@ -35,12 +35,21 @@ types:
         type: s4
         -doc: |
           Sequential 0-based record index within the container (0, 1, 2, ...).
-          Confirmed across all 9 records; this makes the container a plain
-          positional counted list (version, count, records), NOT a QMap/QHash
-          keyed by abbreviation. Used as the portable record-start anchor
-          (see ../tools/parse_teams.py).
+          Confirmed dense across every record of a fictional 9-team save; this
+          makes the container a plain positional counted list (version, count,
+          records), NOT a QMap/QHash keyed by abbreviation. Used as the portable
+          record-start anchor (see ../tools/parse_teams.py). Distinct from
+          team_id: in the 9-team save the indexes are 0..8 while the team_ids are
+          13,11,12,15,14,10,16,17,18, so this field is the file position, not the
+          id. (In a full real-league save the two happen to coincide only because
+          that save stores teams in strict team_id order, i.e. team_id k at
+          position k.)
       - id: team_id
         type: s4
+        -doc: |
+          Stable team identifier, distinct from the positional unknown_1 index
+          (see above). Can be 0 (the first team in a real-league save has
+          team_id 0), so record-start heuristics must accept team_id >= 0.
       - id: name
         type: fhm_common::qstring
         -doc: |
@@ -59,15 +68,18 @@ types:
           Second leading short-code field, a distinct inline QString from name
           (proven by the byte layout: index+team_id precede it, so it is not a
           container-level map key; and by the abbreviation-edit byte-diff, which
-          touched neither name nor name_2). Equal to name in all observed saves,
-          and the two have never been observed to diverge from each other, so
-          their exact roles are not fully pinned down. The team-edit screen
-          exposes no field holding this value (city, nickname, and the editable
-          abbreviation are all elsewhere), so name/name_2 appear to be purely
-          internal, non-UI codes. One possibility is that name/name_2 exist for
-          disambiguation (an internal lookup/short code kept separate from the
-          editable, display abbreviation) -- this is a plausible interpretation,
-          not a confirmed fact.
+          touched neither name nor name_2). It equals name for most teams, but
+          the two DO diverge in a full real-league save for franchises with a
+          relocation/rename history -- observed pairs (name / name_2) include
+          WPG/ATL, OAL/CLE and AND/ANA -- which proves they are genuinely
+          separate fields rather than one value stored twice. The divergence
+          direction is not consistent (in some pairs name is the current code and
+          name_2 an older one; in others the reverse), so the precise role of
+          each is not pinned down. The team-edit screen exposes no field holding
+          either value (city, nickname, and the editable abbreviation are all
+          elsewhere), so name/name_2 appear to be purely internal, non-UI codes,
+          plausibly an internal lookup/short code kept separate from the editable
+          display abbreviation.
       - id: flag_1
         type: u1
         -doc: opaque
@@ -147,9 +159,31 @@ types:
       - id: opaque_tail
         size: record_end_pos - _io.pos
         -doc: |
-          Undecoded trailing block after player_id_list (finance / history /
-          appearance data). Not yet field-decoded; consumed as raw bytes up to
-          this record's end offset.
+          Trailing block after player_id_list (finance / history / appearance
+          data). Consumed here as raw bytes up to this record's end offset; the
+          following sub-structures have been identified within it but are not yet
+          fully field-decoded:
+
+          1. A `-1`-padded fixed block immediately after the line units.
+          2. An "upcoming seasons" array: an s4 count (e.g. 28) followed by that
+             many 9-byte records `{u2 index (1..7), u2 year, u4 value, u1 flag}` --
+             7 entries per season for the next ~4 seasons. Forward-looking
+             (values are schedule/target placeholders), not historical results.
+          3. A per-season franchise-history array: one repeating record per
+             season from the franchise's founding year to the present (e.g. ~117
+             records for an Original Six team founded in 1909). Each record is a
+             fixed stride (~190 bytes for that team) and begins with a `u2 year`
+             followed by the team's identity that season as QStrings
+             (city / nickname / abbreviation) and a block of numeric season
+             stats (win/loss/points/finish-type values, not yet individually
+             labelled). Because identity strings are stored per season, this is
+             where historical relocations/renames are recoverable.
+          4. Franchise-lineage identity sub-blocks for predecessor franchises
+             (defunct/relocated teams folded into this record's history) and
+             external reference URL QStrings.
+
+          These bounds come from a full real-league save whose deeper history
+          exercises the block; a fictional league populates only a subset.
     instances:
       record_end_pos:
         value: "record_index == 0 ? 4722 : (record_index == 1 ? 10295 : (record_index == 2 ? 15031 : (record_index == 3 ? 19765 : (record_index == 4 ? 24476 : (record_index == 5 ? 29197 : (record_index == 6 ? 33898 : (record_index == 7 ? 38607 : _root._io.size)))))))"

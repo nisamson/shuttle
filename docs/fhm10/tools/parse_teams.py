@@ -48,15 +48,20 @@ def find_record_starts(d: bytes) -> list[tuple[int, str]]:
 
     A record begins with a strong multi-field signature:
       unknown_1 (s4)  -- a sequential 0-based record index (0, 1, 2, ...)
-      team_id   (s4)  -- small positive id
+      team_id   (s4)  -- team id (>= 0; the first team in a real save is id 0)
       name      (QString)  -- short upper-case abbreviation, e.g. "ATL"
       name_2    (QString)  -- second short QString (NOT required to equal name)
       flag      (u1)       -- 0/1
       name_3    (QString)  -- city
       name_4    (QString)  -- nickname
-    Anchoring on the sequential index (rather than name == name_2, which merely
-    coincides in observed saves) keeps this robust even if a team's short name
-    ever differs from its abbreviation.
+    Anchoring on the sequential index (rather than name == name_2, which can
+    diverge for relocated/renamed franchises in a real-league save) keeps this
+    robust for the common case. LIMITATION: in a large real-league save some
+    records use non-standard short codes (or name != name_2) that this strict
+    header filter will not recognise; because advancement is a linear
+    forward-scan for the next expected index, an unrecognised record desyncs the
+    walk. This tool therefore targets clean saves; decoding arbitrary
+    full-league saves needs a relaxed header filter.
     """
     starts: list[tuple[int, str]] = []
     o = 8  # after version_tag + count
@@ -65,7 +70,7 @@ def find_record_starts(d: bytes) -> list[tuple[int, str]]:
     while o < end - 24:
         idx = struct.unpack_from(">i", d, o)[0]
         team_id = struct.unpack_from(">i", d, o + 4)[0]
-        if idx == expected_index and 0 < team_id < 100000:
+        if idx == expected_index and 0 <= team_id < 100000:
             r1 = read_qstring(d, o + 8)
             if r1 and is_abbrev(r1[0]):
                 r2 = read_qstring(d, r1[1])
