@@ -14,6 +14,14 @@ With --compare OTHER_TEAMS_DAT it reports exactly which (list, position) slots
 changed between two snapshots -- the primitive used to disambiguate which list
 index corresponds to which game situation via a controlled in-game edit.
 
+With --roles PLAYER_ROLES_DAT each skater is annotated with their primary
+tactical (System-3 skating) role, resolved through players.dat ->
+player_roles.dat. Goaltenders have no tactical role in FHM 10 and are left
+unannotated. The role instance's byte offset within a player record floats, so
+it is located by its shape (a role_id in [0..31] followed by 9 flag bytes and
+9 u2 sub_ratings) rather than a fixed offset; the signature is tuned for a
+freshly-generated (un-simmed) save (nine 0x00 flags, nine 0x0002 sub_ratings).
+
 Situation labels (list index -> situation), all confirmed by controlled
 in-game edits + byte-diff:
   0 ES forwards | 1 ES defense | 2 PP 5v4 | 3 PP 5v3 | 4 PK 4v5 |
@@ -66,9 +74,14 @@ def load_name_map(names: bytes) -> dict[int, str]:
     return by
 
 
-def load_players(players: bytes, max_name_id: int) -> list[tuple[int, int]]:
+def load_players(players: bytes, max_name_id: int) -> list[tuple[int, int, int]]:
+    """Return (first_name_id, surname_id, name_offset) per player record.
+
+    name_offset is the byte offset just past the pre-name marker (where the
+    three name ids begin); it is the anchor used to locate the role instance.
+    """
     marker = struct.pack(">iiiii", 65535, -65536, 65536, 0, 0)
-    recs: list[tuple[int, int]] = []
+    recs: list[tuple[int, int, int]] = []
     start = 0
     while True:
         m = players.find(marker, start)
@@ -85,8 +98,57 @@ def load_players(players: bytes, max_name_id: int) -> list[tuple[int, int]]:
             continue
         if not (1900 <= by <= 2016 and 1 <= bm <= 12 and 1 <= bd <= 31):
             continue
-        recs.append((fn, ln))
+        recs.append((fn, ln, no))
     return recs
+
+
+def load_role_catalogue(roles: bytes) -> dict[int, str]:
+    """Parse player_roles.dat into {role_id: role_name}."""
+    def qstr(o: int) -> tuple[str, int]:
+        ln = s4(roles, o); o += 4
+        text = roles[o:o + ln].decode("utf-16-be") if ln > 0 else ""
+        return text, o + ln
+    out: dict[int, str] = {}
+    o = 8
+    count = s4(roles, 4)
+    for _ in range(count):
+        rid = s4(roles, o); o += 4
+        name, o = qstr(o)                    # long name
+        o += 4 * (8 + 13 + 17 + 4)           # weight groups
+        o += 4                               # applies_to (4x u1) + role_flags
+        o += 2                               # position_category u2
+        _, o = qstr(o)                       # short name
+        o += 2 + 2                           # tuning_a/b
+        _, o = qstr(o)                       # description
+        o += 2                               # tuning_c
+        o += 4 * (19 + 9)                    # more weight groups
+        for _ in range(4):                   # 4 trailing u1 lists
+            c = s4(roles, o); o += 4 + c
+        out[rid] = name
+    return out
+
+
+def find_primary_role(players: bytes, name_off: int) -> int | None:
+    """Locate a skater's primary role_id near the player record.
+
+    The instance offset is not fixed (an optional preceding field shifts it a
+    few bytes), so we anchor on the instance shape rather than a hard offset:
+    a role_id in [0..31] immediately followed by 9 flag bytes and 9 u2
+    sub_ratings. In a freshly-generated save the primary instance reads nine
+    0x00 flags and nine 0x0002 sub_ratings, a reliable signature. Returns the
+    role_id, or None (e.g. goaltender records, which carry no tactical role).
+    """
+    for off in range(name_off + 900, name_off + 1040):
+        if off + 4 + 9 + 18 > len(players):
+            break
+        v = s4(players, off)
+        if 0 <= v <= 31:
+            flags = players[off + 4:off + 13]
+            subs = [struct.unpack_from(">H", players, off + 13 + 2 * k)[0]
+                    for k in range(9)]
+            if flags == b"\x00" * 9 and subs == [2] * 9:
+                return v
+    return None
 
 
 def find_line_unit(teams: bytes, rec_start: int, rec_end: int) -> int | None:
@@ -155,21 +217,38 @@ def main() -> int:
                     help="team abbreviation to dump (default ATL)")
     ap.add_argument("--compare", type=Path, default=None,
                     help="second teams.dat; report changed (list,pos) slots")
+    ap.add_argument("--roles", type=Path, default=None,
+                    help="player_roles.dat; annotate each skater with their "
+                         "tactical role (ignored in --compare mode)")
     args = ap.parse_args()
 
     teams = args.teams.read_bytes()
     by = load_name_map(args.names.read_bytes())
     max_name_id = max(by) + 1
-    recs = load_players(args.players.read_bytes(), max_name_id)
+    players_bytes = args.players.read_bytes()
+    recs = load_players(players_bytes, max_name_id)
+    role_cat = load_role_catalogue(args.roles.read_bytes()) if args.roles else None
 
     def name(slot: int) -> str:
         if slot == -1:
             return "(empty)"
         o = slot - 1
         if 0 <= o < len(recs):
-            fn, ln = recs[o]
+            fn, ln, _no = recs[o]
             return f"{by.get(fn, '?')} {by.get(ln, '?')}"
         return f"?slot{slot}"
+
+    def role(slot: int, list_index: int) -> str:
+        """Role label for a slot; goalie list (12) has no tactical role."""
+        if role_cat is None or slot == -1 or list_index == 12:
+            return ""
+        o = slot - 1
+        if not (0 <= o < len(recs)):
+            return ""
+        rid = find_primary_role(players_bytes, recs[o][2])
+        if rid is None:
+            return " [role: ?]"
+        return f" [{role_cat.get(rid, f'role{rid}')}]"
 
     trecs = find_team_records(teams)
     match = next((t for t in trecs if t[3] == args.abbrev), None)
@@ -189,7 +268,8 @@ def main() -> int:
         print(f"{abbrev} (team_id={team_id}) line_unit @0x{lu:06x}\n")
         for i, vals in enumerate(lists):
             print(f"list {i:2}  {LABELS.get(i, '?')}")
-            print(f"    {[name(v) for v in vals]}")
+            for v in vals:
+                print(f"    {name(v)}{role(v, i)}")
         return 0
 
     # compare mode
