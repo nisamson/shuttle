@@ -392,20 +392,32 @@ types:
              a previously-AI club made exactly this 908-byte block appear (and
              flipped the flag `0`->`1`), with all other clubs unchanged. This
              conditional block is the LARGEST per-team length variation and is now
-             fully accounted for: `managed ? 908 : 0`. HOWEVER, the POST is NOT a
-             single fixed size for AI clubs either -- between the roster array and
-             item 5 there remain SMALLER self-delimiting variable fields that are
-             not yet field-modeled: per-roster-player tactic-familiarity arrays
-             (`[s4 6][6* u2]`, count varies by club) and embedded name/identity
-             QStrings of varying length. These are individually self-delimiting
-             (length/count-prefixed) but their exact field SEQUENCE is not yet
-             enumerated, so item 4's byte-exact length is not yet fully computable
-             from a forward parse. Empirically the residual AI-club POST varies by
-             only a few bytes (roster->affiliation-code span 820-828; code->item5
-             span 2590-2595). (Creating the GM also bumped every club's item-1
-             reserve-list count 70 -> 90, i.e. +20 `-1` entries / +80 bytes --
-             already covered by the item-1 `4 + count*4` model, not a separate
-             field.)
+             fully accounted for: `managed ? 908 : 0`. The POST interior (between
+             the roster array and item 5) has since been mapped further by
+             cross-team byte analysis of the 9-club reference save:
+               * A FIXED 156-byte scaffold immediately follows the roster array
+                 (byte-identical across all AI clubs), then a run of per-team
+                 f4 rating/finance floats (fixed size, values differ).
+               * The main length variable is a pair of count-prefixed big-endian
+                 s4 arrays `[s4 N][N* s4]` holding globally-allocated SEQUENTIAL
+                 club IDs (e.g. one ~26-29-element array followed by one
+                 ~64-67-element array; the second's count byte sits immediately
+                 before its first element). Both are self-delimiting; the larger
+                 is followed by a FIXED anchor `s4 -1, s4 0x270F0000, s4 0, s4 999`.
+               * The last 66 bytes of every record are FIXED (item 5's 32-byte
+                 trailer plus 34 constant bytes before it).
+             So the variable content is bounded to `roster_end+156 .. record_end-66`
+             and dominated by those two self-delimiting ID arrays. What still
+             blocks a byte-exact forward walk is a SMALL residual field in the
+             ~1.4 KB per-player gap: two clubs with the same total ID-array element
+             count differ by a few bytes (e.g. SAN vs FRE: both 93 IDs, 5-byte
+             delta), so at least one more per-player variable field (candidate:
+             per-player tactic-familiarity `[s4 6][6* u2]` arrays and/or a name
+             reference) remains un-enumerated. Empirically the whole AI-club POST
+             varies by only ~13 bytes total (3442-3455 in the reference save).
+             (Creating the GM also bumped every club's item-1 reserve-list count
+             70 -> 90, i.e. +20 `-1` entries / +80 bytes -- already covered by the
+             item-1 `4 + count*4` model, not a separate field.)
           5. A finance/settings block: a FIXED 32-byte trailer that ends every
              record, `00*8 27 0F 00*5 05 F5 E1 00 00*7 01 FF FF FF FF` (a 9999
              cap and a 100,000,000 budget), byte-identical across all 9 records
@@ -446,17 +458,21 @@ types:
           and computable. Item 4's roster array is computable and its single
           LARGEST length variable -- the conditional 908-byte managed-team preset
           block, gated by the item-4 human-managed `u1` flag -- is now fully
-          decoded. What REMAINS before this offset table can be dropped is item
-          4's POST interior: smaller self-delimiting variable fields (per-player
-          `[s4 6][6* u2]` tactic-familiarity arrays and variable-length name
-          QStrings) whose exact field SEQUENCE is not yet enumerated. Until those
-          are modeled a forward parse cannot reach item 5 byte-exactly, so this
-          ABSOLUTE-offset ternary is retained. It stays file-specific and is NOT a
-          portable record delimiter; the portable boundary is the record-START
-          signature implemented in ../tools/parse_teams.py (dense record_index +
-          identity QStrings), which needs no offset table and works on any save.
-          (There is also no Kaitai compiler in-repo to validate a full sequential
-          rewrite; the decode so far is documented in prose above.)
+          decoded. Item 4's POST interior is now largely mapped too (see item 4
+          above): a fixed 156-byte scaffold + per-team floats, then two
+          self-delimiting count-prefixed global-ID arrays, then a fixed 66-byte
+          tail -- so the variable content is bounded to
+          `roster_end+156 .. record_end-66`. What REMAINS before this offset table
+          can be dropped is a SMALL residual per-player variable field inside that
+          window (clubs with equal total ID-array element counts still differ by a
+          few bytes), not yet enumerated. Until it is modeled a forward parse
+          cannot reach item 5 byte-exactly, so this ABSOLUTE-offset ternary is
+          retained. It stays file-specific and is NOT a portable record delimiter;
+          the portable boundary is the record-START signature implemented in
+          ../tools/parse_teams.py (dense record_index + identity QStrings), which
+          needs no offset table and works on any save. (There is also no Kaitai
+          compiler in-repo to validate a full sequential rewrite; the decode so
+          far is documented in prose above.)
 
           Do NOT try to terminate a record on the fixed 32-byte tail that closes
           most records (bytes `00*8 27 0F 00*5 05 F5 E1 00 00*7 01 FF FF FF FF`):
