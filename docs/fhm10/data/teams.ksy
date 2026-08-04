@@ -407,14 +407,19 @@ types:
                * The last 66 bytes of every record are FIXED (item 5's 32-byte
                  trailer plus 34 constant bytes before it).
              So the variable content is bounded to `roster_end+156 .. record_end-66`
-             and dominated by those two self-delimiting ID arrays. What still
-             blocks a byte-exact forward walk is a SMALL residual field in the
-             ~1.4 KB per-player gap: two clubs with the same total ID-array element
+             and dominated by those two self-delimiting ID arrays. A controlled
+             in-game byte-diff established that these arrays are FRANCHISE-level and
+             roster-INDEPENDENT: releasing a player from a club left that club's
+             teams.dat record byte-identical (active roster membership lives in
+             players.dat, not here), so the IDs are franchise-owned entity handles
+             allocated at league creation, not per-active-roster-player records.
+             What still blocks a byte-exact forward walk is a SMALL residual field
+             inside that window: two clubs with the same total ID-array element
              count differ by a few bytes (e.g. SAN vs FRE: both 93 IDs, 5-byte
-             delta), so at least one more per-player variable field (candidate:
-             per-player tactic-familiarity `[s4 6][6* u2]` arrays and/or a name
-             reference) remains un-enumerated. Empirically the whole AI-club POST
-             varies by only ~13 bytes total (3442-3455 in the reference save).
+             delta), so at least one more small variable field remains un-enumerated
+             (NOT roster-driven -- its driver is still unidentified). Empirically
+             the whole AI-club POST varies by only ~13 bytes total (3442-3455 in
+             the reference save).
              (Creating the GM also bumped every club's item-1 reserve-list count
              70 -> 90, i.e. +20 `-1` entries / +80 bytes -- already covered by the
              item-1 `4 + count*4` model, not a separate field.)
@@ -463,16 +468,18 @@ types:
           self-delimiting count-prefixed global-ID arrays, then a fixed 66-byte
           tail -- so the variable content is bounded to
           `roster_end+156 .. record_end-66`. What REMAINS before this offset table
-          can be dropped is a SMALL residual per-player variable field inside that
-          window (clubs with equal total ID-array element counts still differ by a
-          few bytes), not yet enumerated. Until it is modeled a forward parse
-          cannot reach item 5 byte-exactly, so this ABSOLUTE-offset ternary is
-          retained. It stays file-specific and is NOT a portable record delimiter;
-          the portable boundary is the record-START signature implemented in
-          ../tools/parse_teams.py (dense record_index + identity QStrings), which
-          needs no offset table and works on any save. (There is also no Kaitai
-          compiler in-repo to validate a full sequential rewrite; the decode so
-          far is documented in prose above.)
+          can be dropped is a SMALL residual variable field inside that window
+          (clubs with equal total ID-array element counts still differ by a few
+          bytes), not yet enumerated -- and a controlled release-a-player byte-diff
+          left teams.dat byte-identical, proving the field is NOT roster-driven
+          (active roster lives in players.dat), so its driver is still unidentified.
+          Until it is modeled a forward parse cannot reach item 5 byte-exactly, so
+          this ABSOLUTE-offset ternary is retained. It stays file-specific and is
+          NOT a portable record delimiter; the portable boundary is the record-START
+          signature implemented in ../tools/parse_teams.py (dense record_index +
+          identity QStrings), which needs no offset table and works on any save.
+          (There is also no Kaitai compiler in-repo to validate a full sequential
+          rewrite; the decode so far is documented in prose above.)
 
           Do NOT try to terminate a record on the fixed 32-byte tail that closes
           most records (bytes `00*8 27 0F 00*5 05 F5 E1 00 00*7 01 FF FF FF FF`):

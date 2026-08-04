@@ -18,9 +18,12 @@ dropped). Cross-team analysis of a clean multi-club save shows the POST is:
   * a FIXED 66-byte tail (item 5's 32-byte finance trailer + 34 constant bytes).
 
 So the variable content is bounded to `roster_end+156 .. record_end-66`. A small
-residual per-player field inside that window is not yet enumerated (clubs with
-equal total ID-array element counts can still differ by a few bytes), which is
-why the record is not yet byte-exact walkable.
+residual field inside that window is not yet enumerated (clubs with equal total
+ID-array element counts can still differ by a few bytes); a controlled
+release-a-player byte-diff left teams.dat byte-identical, proving these arrays are
+franchise-level and roster-INDEPENDENT (active roster lives in players.dat), so
+the residual field's driver is still unidentified and the record is not yet
+byte-exact walkable.
 
 This tool reports, per club: the human-managed flag, roster_end, POST length, the
 fixed-head/fixed-tail bounds, and every count-prefixed consecutive-ID array it
