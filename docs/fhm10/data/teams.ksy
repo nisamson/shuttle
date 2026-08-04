@@ -390,12 +390,22 @@ types:
              The block was proven present-iff-managed and byte-identical in
              structure by a controlled in-game byte-diff: taking human control of
              a previously-AI club made exactly this 908-byte block appear (and
-             flipped the flag `0`->`1`), with all other clubs unchanged. With the
-             flag gating this fixed 908-byte block, item 4's total length IS now
-             computable: `roster_array + fixed_POST + (managed ? 908 : 0)`.
-             (Creating the GM also bumped every club's item-1 reserve-list count
-             70 -> 90, i.e. +20 `-1` entries / +80 bytes -- already covered by the
-             item-1 `4 + count*4` model, not a separate field.)
+             flipped the flag `0`->`1`), with all other clubs unchanged. This
+             conditional block is the LARGEST per-team length variation and is now
+             fully accounted for: `managed ? 908 : 0`. HOWEVER, the POST is NOT a
+             single fixed size for AI clubs either -- between the roster array and
+             item 5 there remain SMALLER self-delimiting variable fields that are
+             not yet field-modeled: per-roster-player tactic-familiarity arrays
+             (`[s4 6][6* u2]`, count varies by club) and embedded name/identity
+             QStrings of varying length. These are individually self-delimiting
+             (length/count-prefixed) but their exact field SEQUENCE is not yet
+             enumerated, so item 4's byte-exact length is not yet fully computable
+             from a forward parse. Empirically the residual AI-club POST varies by
+             only a few bytes (roster->affiliation-code span 820-828; code->item5
+             span 2590-2595). (Creating the GM also bumped every club's item-1
+             reserve-list count 70 -> 90, i.e. +20 `-1` entries / +80 bytes --
+             already covered by the item-1 `4 + count*4` model, not a separate
+             field.)
           5. A finance/settings block: a FIXED 32-byte trailer that ends every
              record, `00*8 27 0F 00*5 05 F5 E1 00 00*7 01 FF FF FF FF` (a 9999
              cap and a 100,000,000 budget), byte-identical across all 9 records
@@ -431,15 +441,22 @@ types:
           ANY save without decoding the trailing block. See ../tools/parse_teams.py
           for the data-driven boundary finder.
 
-          COMPUTABILITY STATUS: every opaque_tail sub-block (items 1-5 above) is
-          now decoded into a count-prefixed / self-delimiting / fixed-size form,
-          INCLUDING the last unknown -- the conditional 908-byte managed-team
-          preset block, gated by the item-4 human-managed `u1` flag. A record can
-          therefore be walked start-to-end without this offset table. This ternary
-          is retained only because the seq between active_line_unit and opaque_tail
-          is still a KNOWN-MISMODEL raw-byte view (the fields below do not match the
-          real bytes) and there is no Kaitai compiler in-repo to validate a full
-          sequential rewrite; the decode is documented in prose above pending that.
+          COMPUTABILITY STATUS: the opaque_tail sub-blocks are decoded to varying
+          depth. Items 1, 2, 3 and 5 are count-prefixed / self-delimiting / fixed
+          and computable. Item 4's roster array is computable and its single
+          LARGEST length variable -- the conditional 908-byte managed-team preset
+          block, gated by the item-4 human-managed `u1` flag -- is now fully
+          decoded. What REMAINS before this offset table can be dropped is item
+          4's POST interior: smaller self-delimiting variable fields (per-player
+          `[s4 6][6* u2]` tactic-familiarity arrays and variable-length name
+          QStrings) whose exact field SEQUENCE is not yet enumerated. Until those
+          are modeled a forward parse cannot reach item 5 byte-exactly, so this
+          ABSOLUTE-offset ternary is retained. It stays file-specific and is NOT a
+          portable record delimiter; the portable boundary is the record-START
+          signature implemented in ../tools/parse_teams.py (dense record_index +
+          identity QStrings), which needs no offset table and works on any save.
+          (There is also no Kaitai compiler in-repo to validate a full sequential
+          rewrite; the decode so far is documented in prose above.)
 
           Do NOT try to terminate a record on the fixed 32-byte tail that closes
           most records (bytes `00*8 27 0F 00*5 05 F5 E1 00 00*7 01 FF FF FF FF`):
