@@ -456,11 +456,28 @@ types:
              creation/relocation history the same lists hold NON-consecutive ids
              and do not match the consecutive-run detector, and the gap constants
              (219 / 2767 / 3607 / 65) and the `3063 + 4*IDs + 5*C` formula do not
-             hold. What DID generalize is only item 5's fixed finance trailer
-             (`00*8 27 0F 00*5 05 F5 E1 00 ...`), found 5219 times in the 5220-record
-             save -- once per record except a single edited-finance club -- so it
-             remains a near-universal end-of-record ANCHOR for default-finance
-             teams but is not a length model. The roster_end detector below is also
+             hold. What DID generalize is item 5's fixed finance/settings tail.
+             Aligning every record on its end reveals a byte-identical 65-byte tail
+             (this item's "gap4") on default-finance clubs, confirmed 65/65 constant
+             across three unrelated leagues (a 5220-record Original Six save, an
+             unrelated 5224-record league, and the 9-record fictional save) and
+             byte-for-byte equal between arbitrary records within a save:
+
+               00 00 00 63                s4 = 99      (a default setting)
+               00*9 40 20 00 00           f4 = 2.5     (a default price/ratio)
+               00*9 40 20 00 00           f4 = 2.5     (a default price/ratio)
+               00*8 27 0F 00*5 05 F5 E1 00 00*7 01 FF FF FF FF   (32-byte trailer:
+                          9999 cap, 100,000,000 budget, ... -1)
+
+             So item 5 is a FIXED-LAYOUT 65-byte finance/settings block at record
+             end whose all-default byte pattern is what ../tools/split_records.py
+             keys on; an edited-finance club has different VALUES in the same layout
+             (e.g. a non-default budget), not a different length, which is why the
+             trailing 32-byte default pattern is merely absent (not relocated) on
+             such a club. It found that pattern 5219 times in the 5220-record save
+             -- once per record except a single edited-finance club -- so it remains
+             a near-universal end-of-record ANCHOR for default-finance teams but is
+             not a length model. The roster_end detector below is also
              fictional-tuned (it caps slot values at 3000; real players.dat
              ordinals exceed that) and fails to locate the roster on the real save.
              NET: the roster_end..record_end walk is proven only for FRESH FICTIONAL
