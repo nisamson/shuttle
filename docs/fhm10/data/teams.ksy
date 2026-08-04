@@ -365,26 +365,36 @@ types:
              desync. For a team that never relocates the stride happens to be a
              constant ~190 bytes, but the count + fixed-block walk does not rely
              on that.
-          4. Immediately after the history array (item 3): a count-driven block
-             that opens with `s4 = 0`, a small `s4` count (~30-41 observed for a
-             fresh fictional club), and then an array of big-endian `s4`
-             player-ordinal references (1-based players.dat record positions, the
-             same slot encoding line_unit uses) -- a roster/prospect/reserve
-             list. Its on-disk length varies per team (3550-4436 bytes across the
-             9 fictional records), i.e. it is driven by that count, not fixed.
-             Further in it also carries franchise-lineage identity sub-blocks for
-             predecessor franchises (defunct/relocated teams folded into this
-             record's history) and external reference URL QStrings. The internal
-             sub-array structure is not yet fully field-decoded, so its length is
-             not yet independently computable.
-          5. A finance/settings block. For a team left at DEFAULT money its final
-             32 bytes are the byte-identical constant `00*8 27 0F 00*5 05 F5 E1 00
-             00*7 01 FF FF FF FF` (a 9999 cap and a 100,000,000 budget), verified
-             identical across all 9 fictional records, and the record ends exactly
-             at the end of that block (24 bytes past the `27 0F` marker). This is a
-             defaults artifact, NOT a reliable record terminator -- an
-             edited-finance team lacks it (see record_end_pos), so do not split
-             records on it.
+          4. Immediately after the history array (item 3): the roster block plus
+             a large mostly-padding tail. It opens with `s4 = 0`, then `s4
+             roster_count` (~30-41 for a fresh fictional club), then
+             `roster_count` big-endian `s4` player-ordinal references (1-based
+             players.dat record positions, the same slot encoding line_unit
+             uses) -- the active roster. That opening array is decoded and its
+             length is `8 + roster_count*4` (computable). After it comes a POST
+             region (~3.4 KB) that is mostly binary padding with fixed-offset
+             landmarks: a 3-character code QString at a constant offset (~828
+             bytes into POST -- the team's affiliation/relocation code, e.g.
+             "OKL" for a stock club, "ZZZ" as a placeholder) and a "#$%"
+             placeholder QString near its end. POST's head and tail are
+             effectively fixed-size, but a variable-length middle section
+             (between the code QString and the "#$%" marker) carries
+             franchise-lineage identity sub-blocks for predecessor franchises and
+             managed-team data -- e.g. the human-managed club here holds ~845
+             bytes more there than the AI clubs. That middle section is not yet
+             field-decoded, so item 4's total length is not yet independently
+             computable.
+          5. A finance/settings block: a FIXED 32-byte trailer that ends every
+             record, `00*8 27 0F 00*5 05 F5 E1 00 00*7 01 FF FF FF FF` (a 9999
+             cap and a 100,000,000 budget), byte-identical across all 9 records
+             (including the club whose CASH was edited -- editable team cash lives
+             in the header finance_1, not here, so this trailer is unaffected).
+             The `27 0F` marker sits 24 bytes before the record end; the 8 bytes
+             before it are zero. NOTE: this is the DEFAULT budget/cap block -- a
+             team whose budget or cap was edited would differ here -- so it is a
+             reliable end-of-record delimiter only among default-budget teams; do
+             not use it as a general record terminator (use the record-start
+             signature; see record_end_pos).
 
           These bounds come from a full real-league save whose deeper history
           exercises the block; a fictional league populates only a subset.
