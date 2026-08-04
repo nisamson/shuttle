@@ -351,14 +351,26 @@ types:
              desync. For a team that never relocates the stride happens to be a
              constant ~190 bytes, but the count + fixed-block walk does not rely
              on that.
-          4. Franchise-lineage identity sub-blocks for predecessor franchises
-             (defunct/relocated teams folded into this record's history) and
-             external reference URL QStrings.
-          5. A finance/settings block whose final ~32 bytes are constant for a
-             team left at default money (bytes `00*8 27 0F 00*5 05 F5 E1 00 00*7
-             01 FF FF FF FF` = a 9999 cap and a 100,000,000 budget). This tail is
-             a defaults artifact, not a record terminator -- an edited-finance
-             team lacks it (see record_end_pos).
+          4. Immediately after the history array (item 3): a count-driven block
+             that opens with `s4 = 0`, a small `s4` count (~30-41 observed for a
+             fresh fictional club), and then an array of big-endian `s4`
+             player-ordinal references (1-based players.dat record positions, the
+             same slot encoding line_unit uses) -- a roster/prospect/reserve
+             list. Its on-disk length varies per team (3550-4436 bytes across the
+             9 fictional records), i.e. it is driven by that count, not fixed.
+             Further in it also carries franchise-lineage identity sub-blocks for
+             predecessor franchises (defunct/relocated teams folded into this
+             record's history) and external reference URL QStrings. The internal
+             sub-array structure is not yet fully field-decoded, so its length is
+             not yet independently computable.
+          5. A finance/settings block. For a team left at DEFAULT money its final
+             32 bytes are the byte-identical constant `00*8 27 0F 00*5 05 F5 E1 00
+             00*7 01 FF FF FF FF` (a 9999 cap and a 100,000,000 budget), verified
+             identical across all 9 fictional records, and the record ends exactly
+             at the end of that block (24 bytes past the `27 0F` marker). This is a
+             defaults artifact, NOT a reliable record terminator -- an
+             edited-finance team lacks it (see record_end_pos), so do not split
+             records on it.
 
           These bounds come from a full real-league save whose deeper history
           exercises the block; a fictional league populates only a subset.
