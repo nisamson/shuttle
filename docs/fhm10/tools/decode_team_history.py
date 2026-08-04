@@ -6,12 +6,16 @@
 
 teams.dat is a big-endian Qt QDataStream container. Deep inside each team
 record's undecoded trailing block (see teams.ksy `opaque_tail`) is a per-season
-history array: one fixed-stride record per season from the franchise's founding
-year to the present. Each season record is
+history array: one record per season from the franchise's founding year to the
+present. The array is preceded by an `s4` season-count, and each season record is
 
     s4 year
     QString city  QString nickname  QString abbreviation   (that season's identity)
-    ~134-byte big-endian numeric stat block
+    134-byte big-endian numeric stat block   (fixed size, verified constant)
+
+Because the stat block is exactly 134 bytes, every season record is
+self-delimiting, so the array is walked record-to-record (no fixed stride
+needed) and its total length is `4 + sum over seasons of (4 + 3 QStrings + 134)`.
 
 The stat block's confirmed fields, at offsets relative to the start of the stat
 block (i.e. immediately after the three identity QStrings), big-endian u2 unless
@@ -136,13 +140,24 @@ def be16(num: bytes, off: int) -> int:
 
 
 def decode_seasons(d: bytes, start: int, stride: int, limit: int):
+    """Parse the season array sequentially from `start`.
+
+    The per-season stat block is a fixed 134 bytes and each season record is
+    self-delimiting (s4 year + 3 identity QStrings + 134-byte block), so we walk
+    record-to-record without relying on a constant stride -- this also handles a
+    franchise whose identity string lengths change across seasons. `stride` is
+    accepted for backwards compatibility but no longer used for iteration.
+    """
     rows = []
-    k = 0
-    while k < limit:
-        rec = read_identity(d, start + stride * k)
+    off = start
+    prev_year = None
+    while len(rows) < limit:
+        rec = read_identity(d, off)
         if rec is None:
             break
         year, names, stat_off = rec
+        if prev_year is not None and year != prev_year + 1:
+            break
         num = d[stat_off:stat_off + 134]
         rows.append({
             "year": year,
@@ -159,7 +174,8 @@ def decode_seasons(d: bytes, start: int, stride: int, limit: int):
             "shgf": be16(num, 75), "shga": be16(num, 77),
             "ppof": be16(num, 79), "tsh": be16(num, 81),
         })
-        k += 1
+        prev_year = year
+        off = stat_off + 134
     return rows
 
 
@@ -196,10 +212,16 @@ def main() -> None:
     if not rows:
         raise SystemExit("no season records decoded")
 
+    declared = struct.unpack_from(">i", d, start - 4)[0] if start >= 4 else None
+    count_note = ""
+    if declared is not None:
+        ok = "ok" if declared == len(rows) else "MISMATCH"
+        count_note = f", declared-count {declared} [{ok}]"
+
     ident = rows[0]
     print(f"# {ident['city']} {ident['nickname']} ({ident['abbrev']}) "
           f"-- {len(rows)} seasons from {rows[0]['year']} "
-          f"(start {start:#x}, stride {stride})\n")
+          f"(start {start:#x}, stride {stride}{count_note})\n")
     hdr = (f"{'year':>4} {'fin':>3} {'W':>3} {'L':>3} {'T':>3} {'OTL':>3} "
            f"{'pts':>4} {'GF':>4} {'GA':>4} {'PIM':>4} {'PP%':>5} {'PK%':>5} "
            f"{'att':>6} {'PO':>2} {'CH':>2}  team")

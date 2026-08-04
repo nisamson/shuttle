@@ -267,16 +267,18 @@ types:
              many 9-byte records `{u2 index (1..7), u2 year, u4 value, u1 flag}` --
              7 entries per season for the next ~4 seasons. Forward-looking
              (values are schedule/target placeholders), not historical results.
-          3. A per-season franchise-history array: one repeating record per
-             season from the franchise's founding year to the present (e.g. ~117
-             records for an Original Six team founded in 1909). Each record is a
-             fixed stride (~190 bytes for a team that never relocates -- the
-             stride is constant only because its three identity QStrings keep a
-             constant length) and begins with a `s4 year` followed by the team's
-             identity that season as QStrings (city / nickname / abbreviation)
-             and a ~134-byte numeric stat block. Because identity strings are
-             stored per season, this is where historical relocations/renames are
-             recoverable.
+          3. A per-season franchise-history array: an `s4` season-count followed
+             by that many season records, one per season from the franchise's
+             founding year to the present (e.g. count 118 for an Original Six team
+             founded in 1909). Each season record is `s4 year`, the team's
+             identity that season as QStrings (city / nickname / abbreviation),
+             and a FIXED 134-byte numeric stat block. The 134-byte stat-block size
+             is constant across every season and every team (verified over 1300+
+             arrays in a real-league save), so each season record is
+             self-delimiting and the whole array's on-disk length is computable:
+             `4 + sum over seasons of (4 + len(3 identity QStrings) + 134)`.
+             Because identity strings are stored per season, this is also where
+             historical relocations/renames are recoverable.
 
              The numeric stat block is big-endian (like the rest of the Qt
              file). Confirmed fields, at offsets relative to the start of the
@@ -336,14 +338,15 @@ types:
              for a decoder and ../examples/real-league-history-decoded.md for a
              validated Montreal example.
 
-             Stride note: the per-season stride is a constant ~190 bytes for a
-             team whose three identity QStrings keep a constant length (measured
-             from the first two seasons and validated founding..present). A
-             robust reader should still re-read each season's identity QStrings
-             to re-anchor the stat block per record rather than assume a fixed
-             stride, so it also handles a franchise whose identity string lengths
-             change (a relocation/rename shifts the stat block within its
-             record).
+             Parsing note: because the stat block is a fixed 134 bytes, each
+             season record is self-delimiting and a reader should walk the array
+             record-to-record (read year + 3 identity QStrings, then skip 134
+             bytes) for `season_count` records rather than assume a constant
+             stride. That handles a franchise whose identity string lengths change
+             across seasons (a relocation/rename), where a fixed stride would
+             desync. For a team that never relocates the stride happens to be a
+             constant ~190 bytes, but the count + fixed-block walk does not rely
+             on that.
           4. Franchise-lineage identity sub-blocks for predecessor franchises
              (defunct/relocated teams folded into this record's history) and
              external reference URL QStrings.

@@ -8,9 +8,10 @@ century-plus of seasons, so the block is exercised and can be validated against
 the in-game season-history screen and against real-world records.
 
 The example team is the first record in that save, the **Montreal Canadiens
-(MTL)**: 118 season records, from the franchise's founding year **1909** to the
-present, at a constant **190-byte stride** (constant because the club never
-relocates, so its three per-season identity QStrings keep a fixed length).
+(MTL)**: 118 season records (matching the array's `s4` season-count prefix),
+from the franchise's founding year **1909** to the present. Each season's stat
+block is a fixed **134 bytes**, so the records are self-delimiting; for a club
+that never relocates like MTL the resulting stride is a constant **190 bytes**.
 
 ## Season-record layout
 
@@ -65,11 +66,16 @@ results diverge from real history and begin a few seasons later (2023-24 here).
 The presence of nonzero +31/+35/+37 is therefore a practical discriminator
 between a collapsed seed season and a fully-detailed/simulated one.
 
-**Stride:** the per-season stride is a constant **190 bytes** end-to-end
-(founding through the present) because MTL's identity strings never change
-length. The decoder still re-reads each season's identity QStrings to re-anchor
-the stat block per record, so it also handles a franchise whose identity string
-lengths change (a relocation/rename shifts the stat block within its record).
+**Season count & self-delimiting records:** the array is preceded by an `s4`
+season-count (118 for MTL), and each season's stat block is a **fixed 134 bytes**
+(verified constant across every season and every team — 1300+ arrays in the
+save). So each season record — `s4 year` + 3 identity QStrings + 134 bytes — is
+self-delimiting, and the whole array's length is
+`4 + Σ(4 + 3 QStrings + 134)`. A reader walks it record-to-record for
+`season_count` seasons; it never needs a fixed stride. That also handles a
+franchise whose identity string lengths change (a relocation/rename shifts the
+stat block within its record). For a club that never relocates, like MTL, the
+stride happens to be a constant **190 bytes**, but nothing relies on that.
 
 Decode any team's history with
 [`../tools/decode_team_history.py`](../tools/decode_team_history.py), which
