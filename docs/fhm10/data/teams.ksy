@@ -395,31 +395,51 @@ types:
              fully accounted for: `managed ? 908 : 0`. The POST interior (between
              the roster array and item 5) has since been mapped further by
              cross-team byte analysis of the 9-club reference save:
-               * A FIXED 156-byte scaffold immediately follows the roster array
-                 (byte-identical across all AI clubs), then a run of per-team
-                 f4 rating/finance floats (fixed size, values differ).
-               * The main length variable is a pair of count-prefixed big-endian
-                 s4 arrays `[s4 N][N* s4]` holding globally-allocated SEQUENTIAL
-                 club IDs (e.g. one ~26-29-element array followed by one
-                 ~64-67-element array; the second's count byte sits immediately
-                 before its first element). Both are self-delimiting; the larger
-                 is followed by a FIXED anchor `s4 -1, s4 0x270F0000, s4 0, s4 999`.
-               * The last 66 bytes of every record are FIXED (item 5's 32-byte
-                 trailer plus 34 constant bytes before it).
-             So the variable content is bounded to `roster_end+156 .. record_end-66`
-             and dominated by those two self-delimiting ID arrays. A controlled
-             in-game byte-diff established that these arrays are FRANCHISE-level and
-             roster-INDEPENDENT: releasing a player from a club left that club's
-             teams.dat record byte-identical (active roster membership lives in
-             players.dat, not here), so the IDs are franchise-owned entity handles
-             allocated at league creation, not per-active-roster-player records.
-             What still blocks a byte-exact forward walk is a SMALL residual field
-             inside that window: two clubs with the same total ID-array element
-             count differ by a few bytes (e.g. SAN vs FRE: both 93 IDs, 5-byte
-             delta), so at least one more small variable field remains un-enumerated
-             (NOT roster-driven -- its driver is still unidentified). Empirically
-             the whole AI-club POST varies by only ~13 bytes total (3442-3455 in
-             the reference save).
+             The whole region roster_end -> record_end is now FULLY MODELLED as a
+             sequence of self-delimiting fields (no residual remains) and a Python
+             walker (../tools/walk_record.py) computes record_end from this model
+             and lands byte-EXACT on all 9 record boundaries of both the AI-only
+             and the human-managed reference save:
+               * gap1: a FIXED 219-byte region immediately after the roster array
+                 (byte-identical across all AI clubs; a 156-byte scaffold plus a
+                 run of per-team f4 rating/finance floats, fixed size, values
+                 differ).
+               * array1: a count-prefixed big-endian s4 array `[s4 N1][N1* s4]` of
+                 globally-allocated SEQUENTIAL club IDs (~26-29 elements).
+               * array2: a second such array `[s4 N2][N2* s4]` (~64-67 elements)
+                 immediately adjacent to array1 (gap2 = 0), followed by a FIXED
+                 anchor `s4 -1, s4 0x270F0000, s4 0, s4 999`.
+               * gap3: a FIXED region to the next array -- 2767 bytes for an AI
+                 club, 3607 for a human-managed club (the +840 is exactly where
+                 the managed-team preset block lands, so the `managed ? +840 : 0`
+                 length delta lives entirely inside gap3).
+               * five_array: a count-prefixed array of 5-byte records
+                 `[s4 C][C* (s4 id + u1 tag=0x03)]`, preceded by the byte pattern
+                 `01 05 03 0X` and terminated by the fixed word `s4 99`
+                 (0x00000063). C observed 3-5. This ODD-width (5-byte) record array
+                 was the last unmodelled field: two clubs with equal total ID-array
+                 element counts differed by a multiple of 5 bytes (e.g. FRE C=4 vs
+                 SAN C=3 -> a 5-byte delta), which pinpointed a 5-byte-record array
+                 rather than an s4 (x4) array or a QString (always even).
+               * gap4: a FIXED 65-byte tail to record_end (includes item 5's
+                 32-byte finance trailer).
+             All four gaps are CONSTANT across every AI club, so the record length
+             is fully computable from the three parsed counts and the managed flag:
+
+               record_end = roster_end + 219
+                          + (4 + 4*N1) + (4 + 4*N2)
+                          + (managed ? 3607 : 2767)
+                          + (4 + 5*C) + 65
+
+             Equivalently `post_len = 3063 + 4*(N1+N2) + 5*C (+840 if managed)`,
+             where 3063 = 219 + 2767 + 65 + the three 4-byte count prefixes. This
+             formula matched EXACTLY for all 8 AI clubs in the reference save and
+             both managed clubs. A controlled in-game byte-diff established that the
+             two ID arrays are FRANCHISE-level and roster-INDEPENDENT: releasing a
+             player from a club left that club's teams.dat record byte-identical
+             (active roster membership lives in players.dat, not here), so the IDs
+             are franchise-owned entity handles allocated at league creation, not
+             per-active-roster-player records.
              (Creating the GM also bumped every club's item-1 reserve-list count
              70 -> 90, i.e. +20 `-1` entries / +80 bytes -- already covered by the
              item-1 `4 + count*4` model, not a separate field.)
@@ -458,28 +478,40 @@ types:
           ANY save without decoding the trailing block. See ../tools/parse_teams.py
           for the data-driven boundary finder.
 
-          COMPUTABILITY STATUS: the opaque_tail sub-blocks are decoded to varying
-          depth. Items 1, 2, 3 and 5 are count-prefixed / self-delimiting / fixed
-          and computable. Item 4's roster array is computable and its single
-          LARGEST length variable -- the conditional 908-byte managed-team preset
-          block, gated by the item-4 human-managed `u1` flag -- is now fully
-          decoded. Item 4's POST interior is now largely mapped too (see item 4
-          above): a fixed 156-byte scaffold + per-team floats, then two
-          self-delimiting count-prefixed global-ID arrays, then a fixed 66-byte
-          tail -- so the variable content is bounded to
-          `roster_end+156 .. record_end-66`. What REMAINS before this offset table
-          can be dropped is a SMALL residual variable field inside that window
-          (clubs with equal total ID-array element counts still differ by a few
-          bytes), not yet enumerated -- and a controlled release-a-player byte-diff
-          left teams.dat byte-identical, proving the field is NOT roster-driven
-          (active roster lives in players.dat), so its driver is still unidentified.
-          Until it is modeled a forward parse cannot reach item 5 byte-exactly, so
-          this ABSOLUTE-offset ternary is retained. It stays file-specific and is
-          NOT a portable record delimiter; the portable boundary is the record-START
-          signature implemented in ../tools/parse_teams.py (dense record_index +
-          identity QStrings), which needs no offset table and works on any save.
+          COMPUTABILITY STATUS: the opaque_tail sub-blocks are now ALL decoded to a
+          self-delimiting / computable depth. Items 1, 2, 3 and 5 are count-prefixed
+          / self-delimiting / fixed. Item 4 is fully modelled end-to-end: its roster
+          array is count-prefixed; the conditional managed-team preset block (gated
+          by the item-4 human-managed `u1` flag) is accounted for as a `managed ?
+          +840 : 0` delta inside a fixed gap; and its POST interior resolves to
+          gap1(219) + array1`[s4 N1][N1*s4]` + array2`[s4 N2][N2*s4]`+anchor +
+          gap3(managed ? 3607 : 2767) + five_array`[s4 C][C*5]` + gap4(65) -- see
+          item 4 above. The previously-unmodelled residual is SOLVED: it was the
+          odd-width (5-byte-record) five_array. A Python walker
+          (../tools/walk_record.py) computes record_end purely from this model
+          (record_end = roster_end + 219 + (4+4*N1) + (4+4*N2) + (managed?3607:2767)
+          + (4+5*C) + 65) and lands byte-EXACT on all 9 record boundaries of BOTH
+          reference saves (AI-only and human-managed), proving the tail from
+          roster_end onward is fully self-delimiting.
+
+          What still prevents DROPPING this offset table is the record HEADER, not
+          the tail: the `line_unit` type below is currently only a fixed-size "raw
+          byte view of the reference save" and does NOT match the true structure (a
+          leading block plus 13 count-prefixed QList<s4>), so a forward parse of the
+          active_line_unit + line_units array does not reach opaque_tail's start
+          byte-exactly on an arbitrary save. The walker sidesteps this by LOCATING
+          roster_end via a data signature (the `[s4 0][s4 roster_count][ids...]`
+          window) rather than by forward-parsing the header. Decoding the
+          line_unit leading block is the remaining work before the header, too, is
+          self-delimiting and this ternary can be replaced by a computed length /
+          a full sequential parse. Until then this ABSOLUTE-offset ternary is
+          retained. It stays file-specific and is NOT a portable record delimiter;
+          the portable boundary is the record-START signature implemented in
+          ../tools/parse_teams.py (dense record_index + identity QStrings), which
+          needs no offset table and works on any save.
           (There is also no Kaitai compiler in-repo to validate a full sequential
-          rewrite; the decode so far is documented in prose above.)
+          rewrite; the decode so far is documented in prose above and validated by
+          ../tools/walk_record.py.)
 
           Do NOT try to terminate a record on the fixed 32-byte tail that closes
           most records (bytes `00*8 27 0F 00*5 05 F5 E1 00 00*7 01 FF FF FF FF`):
