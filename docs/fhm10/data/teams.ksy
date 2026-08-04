@@ -264,7 +264,21 @@ types:
           following sub-structures have been identified within it but are not yet
           fully field-decoded:
 
-          1. A `-1`-padded fixed block immediately after the line units.
+          1. A leadership group + a `-1`-padded reserve list, immediately after
+             the 13 line-unit lists. This whole region is now field-decoded and
+             computable (verified across all 9 records of a fresh fictional
+             save):
+               a. `3 x s4` player-ordinal references (1-based players.dat record
+                  positions, the same slot encoding line_unit uses) -- the team
+                  captain and its two alternate captains. For an active club they
+                  resolve to real skaters (e.g. Atlanta = 138, 173, 154 =
+                  its RD1 / C1 / LW1); an empty placeholder club still stores
+                  three values here.
+               b. `s4 count` (70 in every record observed) followed by that many
+                  `s4` reserve/roster slots, all `-1` in a fresh save -- a
+                  fixed-capacity reserve list. On-disk length is `4 + count*4`
+                  (computable), so this block is self-delimiting and item 2
+                  (below) begins immediately after it.
           2. An "upcoming seasons" array: an `s4` count followed by that many
              9-byte records `{u2 index (1..7), u2 year, u4 value, u1 flag}` --
              7 entries per season for the next 4 seasons (e.g. count 28 = 7 x
@@ -516,8 +530,10 @@ types:
       A unit is exactly 13 consecutive QList<s4> with FIXED per-situation slot
       counts [12, 8, 10, 10, 12, 6, 8, 6, 8, 6, 5, 5, 2] (identical across all
       teams; counts are per game-situation, not fill-dependent). AI/other teams
-      leave every slot -1. After the 13 lists come a -1-padded fixed block and
-      then non-line data (season history); that tail is not yet field-decoded.
+      leave every slot -1. After the 13 lists come three s4 leadership refs
+      (captain + 2 alternate captains) and a count-prefixed `-1`-padded reserve
+      list, then the upcoming-seasons and season-history arrays (see
+      team_record.opaque_tail items 1-3).
 
       Confirmed per-situation map (list index -> situation), grouped into the
       indicated sub-units. All special-teams indices below were pinned by
