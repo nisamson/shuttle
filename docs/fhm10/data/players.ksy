@@ -175,6 +175,22 @@ types:
   # the two instances (primary, secondary) is preceded by an s4 presence marker
   # (-1 = null/absent; otherwise the instance follows). role_id indexes the
   # player_roles.dat catalogue (-1 = derive from position on load).
+  #
+  # CONFIRMED by a controlled in-game edit + byte-diff (changing one skater's
+  # primary role from Two-Way Forward (15) to Enforcer (10) flipped exactly the
+  # low byte of one s4 in that player's record from 0x0f to 0x0a): the s4 that
+  # changed is this instance's `role_id`, and the instance is immediately
+  # followed by its 9 `flags` (u1) and 9 `sub_ratings` (u2). This field applies
+  # to SKATERS ONLY (forwards and defencemen); goaltenders have no tactical role
+  # in FHM 10, so in goaltender records the same slot just reads leftover /
+  # irrelevant skater-role ids and should be ignored.
+  #
+  # Locating the instance: its byte offset within a record is NOT fixed — an
+  # optional preceding field shifts it by ~4 bytes between records — so do not
+  # hard-code an offset. Instead anchor on the instance shape: a `role_id` in
+  # [0..31] immediately followed by 9 `flags` and 9 `sub_ratings`. In a
+  # freshly-generated save the primary instance's flags read as nine 0x00 and
+  # its sub_ratings as nine 0x0002, which makes a reliable search signature.
   player_role_instance:
     seq:
       - id: role_id
