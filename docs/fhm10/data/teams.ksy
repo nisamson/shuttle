@@ -371,19 +371,31 @@ types:
              `roster_count` big-endian `s4` player-ordinal references (1-based
              players.dat record positions, the same slot encoding line_unit
              uses) -- the active roster. That opening array is decoded and its
-             length is `8 + roster_count*4` (computable). After it comes a POST
-             region (~3.4 KB) that is mostly binary padding with fixed-offset
-             landmarks: a 3-character code QString at a constant offset (~828
-             bytes into POST -- the team's affiliation/relocation code, e.g.
-             "OKL" for a stock club, "ZZZ" as a placeholder) and a "#$%"
-             placeholder QString near its end. POST's head and tail are
-             effectively fixed-size, but a variable-length middle section
-             (between the code QString and the "#$%" marker) carries
-             franchise-lineage identity sub-blocks for predecessor franchises and
-             managed-team data -- e.g. the human-managed club here holds ~845
-             bytes more there than the AI clubs. That middle section is not yet
-             field-decoded, so item 4's total length is not yet independently
-             computable.
+             length is `8 + roster_count*4` (computable). Shortly after the
+             roster array (at a fixed offset past its trailing fields) is a `u1`
+             HUMAN-MANAGED FLAG: `1` when the club is controlled by a human GM,
+             `0` for an AI club. After it comes a POST region (~3.4 KB) that is
+             mostly binary padding with fixed-offset landmarks: a 3-character code
+             QString at a constant offset (~828 bytes into POST -- the team's
+             affiliation/relocation code, e.g. "OKL" for a stock club, "ZZZ" as a
+             placeholder) and a "#$%" placeholder QString near its end. Every AI
+             club's POST is the SAME fixed size; the ONLY per-team length
+             variation is a conditional MANAGED-TEAM PRESET BLOCK inserted iff the
+             human-managed flag is `1`. That block is itself fixed: exactly 908
+             bytes, a run of 17 count-prefixed arrays `[s4 count][count* s4]` with
+             the constant count sequence [20,20,20,20,20,5,5,10,10,10,10,10,10,10,
+             10,10,10] (5x 20-slot + 2x 5-slot + 10x 10-slot line/depth-chart
+             PRESET slots). In an empty template every slot is `-1` (0xFFFFFFFF);
+             a GM who saved custom preset lines would store player ordinals here.
+             The block was proven present-iff-managed and byte-identical in
+             structure by a controlled in-game byte-diff: taking human control of
+             a previously-AI club made exactly this 908-byte block appear (and
+             flipped the flag `0`->`1`), with all other clubs unchanged. With the
+             flag gating this fixed 908-byte block, item 4's total length IS now
+             computable: `roster_array + fixed_POST + (managed ? 908 : 0)`.
+             (Creating the GM also bumped every club's item-1 reserve-list count
+             70 -> 90, i.e. +20 `-1` entries / +80 bytes -- already covered by the
+             item-1 `4 + count*4` model, not a separate field.)
           5. A finance/settings block: a FIXED 32-byte trailer that ends every
              record, `00*8 27 0F 00*5 05 F5 E1 00 00*7 01 FF FF FF FF` (a 9999
              cap and a 100,000,000 budget), byte-identical across all 9 records
@@ -418,6 +430,16 @@ types:
           that sequential index yields each record's [start, next_start) extent on
           ANY save without decoding the trailing block. See ../tools/parse_teams.py
           for the data-driven boundary finder.
+
+          COMPUTABILITY STATUS: every opaque_tail sub-block (items 1-5 above) is
+          now decoded into a count-prefixed / self-delimiting / fixed-size form,
+          INCLUDING the last unknown -- the conditional 908-byte managed-team
+          preset block, gated by the item-4 human-managed `u1` flag. A record can
+          therefore be walked start-to-end without this offset table. This ternary
+          is retained only because the seq between active_line_unit and opaque_tail
+          is still a KNOWN-MISMODEL raw-byte view (the fields below do not match the
+          real bytes) and there is no Kaitai compiler in-repo to validate a full
+          sequential rewrite; the decode is documented in prose above pending that.
 
           Do NOT try to terminate a record on the fixed 32-byte tail that closes
           most records (bytes `00*8 27 0F 00*5 05 F5 E1 00 00*7 01 FF FF FF FF`):
