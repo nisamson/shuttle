@@ -263,10 +263,12 @@ types:
           fully field-decoded:
 
           1. A `-1`-padded fixed block immediately after the line units.
-          2. An "upcoming seasons" array: an s4 count (e.g. 28) followed by that
-             many 9-byte records `{u2 index (1..7), u2 year, u4 value, u1 flag}` --
-             7 entries per season for the next ~4 seasons. Forward-looking
-             (values are schedule/target placeholders), not historical results.
+          2. An "upcoming seasons" array: an `s4` count followed by that many
+             9-byte records `{u2 index (1..7), u2 year, u4 value, u1 flag}` --
+             7 entries per season for the next 4 seasons (e.g. count 28 = 7 x
+             2024..2027). Its on-disk length is therefore `4 + count*9`
+             (computable). Forward-looking (values are schedule/target
+             placeholders, all zero in a fresh save), not historical results.
           3. A per-season franchise-history array: an `s4` season-count followed
              by that many season records, one per season from the franchise's
              founding year to the present (e.g. count 118 for an Original Six team
