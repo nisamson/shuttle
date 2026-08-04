@@ -196,16 +196,18 @@ types:
       - id: finance_1
         type: s4
         -doc: |
-          Large monetary value (franchise cash / value). Real-league clubs are
-          in the ~55-137 million range and affiliates around ~0.6-1.3 million,
-          with the wealthiest markets highest -- consistent with a cash or
-          franchise-value figure in whole currency units.
+          The team's editable CASH, in whole currency units. Confirmed by an
+          in-game byte-diff: editing one club's cash (123,456,789 -> 98,765,432)
+          changed exactly these 4 bytes and nothing else in the file. Real-league
+          clubs sit in the ~55-137 million range and affiliates around ~0.6-1.3
+          million, with the wealthiest markets highest.
       - id: finance_2
         type: s4
         -doc: |
-          Secondary monetary value (e.g. an operating budget), smaller than
-          finance_1: single-digit-millions for top clubs, hundreds of thousands
-          for affiliates.
+          The team's STAFF BUDGET, in whole currency units. User-confirmed: the
+          value here (e.g. 8,140,000 for Montreal) matches the club's staff
+          budget exactly. Smaller than finance_1 (cash): single-digit-millions
+          for top clubs, hundreds of thousands for affiliates.
       - id: finance_3
         type: s4
         -doc: |
