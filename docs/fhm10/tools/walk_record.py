@@ -4,14 +4,24 @@
 # ///
 """Walk each FHM10 teams.dat record by a self-delimiting field model (no offsets).
 
-This is the executable proof that a team record's length is COMPUTABLE from the
-data alone, so teams.ksy's file-specific `record_end_pos` absolute-offset table is
-not fundamentally required. For every record it computes the end offset purely
-from parsed field lengths and checks it against the independent record-START
-signature boundary (the same one parse_teams.py uses).
+SCOPE / VALIDITY: this walker is validated ONLY on FRESH FICTIONAL saves (the
+9-club reference saves). Its field model was REFUTED on a real-league save (an
+Original Six league, 5220 records): a whole-file scan there found ZERO of the
+consecutive-ID arrays this model depends on -- they are an artifact of a fresh
+league allocating entity ids 1,2,3,... in order, so a plain id list happens to
+look like a `+1` consecutive run; real leagues store non-consecutive ids and the
+gap/formula constants below do not hold. Only item 5's finance trailer
+generalized. On a real save `roster_end` is not even located (the detector caps
+slot values at 3000; real players.dat ordinals exceed that). Treat this tool as a
+fictional-save proof-of-concept, NOT a general teams.dat length model.
+
+This was the executable proof that, ON A FRESH FICTIONAL SAVE, a team record's
+length is COMPUTABLE from the data alone. For every record it computes the end
+offset purely from parsed field lengths and checks it against the independent
+record-START signature boundary (the same one parse_teams.py uses).
 
 Decoded model of item-4's POST (the region after the roster array), established by
-cross-team analysis + controlled byte-diffs on the reference save:
+cross-team analysis + controlled byte-diffs on the fresh fictional reference save:
 
     roster_end
       + 219 bytes            fixed scaffold

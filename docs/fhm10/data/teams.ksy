@@ -394,12 +394,15 @@ types:
              conditional block is the LARGEST per-team length variation and is now
              fully accounted for: `managed ? 908 : 0`. The POST interior (between
              the roster array and item 5) has since been mapped further by
-             cross-team byte analysis of the 9-club reference save:
-             The whole region roster_end -> record_end is now FULLY MODELLED as a
-             sequence of self-delimiting fields (no residual remains) and a Python
-             walker (../tools/walk_record.py) computes record_end from this model
-             and lands byte-EXACT on all 9 record boundaries of both the AI-only
-             and the human-managed reference save:
+             cross-team byte analysis of the 9-club reference save.
+             IMPORTANT SCOPE: the field-by-field POST model below was derived and
+             validated ONLY on FRESH FICTIONAL 9-club saves; a later check against
+             a real-league save REFUTES its generality (see the REAL-SAVE CAVEAT at
+             the end of this item). On those fresh fictional saves the whole region
+             roster_end -> record_end walks as a sequence of self-delimiting fields
+             and a Python walker (../tools/walk_record.py) computes record_end from
+             this model and lands byte-EXACT on all 9 record boundaries of both the
+             AI-only and the human-managed fictional reference save:
                * gap1: a FIXED 219-byte region immediately after the roster array
                  (byte-identical across all AI clubs; a 156-byte scaffold plus a
                  run of per-team f4 rating/finance floats, fixed size, values
@@ -440,6 +443,30 @@ types:
              (active roster membership lives in players.dat, not here), so the IDs
              are franchise-owned entity handles allocated at league creation, not
              per-active-roster-player records.
+
+             REAL-SAVE CAVEAT (this POST model does NOT generalize): running the
+             walker against a full real-league save (an Original Six league,
+             version_tag 51, 5220 records) REFUTES the field model above. A
+             whole-file scan of that 45 MB save found ZERO consecutive-ID arrays
+             (array1/array2 as modelled), no `0x270F0000` array anchor in a normal
+             club record, and no `01 05 03` five_array signature in a clean club
+             record. Those "sequential club ID" arrays were an ARTIFACT of a fresh
+             league that allocates entity ids 1,2,3,... in order (so a plain id
+             list looks like a `+1` consecutive run); in a real league with
+             creation/relocation history the same lists hold NON-consecutive ids
+             and do not match the consecutive-run detector, and the gap constants
+             (219 / 2767 / 3607 / 65) and the `3063 + 4*IDs + 5*C` formula do not
+             hold. What DID generalize is only item 5's fixed finance trailer
+             (`00*8 27 0F 00*5 05 F5 E1 00 ...`), found 5219 times in the 5220-record
+             save -- once per record except a single edited-finance club -- so it
+             remains a near-universal end-of-record ANCHOR for default-finance
+             teams but is not a length model. The roster_end detector below is also
+             fictional-tuned (it caps slot values at 3000; real players.dat
+             ordinals exceed that) and fails to locate the roster on the real save.
+             NET: the roster_end..record_end walk is proven only for FRESH FICTIONAL
+             saves; on real saves the POST beyond item 5's trailer is NOT yet
+             decoded, so this remains open, and the record-START signature (dense
+             record_index) stays the portable boundary.
              (Creating the GM also bumped every club's item-1 reserve-list count
              70 -> 90, i.e. +20 `-1` entries / +80 bytes -- already covered by the
              item-1 `4 + count*4` model, not a separate field.)
@@ -478,37 +505,44 @@ types:
           ANY save without decoding the trailing block. See ../tools/parse_teams.py
           for the data-driven boundary finder.
 
-          COMPUTABILITY STATUS: the opaque_tail sub-blocks are now ALL decoded to a
-          self-delimiting / computable depth. Items 1, 2, 3 and 5 are count-prefixed
-          / self-delimiting / fixed. Item 4 is fully modelled end-to-end: its roster
-          array is count-prefixed; the conditional managed-team preset block (gated
-          by the item-4 human-managed `u1` flag) is accounted for as a `managed ?
-          +840 : 0` delta inside a fixed gap; and its POST interior resolves to
+          COMPUTABILITY STATUS: items 1, 2, 3 and 5 are count-prefixed /
+          self-delimiting / fixed and hold on both fictional and real saves. Item 4
+          is fully modelled END-TO-END ONLY ON FRESH FICTIONAL SAVES: there its
+          roster array is count-prefixed; the conditional managed-team preset block
+          (gated by the item-4 human-managed `u1` flag) is a `managed ? +840 : 0`
+          delta inside a fixed gap; and its POST interior resolves to
           gap1(219) + array1`[s4 N1][N1*s4]` + array2`[s4 N2][N2*s4]`+anchor +
-          gap3(managed ? 3607 : 2767) + five_array`[s4 C][C*5]` + gap4(65) -- see
-          item 4 above. The previously-unmodelled residual is SOLVED: it was the
-          odd-width (5-byte-record) five_array. A Python walker
-          (../tools/walk_record.py) computes record_end purely from this model
-          (record_end = roster_end + 219 + (4+4*N1) + (4+4*N2) + (managed?3607:2767)
-          + (4+5*C) + 65) and lands byte-EXACT on all 9 record boundaries of BOTH
-          reference saves (AI-only and human-managed), proving the tail from
-          roster_end onward is fully self-delimiting.
+          gap3(managed ? 3607 : 2767) + five_array`[s4 C][C*5]` + gap4(65). On those
+          fictional saves a Python walker (../tools/walk_record.py) computes
+          record_end purely from this model (record_end = roster_end + 219 +
+          (4+4*N1) + (4+4*N2) + (managed?3607:2767) + (4+5*C) + 65) and lands
+          byte-EXACT on all 9 records of BOTH fictional reference saves.
 
-          What still prevents DROPPING this offset table is the record HEADER, not
-          the tail: the `line_unit` type below is currently only a fixed-size "raw
-          byte view of the reference save" and does NOT match the true structure (a
-          leading block plus 13 count-prefixed QList<s4>), so a forward parse of the
-          active_line_unit + line_units array does not reach opaque_tail's start
-          byte-exactly on an arbitrary save. The walker sidesteps this by LOCATING
-          roster_end via a data signature (the `[s4 0][s4 roster_count][ids...]`
-          window) rather than by forward-parsing the header. Decoding the
-          line_unit leading block is the remaining work before the header, too, is
-          self-delimiting and this ternary can be replaced by a computed length /
-          a full sequential parse. Until then this ABSOLUTE-offset ternary is
-          retained. It stays file-specific and is NOT a portable record delimiter;
-          the portable boundary is the record-START signature implemented in
-          ../tools/parse_teams.py (dense record_index + identity QStrings), which
-          needs no offset table and works on any save.
+          HOWEVER, this item-4 model does NOT generalize: checked against a real
+          Original Six league save (5220 records) it FAILS -- a whole-file scan
+          found ZERO of the consecutive-ID arrays it depends on (they were an
+          artifact of a fresh league allocating ids 1,2,3,...; real ids are
+          non-consecutive), and the gap/formula constants do not hold. Only item 5's
+          finance trailer generalized (present once per record). See the REAL-SAVE
+          CAVEAT under item 4. So a data-driven record_end is proven only for fresh
+          fictional saves; on real saves the item-4 POST beyond the roster array and
+          item 5's trailer is NOT yet decoded.
+
+          Two things therefore still block DROPPING this offset table: (a) the
+          real-save item-4 POST is undecoded (above), and (b) even the record HEADER
+          is not self-delimiting -- the `line_unit` type below is only a fixed-size
+          "raw byte view of the reference save" and does NOT match the true
+          structure (a leading block plus 13 count-prefixed QList<s4>), so a forward
+          parse of the active_line_unit + line_units array does not reach
+          opaque_tail's start byte-exactly on an arbitrary save. (The fictional
+          walker sidesteps the header by LOCATING roster_end via a data signature
+          rather than forward-parsing it.) Until both are resolved this
+          ABSOLUTE-offset ternary is retained. It stays file-specific and is NOT a
+          portable record delimiter; the portable boundary is the record-START
+          signature (dense record_index) -- note that on a real-league save the
+          identity-gated variant in ../tools/parse_teams.py under-enumerates
+          (affiliate / placeholder records carry no identity strings), so a robust
+          real-save splitter must key on the dense record_index alone.
           (There is also no Kaitai compiler in-repo to validate a full sequential
           rewrite; the decode so far is documented in prose above and validated by
           ../tools/walk_record.py.)
