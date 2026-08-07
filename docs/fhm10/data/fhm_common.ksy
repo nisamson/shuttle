@@ -2,7 +2,7 @@ meta:
   id: fhm_common
   title: FHM 10 save — shared Qt QDataStream primitives and enums
   endian: be
-  ks-version: 0.10
+  ks-version: '0.10'
 doc: |
   Shared building blocks for the Franchise Hockey Manager 10 save-folder `*.dat`
   files. Every file uses Qt's QDataStream in its default big-endian byte order.

@@ -2,7 +2,7 @@ meta:
   id: tactical_settings_mod
   title: FHM 10 tactical-settings modifier catalogue
   endian: be
-  ks-version: 0.10
+  ks-version: '0.10'
   imports:
     - fhm_common
 doc: |

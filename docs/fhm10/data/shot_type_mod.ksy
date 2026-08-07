@@ -2,7 +2,7 @@ meta:
   id: shot_type_mod
   title: FHM 10 shot-type modifier catalogue
   endian: be
-  ks-version: 0.10
+  ks-version: '0.10'
   imports:
     - fhm_common
 doc: |

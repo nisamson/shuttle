@@ -2,7 +2,7 @@ meta:
   id: tactic_templates
   title: FHM 10 tactic-template catalogue
   endian: be
-  ks-version: 0.10
+  ks-version: '0.10'
   imports:
     - fhm_common
 doc: |

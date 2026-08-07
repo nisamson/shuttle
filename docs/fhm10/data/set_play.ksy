@@ -2,7 +2,7 @@ meta:
   id: set_play
   title: FHM 10 tactic set-play catalogue
   endian: be
-  ks-version: 0.10
+  ks-version: '0.10'
   imports:
     - fhm_common
 doc: |

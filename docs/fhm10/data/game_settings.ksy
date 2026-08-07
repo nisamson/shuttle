@@ -2,7 +2,7 @@ meta:
   id: game_settings
   title: FHM 10 save — game_settings.dat
   endian: be
-  ks-version: 0.10
+  ks-version: '0.10'
   imports:
     - fhm_common
 doc: |

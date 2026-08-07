@@ -2,7 +2,7 @@ meta:
   id: leagues
   title: FHM 10 save — leagues.dat
   endian: be
-  ks-version: 0.10
+  ks-version: '0.10'
   imports:
     - fhm_common
 doc: |

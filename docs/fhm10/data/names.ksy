@@ -2,7 +2,7 @@ meta:
   id: names
   title: FHM 10 save — names.dat
   endian: be
-  ks-version: 0.10
+  ks-version: '0.10'
   imports:
     - fhm_common
 doc: |
