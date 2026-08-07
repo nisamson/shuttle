@@ -2,11 +2,13 @@ meta:
   id: player_roles
   title: FHM 10 player role catalogue
   endian: be
-  ks-version: 0.10
+  ks-version: '0.10'
   imports:
     - fhm_common
 doc: |
-  Franchise Hockey Manager 10 player role catalogue.
+  Player-role catalogue. Player records store selected role ids from this
+  catalogue. Role fitness is derived from player attributes and the role's
+  requirement data rather than stored as a standalone player value.
 seq:
   - id: version_tag
     type: s4
@@ -19,7 +21,9 @@ seq:
 
 types:
   role_record:
-    doc: Player role definition.
+    doc: |
+      Player role definition, applicability metadata, descriptive text, and
+      requirement/tuning vectors used to evaluate role suitability.
     seq:
       - id: role_id
         type: s4
@@ -43,10 +47,13 @@ types:
         repeat-expr: 4
       - id: applies_to_forwards
         type: u1
+        doc: Boolean applicability flag.
       - id: applies_to_defencemen
         type: u1
+        doc: Boolean applicability flag.
       - id: applies_to_goalies
         type: u1
+        doc: Boolean applicability flag.
       - id: role_flags
         type: u1
       - id: position_category

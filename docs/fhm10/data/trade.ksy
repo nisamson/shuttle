@@ -2,7 +2,7 @@ meta:
   id: trade
   title: FHM 10 save — trade.dat
   endian: be
-  ks-version: 0.10
+  ks-version: '0.10'
   imports:
     - fhm_common
 doc: |

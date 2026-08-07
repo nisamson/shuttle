@@ -2,7 +2,7 @@ meta:
   id: zone_event_mod
   title: FHM 10 zone-event modifier catalogue
   endian: be
-  ks-version: 0.10
+  ks-version: '0.10'
   imports:
     - fhm_common
 doc: |

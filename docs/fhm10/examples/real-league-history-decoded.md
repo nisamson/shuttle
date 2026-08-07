@@ -77,13 +77,8 @@ franchise whose identity string lengths change (a relocation/rename shifts the
 stat block within its record). For a club that never relocates, like MTL, the
 stride happens to be a constant **190 bytes**, but nothing relies on that.
 
-Decode any team's history with
-[`../tools/decode_team_history.py`](../tools/decode_team_history.py), which
-auto-detects the array (no hard-coded offsets):
-
-```sh
-uv run decode_team_history.py teams.dat
-```
+The season-history array is self-delimiting and can be decoded without
+hard-coded record offsets.
 
 ## Representative seasons
 

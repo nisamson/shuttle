@@ -80,7 +80,7 @@ consistent with a one-division fictional league. No affiliates exist.
 
 ## Other decoded scalars
 
-| idx | code | unknown_8 | unknown_9 | unknown_13 | record size (bytes) |
+| idx | code | market_size | fan_loyalty | unknown_13 | record size (bytes) |
 | --: | --- | --: | --: | --: | --: |
 | 0 | FRE | 2 | 4 | 0 | 4,874 |
 | 1 | ATL | 2 | 1 | 1 | 5,733 |
@@ -94,17 +94,36 @@ consistent with a one-division fictional league. No affiliates exist.
 
 Notes:
 
-- `unknown_8` / `unknown_9` are small per-team values (unconfirmed; possibly
-  prestige/reputation ratings).
+- `market_size` (was `unknown_8`) and `fan_loyalty` (was `unknown_9`) are the
+  editable team settings of those names, CONFIRMED by controlled in-game
+  byte-diffs on this very save: setting OKL's market size to maximum moved
+  `market_size` 4 -> 5, and setting OTT's fan loyalty to maximum moved
+  `fan_loyalty` 2 -> 4, and a second round set both to minimum, moving them to
+  0. The scales are 0..5 (six levels) and 0..4 (five levels).
 - `unknown_13` equals the **`record_index`** here (0..8), not `team_id`. (In a
   real-league save it usually tracks `team_id`; the two are equal there but not
   in IMPEX, so this is a useful counter-example.)
-- `flag_1` = 1 and `flag_2` = 0 for every team.
+- `flag_1` = 1 for every team, and `nickname_placement` (was `flag_2`) = 0 for
+  every team; flipping WAR's nickname-usage setting in the editor moved it to 1.
 
 ## Variable / not-yet-fully-decoded blocks
 
-- **Tactics:** `tactics_count` = 0 for every team — the fictional league saved no
-  custom tactic records.
+- **Tactics:** the record's 12 per-zone tactic selectors ARE populated — e.g.
+  team 1 (`ZZZ`) runs Flexible Reaction / Dump In / Cycle / 1-2-2 / 1-2-2 Wide /
+  2-3 at even strength, Drop Pass + Overload + Pursue Aggressively on the power
+  play, and Tandem Forecheck + Press + Counterattack shorthanded, with system
+  names resolved through `team_tactics.dat`.
+  Each record holds **22** such 12-entry `u2` selector blocks (block 0 =
+  team-wide, blocks 1..21 = the per-line units), at a stride of 28-32 bytes — the
+  24 bytes of selectors plus a small per-block suffix of tendency/toggle bytes.
+
+  > **CORRECTION.** An earlier version of this page reported "`tactics_count` = 0
+  > for every team — the fictional league saved no custom tactic records". That
+  > was a mislabelled field, not an absence of tactics: the `s4` in question is
+  > the **season count**, and the array following it is the per-season franchise
+  > history (see [`teams.ksy`](../data/teams.ksy) `season_count` /
+  > `season_history`). It reads 0 here simply because IMPEX is a newly created
+  > league with no seasons played yet.
 - **Line-ups (`line_unit`):** structurally decoded (13 situational `QList<s4>`
   slot lists with fixed counts `[12,8,10,10,12,6,8,6,8,6,5,5,2]`), but this save
   is unmanaged, so the slots are empty (−1). There is no accompanying
