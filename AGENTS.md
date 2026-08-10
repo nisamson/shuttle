@@ -158,6 +158,11 @@ orchestration host.
   de-duplicates captures by content hash. OCR is pluggable behind `IOcrEngine`; the default is the
   built-in `Windows.Media.Ocr` engine. Standalone (not part of the cross-platform build/orchestration)
   and provides the data-collection stage for a future ratings→roles model. See its `README.md`.
+- **`Shuttle.Fhm.SaveData`** — dependency-free FHM 10 save-folder binary library. It uses handwritten
+  big-endian Qt/QDataStream readers and writers and preserves unsupported files as normalized
+  relative paths plus raw bytes. It is intentionally separate from EF Core and
+  `Shuttle.Fhm.Vision`; see `Shuttle.Fhm.SaveData/README.md` for its supported file codecs and current
+  lossless opaque boundaries.
 - **`Shuttle.Tests`** — the test project (see Test section below).
 
 ### Cross-cutting notes

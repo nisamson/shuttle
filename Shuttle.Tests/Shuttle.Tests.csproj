@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -28,6 +28,7 @@
     <ProjectReference Include="..\Shuttle.Api\Shuttle.Api.csproj" />
     <ProjectReference Include="..\Shuttle.Api.Client\Shuttle.Api.Client.csproj" />
     <ProjectReference Include="..\Shuttle.Analysis\Shuttle.Analysis.csproj" />
+    <ProjectReference Include="..\Shuttle.Fhm.SaveData\Shuttle.Fhm.SaveData.csproj" />
   </ItemGroup>
 
   <ItemGroup>
