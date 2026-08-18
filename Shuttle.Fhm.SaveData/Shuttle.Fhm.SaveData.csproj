@@ -4,4 +4,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="BinarySerializer" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Shuttle.BinarySerde.Common\Shuttle.BinarySerde.Common.csproj" />
+    <ProjectReference Include="..\Shuttle.Fhm.Serde\Shuttle.Fhm.Serde.csproj" />
+  </ItemGroup>
 </Project>

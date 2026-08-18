@@ -1,10 +1,14 @@
 using Shuttle.Fhm.SaveData.Binary;
+using Shuttle.BinarySerde.Common.QFormat;
+using Shuttle.Fhm.Serde.Names;
 
 namespace Shuttle.Fhm.SaveData.Files;
 
 /// <summary>The name-generation reference tables in <c>names.dat</c>.</summary>
 public sealed class FhmNamesFile : IFhmSaveFile
 {
+    private const int MaximumCollectionCount = 10_000_000;
+
     /// <summary>Number of nation-indexed arrays serialized by FHM 10.</summary>
     public const int NationCount = 102;
 
@@ -29,61 +33,63 @@ public sealed class FhmNamesFile : IFhmSaveFile
     /// <summary>Gets the second 102-value per-nation scalar array.</summary>
     public IList<int> ScalarArrayB { get; } = new int[NationCount];
 
-    internal static FhmNamesFile Read(FhmBinaryReader reader)
+    internal static FhmNamesFile Read(Stream stream)
     {
-        var result = new FhmNamesFile { ReservedZero = reader.ReadInt32() };
-        if (result.ReservedZero != 0)
+        ArgumentNullException.ThrowIfNull(stream);
+        FhmNamesFileData wire;
+        try
         {
-            throw new FhmFormatException("names.dat reserved_zero must be zero.");
+            wire = FhmNamesFileSerializer.Deserialize(stream);
+        }
+        catch (InvalidDataException exception)
+        {
+            throw new FhmFormatException(exception.Message);
         }
 
-        var count = reader.ReadCount("names.dat master names");
-        for (var index = 0; index < count; index++)
+        ValidateWire(wire);
+        var result = new FhmNamesFile { ReservedZero = wire.ReservedZero };
+        foreach (var entry in wire.MasterNames)
         {
-            result.MasterNames.Add(new FhmNameEntry(
-                reader.ReadQString(),
-                reader.ReadInt32(),
-                reader.ReadInt32(),
-                unchecked((short)reader.ReadUInt16()),
-                reader.ReadByte(),
-                reader.ReadByte(),
-                reader.ReadByte()));
+            result.MasterNames.Add(new(
+                entry.Text.Value,
+                entry.NameId,
+                entry.GroupId,
+                unchecked((short)entry.CategoryWeight),
+                entry.FlagA,
+                entry.FlagB,
+                entry.FlagC));
         }
 
-        ReadNationLists(reader, result.FirstNameLists, "first-name");
-        ReadNationLists(reader, result.SurnameLists, "surname");
-        ReadScalars(reader, result.ScalarArrayA);
-        ReadScalars(reader, result.ScalarArrayB);
-        reader.EnsureEof("names.dat");
+        CopyNationLists(wire.FirstNameLists, result.FirstNameLists);
+        CopyNationLists(wire.SurnameLists, result.SurnameLists);
+        CopyScalars(wire.ScalarArrayA, result.ScalarArrayA);
+        CopyScalars(wire.ScalarArrayB, result.ScalarArrayB);
         return result;
     }
 
-    /// <inheritdoc />
-    public void WriteTo(FhmBinaryWriter writer)
+    public void WriteTo(Stream stream)
     {
-        if (ReservedZero != 0)
+        ArgumentNullException.ThrowIfNull(stream);
+        ValidateForWrite();
+        FhmNamesFileSerializer.Serialize(stream, new FhmNamesFileData
         {
-            throw new FhmFormatException("names.dat ReservedZero must be zero.");
-        }
-
-        ValidateNationTables();
-        writer.WriteInt32(ReservedZero);
-        writer.WriteCount(MasterNames.Count, "names.dat master names");
-        foreach (var entry in MasterNames)
-        {
-            writer.WriteQString(entry.Text);
-            writer.WriteInt32(entry.NameId);
-            writer.WriteInt32(entry.GroupId);
-            writer.WriteUInt16(unchecked((ushort)entry.CategoryWeight));
-            writer.WriteByte(entry.FlagA);
-            writer.WriteByte(entry.FlagB);
-            writer.WriteByte(entry.FlagC);
-        }
-
-        WriteNationLists(writer, FirstNameLists, "first-name");
-        WriteNationLists(writer, SurnameLists, "surname");
-        WriteScalars(writer, ScalarArrayA);
-        WriteScalars(writer, ScalarArrayB);
+            ReservedZero = ReservedZero,
+            MasterNameCount = MasterNames.Count,
+            MasterNames = MasterNames.Select(entry => new FhmNameData
+            {
+                Text = new QString { Value = entry.Text },
+                NameId = entry.NameId,
+                GroupId = entry.GroupId,
+                CategoryWeight = unchecked((ushort)entry.CategoryWeight),
+                FlagA = entry.FlagA,
+                FlagB = entry.FlagB,
+                FlagC = entry.FlagC,
+            }).ToList(),
+            FirstNameLists = ToWireNationLists(FirstNameLists),
+            SurnameLists = ToWireNationLists(SurnameLists),
+            ScalarArrayA = ScalarArrayA.ToList(),
+            ScalarArrayB = ScalarArrayB.ToList(),
+        });
     }
 
     private static IList<IList<int>> CreateNationLists()
@@ -97,52 +103,112 @@ public sealed class FhmNamesFile : IFhmSaveFile
         return result;
     }
 
-    private static void ReadNationLists(FhmBinaryReader reader, IList<IList<int>> destination, string description)
+    private static List<QList<int>> ToWireNationLists(IEnumerable<IList<int>> values) =>
+        values.Select(list => new QList<int> { Length = list.Count, Items = list.ToList() }).ToList();
+
+    private static void CopyNationLists(IReadOnlyList<QList<int>> source, IList<IList<int>> destination)
     {
         for (var nation = 0; nation < NationCount; nation++)
         {
-            var count = reader.ReadCount($"names.dat {description} ids");
-            for (var index = 0; index < count; index++)
+            foreach (var value in source[nation].Items)
             {
-                destination[nation].Add(reader.ReadInt32());
+                destination[nation].Add(value);
             }
         }
     }
 
-    private static void ReadScalars(FhmBinaryReader reader, IList<int> destination)
+    private static void CopyScalars(IReadOnlyList<int> source, IList<int> destination)
     {
         for (var index = 0; index < NationCount; index++)
         {
-            destination[index] = reader.ReadInt32();
+            destination[index] = source[index];
         }
     }
 
-    private static void WriteNationLists(FhmBinaryWriter writer, IEnumerable<IList<int>> values, string description)
+    private static void ValidateWire(FhmNamesFileData wire)
     {
-        foreach (var list in values)
+        if (wire.ReservedZero != 0)
         {
-            writer.WriteCount(list.Count, $"names.dat {description} ids");
-            foreach (var value in list)
+            throw new FhmFormatException("names.dat reserved_zero must be zero.");
+        }
+
+        if (wire.MasterNameCount < 0 || wire.MasterNameCount > MaximumCollectionCount ||
+            wire.MasterNames.Count != wire.MasterNameCount)
+        {
+            throw new FhmFormatException($"Invalid names.dat master names count {wire.MasterNameCount}.");
+        }
+
+        ValidateNationTables(wire.FirstNameLists, wire.SurnameLists, wire.ScalarArrayA, wire.ScalarArrayB);
+        ValidateNationListCounts(wire.FirstNameLists, "first-name");
+        ValidateNationListCounts(wire.SurnameLists, "surname");
+    }
+
+    private void ValidateForWrite()
+    {
+        if (ReservedZero != 0)
+        {
+            throw new FhmFormatException("names.dat ReservedZero must be zero.");
+        }
+
+        if (MasterNames.Count > MaximumCollectionCount)
+        {
+            throw new FhmFormatException($"Invalid names.dat master names count {MasterNames.Count}.");
+        }
+
+        ValidateNationTables(FirstNameLists, SurnameLists, ScalarArrayA, ScalarArrayB);
+        foreach (var list in FirstNameLists)
+        {
+            ValidateNationListCount(list.Count, "first-name");
+        }
+
+        foreach (var list in SurnameLists)
+        {
+            ValidateNationListCount(list.Count, "surname");
+        }
+    }
+
+    private static void ValidateNationTables(
+        IReadOnlyCollection<QList<int>> firstNameLists,
+        IReadOnlyCollection<QList<int>> surnameLists,
+        IReadOnlyCollection<int> scalarArrayA,
+        IReadOnlyCollection<int> scalarArrayB)
+    {
+        if (firstNameLists.Count != NationCount || surnameLists.Count != NationCount ||
+            scalarArrayA.Count != NationCount || scalarArrayB.Count != NationCount)
+        {
+            throw new FhmFormatException($"names.dat requires exactly {NationCount} nation entries in every nation-indexed table.");
+        }
+    }
+
+    private static void ValidateNationTables(
+        ICollection<IList<int>> firstNameLists,
+        ICollection<IList<int>> surnameLists,
+        ICollection<int> scalarArrayA,
+        ICollection<int> scalarArrayB)
+    {
+        if (firstNameLists.Count != NationCount || surnameLists.Count != NationCount ||
+            scalarArrayA.Count != NationCount || scalarArrayB.Count != NationCount)
+        {
+            throw new FhmFormatException($"names.dat requires exactly {NationCount} nation entries in every nation-indexed table.");
+        }
+    }
+
+    private static void ValidateNationListCounts(IEnumerable<QList<int>> lists, string description)
+    {
+        foreach (var list in lists)
+        {
+            if (list.Length < 0 || list.Length > MaximumCollectionCount || list.Items.Count != list.Length)
             {
-                writer.WriteInt32(value);
+                throw new FhmFormatException($"Invalid names.dat {description} ids count {list.Length}.");
             }
         }
     }
 
-    private static void WriteScalars(FhmBinaryWriter writer, IEnumerable<int> values)
+    private static void ValidateNationListCount(int count, string description)
     {
-        foreach (var value in values)
+        if (count > MaximumCollectionCount)
         {
-            writer.WriteInt32(value);
-        }
-    }
-
-    private void ValidateNationTables()
-    {
-        if (FirstNameLists.Count != NationCount || SurnameLists.Count != NationCount ||
-            ScalarArrayA.Count != NationCount || ScalarArrayB.Count != NationCount)
-        {
-            throw new FhmFormatException($"names.dat requires exactly {NationCount} nation entries in every nation-indexed table.");
+            throw new FhmFormatException($"Invalid names.dat {description} ids count {count}.");
         }
     }
 }

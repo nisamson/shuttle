@@ -27,7 +27,7 @@ public sealed class FhmTeamsFileTests
             Assert.Equal("Test City", team.City);
             Assert.Equal(2030, Assert.Single(team.SeasonHistory).Year);
             Assert.Equal(5, Assert.Single(team.SeasonParticipation.Blocks).Records[0].ParticipationId);
-            Assert.Equal(new FhmPlayerInternalIdentity(11), Assert.Single(team.PostHead.Goalies));
+            Assert.Equal(11, Assert.Single(team.PostHead.Goalies));
             Assert.False(team.PostHead.PositionRequirements.HasConsistentPairs);
             Assert.Equal([3, 2, 99], team.PostHead.PositionRequirements.Words);
             Assert.Equal((ushort)77, team.Tail.Tactics.FinalOffensiveOrientation.RawValue);
@@ -35,7 +35,7 @@ public sealed class FhmTeamsFileTests
             Assert.Equal((ushort)99, Assert.Single(team.Tail.Rest.FanHappinessHistory).EventType.RawValue);
             Assert.False(Assert.Single(team.Tail.Rest.FanHappinessHistory).EventType.IsKnown);
             Assert.Equal((byte)1, team.Tail.Rest.ActiveLineSlotLocks[0].Values[0]);
-            Assert.Equal(new FhmPlayerInternalIdentity(22), Assert.Single(team.Tail.Rest.ManagedDepthCharts[0].PlayerReferences));
+            Assert.Equal(22, Assert.Single(team.Tail.Rest.ManagedDepthCharts[0].PlayerReferences));
             Assert.Equal([9, 8, 7], team.Tail.Rest.FinanceCurveRecords[0].Value[..3]);
 
             WriteTeams(loaded, rewritten);
@@ -158,56 +158,56 @@ public sealed class FhmTeamsFileTests
         team.FranchiseHistory.NameHistoryCount = 1;
         team.FranchiseHistory.NameHistory.Add("Test City Rockets");
         team.FranchiseHistory.AbbreviationHistory.Add("TST");
-        team.ActiveLines.Lists[0].PlayerReferences.Add(new FhmPlayerInternalIdentity(10));
-        team.LeadershipReserve.Captain = new FhmPlayerInternalIdentity(10);
-        team.LeadershipReserve.AlternateCaptain1 = new FhmPlayerInternalIdentity(11);
-        team.LeadershipReserve.ReserveSlots.Add(new FhmPlayerInternalIdentity(12));
+        team.ActiveLines.Lists[0].PlayerReferences.Add(10);
+        team.LeadershipReserve.Captain = 10;
+        team.LeadershipReserve.AlternateCaptain1 = 11;
+        team.LeadershipReserve.ReserveSlots.Add(12);
         var participation = new FhmSeasonParticipationBlock();
         participation.Records.Add(new FhmSeasonParticipationRecord { SequenceNumber = 1, Year = 2030, ParticipationId = 5, Flag = 1 });
         team.SeasonParticipation.Blocks.Clear();
         team.SeasonParticipation.Blocks.Add(participation);
-        team.PostHead.Goalies.Add(new FhmPlayerInternalIdentity(11));
-        team.PostHead.Defensemen.Add(new FhmPlayerInternalIdentity(12));
-        team.PostHead.Forwards.Add(new FhmPlayerInternalIdentity(13));
+        team.PostHead.Goalies.Add(11);
+        team.PostHead.Defensemen.Add(12);
+        team.PostHead.Forwards.Add(13);
         team.PostHead.RegionId = 9;
         team.PostHead.PositionRequirements.LogicalEntryCount = 1;
         team.PostHead.PositionRequirements.Words.Add(3);
         team.PostHead.PositionRequirements.Words.Add(2);
         team.PostHead.PositionRequirements.Words.Add(99);
-        team.PostBody.AllTimePlayers.Add(new FhmPlayerInternalIdentity(10));
+        team.PostBody.AllTimePlayers.Add(10);
         team.PostBody.PreColourList.Add(20);
         team.PostBody.Colours[0] = new FhmQColor { Spec = 1, Alpha = 65535, Red = 1, Green = 2, Blue = 3 };
         team.PostBody.Abbreviation = "TST";
         team.PostBody.Units[0].Values.Add(4);
         team.Tail.UnknownMRecords.Add(new FhmOpaqueBytes(new byte[12]));
         team.Tail.FanHappiness = 61;
-        team.Tail.RetiredNumbers.Add(new FhmRetiredNumber { Year = 2020, Number = 9, Flag = 1, PlayerReference = new FhmPlayerInternalIdentity(10) });
+        team.Tail.RetiredNumbers.Add(new FhmRetiredNumber { Year = 2020, Number = 9, Flag = 1, PlayerReference = 10 });
         team.Tail.WikiUrl = "https://example.test/wiki";
         team.Tail.WebsiteUrl = "https://example.test";
         ConfigureTactics(team.Tail.Tactics);
         team.Tail.Rest.MajorJuniorHistory.Add(new FhmJuniorHistoryRecord { Flag = 1, Year = 2029, TeamId = 99, Pad = 0 });
-        team.Tail.Rest.MainRivalRecordIndex = new FhmTeamRecordIndex(2);
-        team.Tail.Rest.PotentialRivalRecordIndex = new FhmTeamRecordIndex(4);
+        team.Tail.Rest.MainRivalRecordIndex = 2;
+        team.Tail.Rest.PotentialRivalRecordIndex = 4;
         team.Tail.Rest.PotentialRivalProgress = 3;
         team.Tail.Rest.FanHappinessHistory.Add(new FhmFanHappinessHistoryRecord
         {
             EventType = new FhmEnumValue<FhmFanHappinessEvent>(99),
             ResultingHappiness = 61,
-            PlayerReference = new FhmPlayerInternalIdentity(10),
+            PlayerReference = 10,
             StaffId = -1,
-            RelatedTeamRecordIndex = new FhmTeamRecordIndex(2),
+            RelatedTeamRecordIndex = 2,
             CompetitionId = -1,
             LeagueId = 1,
         });
         team.Tail.Rest.ActiveLineSlotLocks[0].Values.Add(1);
-        team.Tail.Rest.ManagedDepthCharts[0].PlayerReferences.Add(new FhmPlayerInternalIdentity(22));
+        team.Tail.Rest.ManagedDepthCharts[0].PlayerReferences.Add(22);
         team.Tail.Rest.UnsignedShortLists[0].Add(6);
-        team.Tail.Rest.AdditionalPlayerIds.Add(new FhmPlayerInternalIdentity(23));
+        team.Tail.Rest.AdditionalPlayerIds.Add(23);
         team.Tail.Rest.Flags4To9[0] = 4;
         team.Tail.Rest.UnknownBytes6To9[3] = 9;
         team.Tail.Rest.FinanceCurveRecords.Add(new FhmOpaqueBytes([9, 8, 7, .. new byte[86]]));
-        team.Tail.Rest.NestedPlayerIdLists.Add([new FhmPlayerInternalIdentity(24)]);
-        team.Tail.Rest.TaggedPlayerIds.Add(new FhmTaggedPlayerId(new FhmPlayerInternalIdentity(25), 2));
+        team.Tail.Rest.NestedPlayerIdLists.Add([24]);
+        team.Tail.Rest.TaggedPlayerIds.Add(new FhmTaggedPlayerId(25, 2));
         team.Tail.Rest.ClosingFlags[8] = 1;
         return team;
     }

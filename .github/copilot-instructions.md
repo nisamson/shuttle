@@ -68,6 +68,8 @@ Cross-cutting: auth everywhere is **Entra ID via `Microsoft.Identity.Web`**; obs
 - **Style (`.editorconfig`):** accessibility modifiers are required; no `this.` qualification;
   prefer framework type keywords (`int`, not `Int32`); modifier order per
   `csharp_preferred_modifier_order`. Concrete types are typically `sealed`.
+- **Primitive identifiers:** use named `int` properties and collections for serialized IDs and
+  ordinals. Do not introduce single-value wrapper types unless explicitly requested.
 - **Skills** go in `.github/skills/<name>/SKILL.md` so they are version-controlled.
 
 ## Tooling

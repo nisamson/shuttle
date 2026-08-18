@@ -1,37 +1,138 @@
 using Shuttle.Fhm.SaveData.Binary;
 using Shuttle.Fhm.SaveData.Model;
+using Shuttle.BinarySerde.Common.QFormat;
+using Shuttle.Fhm.Serde.StoredLines;
 
 namespace Shuttle.Fhm.SaveData.Files;
 
 /// <summary>Saved lineup presets in <c>stored_lines.dat</c>.</summary>
 public sealed class FhmStoredLinesFile : IFhmSaveFile
 {
+    private const int MaximumCollectionCount = 10_000_000;
+
     /// <inheritdoc />
     public string RelativePath => "stored_lines.dat";
 
     /// <summary>Gets named presets in serialized order.</summary>
     public IList<FhmStoredLine> StoredLines { get; } = [];
 
-    internal static FhmStoredLinesFile Read(FhmBinaryReader reader)
+    internal static FhmStoredLinesFile Read(Stream stream)
     {
-        var result = new FhmStoredLinesFile();
-        var count = reader.ReadCount("stored lines");
-        for (var index = 0; index < count; index++)
+        ArgumentNullException.ThrowIfNull(stream);
+        FhmStoredLinesFileData wire;
+        try
         {
-            result.StoredLines.Add(FhmStoredLine.Read(reader));
+            wire = FhmStoredLinesFileSerializer.Deserialize(stream);
+        }
+        catch (InvalidDataException exception)
+        {
+            throw new FhmFormatException(exception.Message);
         }
 
-        reader.EnsureEof("stored_lines.dat");
+        ValidateWire(wire);
+        var result = new FhmStoredLinesFile();
+        foreach (var line in wire.StoredLines)
+        {
+            var storedLine = new FhmStoredLine { Name = line.Name.Value };
+            CopyGroups(line.PlayerGroups, storedLine.PlayerGroups);
+            CopyGroups(line.UnitLocks, storedLine.UnitLocks);
+            result.StoredLines.Add(storedLine);
+        }
+
         return result;
     }
 
-    /// <inheritdoc />
-    public void WriteTo(FhmBinaryWriter writer)
+    public void WriteTo(Stream stream)
     {
-        writer.WriteCount(StoredLines.Count, "stored lines");
+        ArgumentNullException.ThrowIfNull(stream);
+        ValidateForWrite();
+        FhmStoredLinesFileSerializer.Serialize(stream, new FhmStoredLinesFileData
+        {
+            StoredLineCount = StoredLines.Count,
+            StoredLines = StoredLines.Select(ToWire).ToList(),
+        });
+    }
+
+    private static FhmStoredLineData ToWire(FhmStoredLine line) => new()
+    {
+        Name = new QString { Value = line.Name },
+        PlayerGroups = ToWireGroups(line.PlayerGroups),
+        UnitLocks = ToWireGroups(line.UnitLocks),
+    };
+
+    private static List<QList<T>> ToWireGroups<T>(IEnumerable<IList<T>> groups) =>
+        groups.Select(group => new QList<T> { Length = group.Count, Items = group.ToList() }).ToList();
+
+    private static void CopyGroups<T>(IReadOnlyList<QList<T>> source, IList<IList<T>> destination)
+    {
+        for (var index = 0; index < FhmStoredLineData.GroupCount; index++)
+        {
+            foreach (var value in source[index].Items)
+            {
+                destination[index].Add(value);
+            }
+        }
+    }
+
+    private static void ValidateWire(FhmStoredLinesFileData wire)
+    {
+        if (wire.StoredLineCount < 0 || wire.StoredLineCount > MaximumCollectionCount ||
+            wire.StoredLines.Count != wire.StoredLineCount)
+        {
+            throw new FhmFormatException($"Invalid stored lines count {wire.StoredLineCount}.");
+        }
+
+        foreach (var line in wire.StoredLines)
+        {
+            ValidateWireGroups(line.PlayerGroups, "player");
+            ValidateWireGroups(line.UnitLocks, "lock");
+        }
+    }
+
+    private void ValidateForWrite()
+    {
+        if (StoredLines.Count > MaximumCollectionCount)
+        {
+            throw new FhmFormatException($"Invalid stored lines count {StoredLines.Count}.");
+        }
+
         foreach (var line in StoredLines)
         {
-            line.WriteTo(writer);
+            ArgumentNullException.ThrowIfNull(line);
+            ValidateGroups(line.PlayerGroups, "player");
+            ValidateGroups(line.UnitLocks, "lock");
+        }
+    }
+
+    private static void ValidateWireGroups<T>(IReadOnlyCollection<QList<T>> groups, string description)
+    {
+        if (groups.Count != FhmStoredLineData.GroupCount)
+        {
+            throw new FhmFormatException($"A stored line must contain exactly thirteen {description} groups.");
+        }
+
+        foreach (var group in groups)
+        {
+            if (group.Length < 0 || group.Length > MaximumCollectionCount || group.Items.Count != group.Length)
+            {
+                throw new FhmFormatException($"Invalid stored line {description} group count {group.Length}.");
+            }
+        }
+    }
+
+    private static void ValidateGroups<T>(ICollection<IList<T>> groups, string description)
+    {
+        if (groups.Count != FhmStoredLineData.GroupCount)
+        {
+            throw new FhmFormatException($"A stored line must contain exactly thirteen {description} groups.");
+        }
+
+        foreach (var group in groups)
+        {
+            if (group is null || group.Count > MaximumCollectionCount)
+            {
+                throw new FhmFormatException($"Invalid stored line {description} group count {group?.Count}.");
+            }
         }
     }
 }
@@ -48,26 +149,6 @@ public sealed class FhmStoredLine
     /// <summary>Gets the 13 ordered lock-state groups corresponding to <see cref="PlayerGroups"/>.</summary>
     public IList<IList<byte>> UnitLocks { get; } = CreateLists<byte>();
 
-    internal static FhmStoredLine Read(FhmBinaryReader reader)
-    {
-        var result = new FhmStoredLine { Name = reader.ReadQString() };
-        ReadGroups(reader, result.PlayerGroups, static reader => reader.ReadInt32(), "stored line player group");
-        ReadGroups(reader, result.UnitLocks, static reader => reader.ReadByte(), "stored line lock group");
-        return result;
-    }
-
-    internal void WriteTo(FhmBinaryWriter writer)
-    {
-        if (PlayerGroups.Count != Enum.GetValues<FhmLineGroup>().Length || UnitLocks.Count != Enum.GetValues<FhmLineGroup>().Length)
-        {
-            throw new FhmFormatException("A stored line must contain exactly thirteen player and lock groups.");
-        }
-
-        writer.WriteQString(Name);
-        WriteGroups(writer, PlayerGroups, static (writer, value) => writer.WriteInt32(value), "stored line player group");
-        WriteGroups(writer, UnitLocks, static (writer, value) => writer.WriteByte(value), "stored line lock group");
-    }
-
     private static IList<IList<T>> CreateLists<T>()
     {
         var result = new List<IList<T>>(Enum.GetValues<FhmLineGroup>().Length);
@@ -77,29 +158,5 @@ public sealed class FhmStoredLine
         }
 
         return result;
-    }
-
-    private static void ReadGroups<T>(FhmBinaryReader reader, IEnumerable<IList<T>> groups, Func<FhmBinaryReader, T> read, string description)
-    {
-        foreach (var group in groups)
-        {
-            var count = reader.ReadCount(description);
-            for (var index = 0; index < count; index++)
-            {
-                group.Add(read(reader));
-            }
-        }
-    }
-
-    private static void WriteGroups<T>(FhmBinaryWriter writer, IEnumerable<IList<T>> groups, Action<FhmBinaryWriter, T> write, string description)
-    {
-        foreach (var group in groups)
-        {
-            writer.WriteCount(group.Count, description);
-            foreach (var value in group)
-            {
-                write(writer, value);
-            }
-        }
     }
 }

@@ -1,4 +1,5 @@
 using Shuttle.Fhm.SaveData.Binary;
+using Shuttle.Fhm.Serde.Tactics;
 
 namespace Shuttle.Fhm.SaveData.Files;
 
@@ -17,21 +18,43 @@ public sealed class FhmTacticsFile : IFhmSaveFile
     /// <summary>Gets or sets exact opaque record bytes.</summary>
     public byte[] RecordsOpaque { get; set; } = [];
 
-    internal static FhmTacticsFile Read(FhmBinaryReader reader)
+    internal static FhmTacticsFile Read(Stream stream)
     {
+        ArgumentNullException.ThrowIfNull(stream);
+        FhmTacticsFileData wire;
+        try
+        {
+            wire = FhmTacticsFileSerializer.DeserializeHeader(stream);
+        }
+        catch (InvalidDataException exception)
+        {
+            throw new FhmFormatException(exception.Message);
+        }
+
+        if (wire.TacticCount < 0 || wire.TacticCount > 10_000_000)
+        {
+            throw new FhmFormatException($"Invalid tactics count {wire.TacticCount}.");
+        }
+
+        using var remaining = new MemoryStream();
+        stream.CopyTo(remaining);
         return new FhmTacticsFile
         {
-            Version = reader.ReadInt32(),
-            TacticCount = reader.ReadCount("tactics"),
-            RecordsOpaque = reader.ReadRemaining(),
+            Version = wire.Version,
+            TacticCount = wire.TacticCount,
+            RecordsOpaque = remaining.ToArray(),
         };
     }
 
-    /// <inheritdoc />
-    public void WriteTo(FhmBinaryWriter writer)
+    public void WriteTo(Stream stream)
     {
-        writer.WriteInt32(Version);
-        writer.WriteCount(TacticCount, "tactics");
-        writer.WriteOpaqueBytes(new FhmOpaqueBytes(RecordsOpaque));
+        ArgumentNullException.ThrowIfNull(stream);
+        if (TacticCount < 0 || TacticCount > 10_000_000)
+        {
+            throw new FhmFormatException($"Invalid tactics count {TacticCount}.");
+        }
+
+        FhmTacticsFileSerializer.SerializeHeader(stream, new() { Version = Version, TacticCount = TacticCount });
+        stream.Write(RecordsOpaque);
     }
 }

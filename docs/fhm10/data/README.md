@@ -56,9 +56,17 @@ field has a final semantic name.
 
 - `players.dat` stores first, surname, and common-name ids that reference
   `names.dat`.
-- In version 58, `player_record.internal_identity` equals the zero-based
-  `players.dat` record ordinal.
+- In version 58, `player_record.internal_identity` equalled the zero-based
+  `players.dat` record ordinal for every record in the validated 22-save
+  corpus (2,446,606 records). This is a serialized-file result. Runtime-wide
+  uniqueness is false: active and `retired.dat` player pools have overlapping
+  internal identities, so runtime references require a pool discriminator.
 - Team line slots and stored-line presets use this internal identity.
+- `player_record.exported_player_id` is the distinct `PlayerId` emitted by
+  FHM's CSV exports.
+- Element 4 of `player_record.unknown_s4_values_01` is the CSV `TeamId`;
+  element 0 of `player_record.unknown_s4_values_07` is the CSV
+  `FranchiseId`.
 - A player reference of `-1` denotes an empty slot.
 
 ### Roles and role fitness

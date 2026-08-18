@@ -1,4 +1,5 @@
 using Shuttle.Fhm.SaveData.Binary;
+using Shuttle.Fhm.Serde.ZoneEvents;
 
 namespace Shuttle.Fhm.SaveData.Files;
 
@@ -17,36 +18,69 @@ public sealed class FhmZoneEventModifiersFile : IFhmSaveFile
     /// <summary>Gets length-prefixed modifier grids to EOF.</summary>
     public IList<FhmLengthPrefixedBlock> ModifierGrids { get; } = [];
 
-    internal static FhmZoneEventModifiersFile Read(FhmBinaryReader reader)
+    internal static FhmZoneEventModifiersFile Read(Stream stream)
     {
+        ArgumentNullException.ThrowIfNull(stream);
+        FhmZoneEventModifiersFileData header;
+        try
+        {
+            header = FhmZoneEventModifiersFileSerializer.DeserializeHeader(stream);
+        }
+        catch (InvalidDataException exception)
+        {
+            throw new FhmFormatException(exception.Message);
+        }
+
         var result = new FhmZoneEventModifiersFile
         {
-            Version = reader.ReadInt32(),
-            ZoneCount = reader.ReadCount("zone-event modifier groups"),
+            Version = header.Version,
+            ZoneCount = header.ZoneCount,
         };
-        while (reader.Remaining > 0)
+        if (result.ZoneCount < 0 || result.ZoneCount > 10_000_000)
         {
-            var length = reader.ReadInt32();
-            if (length < 0)
+            throw new FhmFormatException($"Invalid zone-event modifier groups count {result.ZoneCount}.");
+        }
+
+        while (!stream.CanSeek || stream.Position < stream.Length)
+        {
+            FhmZoneEventModifierGridData grid;
+            try
+            {
+                grid = FhmZoneEventModifiersFileSerializer.DeserializeGrid(stream);
+            }
+            catch (InvalidDataException exception)
+            {
+                throw new FhmFormatException(exception.Message);
+            }
+
+            if (grid.ByteLength < 0)
             {
                 throw new FhmFormatException("zone_event_mod.dat contains a negative modifier-grid length.");
             }
 
-            result.ModifierGrids.Add(new FhmLengthPrefixedBlock(reader.ReadOpaqueBytes(length).Value));
+            result.ModifierGrids.Add(new FhmLengthPrefixedBlock(grid.Data));
         }
 
         return result;
     }
 
-    /// <inheritdoc />
-    public void WriteTo(FhmBinaryWriter writer)
+    public void WriteTo(Stream stream)
     {
-        writer.WriteInt32(Version);
-        writer.WriteCount(ZoneCount, "zone-event modifier groups");
+        ArgumentNullException.ThrowIfNull(stream);
+        if (ZoneCount < 0 || ZoneCount > 10_000_000)
+        {
+            throw new FhmFormatException($"Invalid zone-event modifier groups count {ZoneCount}.");
+        }
+
+        FhmZoneEventModifiersFileSerializer.SerializeHeader(stream, new() { Version = Version, ZoneCount = ZoneCount });
         foreach (var grid in ModifierGrids)
         {
-            writer.WriteCount(grid.Data.Length, "zone-event modifier grid bytes");
-            writer.WriteOpaqueBytes(new FhmOpaqueBytes(grid.Data));
+            ArgumentNullException.ThrowIfNull(grid);
+            FhmZoneEventModifiersFileSerializer.SerializeGrid(stream, new()
+            {
+                ByteLength = grid.Data.Length,
+                Data = grid.Data,
+            });
         }
     }
 }

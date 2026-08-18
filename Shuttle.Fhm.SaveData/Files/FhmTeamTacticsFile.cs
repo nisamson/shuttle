@@ -1,11 +1,14 @@
 using Shuttle.Fhm.SaveData.Binary;
 using Shuttle.Fhm.SaveData.Model;
+using Shuttle.Fhm.Serde.Teams;
 
 namespace Shuttle.Fhm.SaveData.Files;
 
 /// <summary>The selectable per-zone tactic-system catalogue in <c>team_tactics.dat</c>.</summary>
 public sealed class FhmTeamTacticsFile : IFhmSaveFile
 {
+    private const int MaximumCollectionCount = 10_000_000;
+
     /// <inheritdoc />
     public string RelativePath => "team_tactics.dat";
 
@@ -15,39 +18,65 @@ public sealed class FhmTeamTacticsFile : IFhmSaveFile
     /// <summary>Gets selectable tactic systems in serialized order.</summary>
     public IList<FhmTacticSystem> Records { get; } = [];
 
-    internal static FhmTeamTacticsFile Read(FhmBinaryReader reader)
+    internal static FhmTeamTacticsFile Read(Stream stream)
     {
-        var result = new FhmTeamTacticsFile { VersionTag = reader.ReadInt32() };
-        var count = reader.ReadCount("team tactic systems");
-        for (var index = 0; index < count; index++)
+        ArgumentNullException.ThrowIfNull(stream);
+        FhmTeamTacticsFileData wire;
+        try
         {
-            result.Records.Add(new FhmTacticSystem
+            wire = FhmTeamTacticsFileSerializer.Deserialize(stream);
+        }
+        catch (InvalidDataException exception)
+        {
+            throw new FhmFormatException(exception.Message);
+        }
+
+        if (wire.RecordCount < 0 || wire.RecordCount > MaximumCollectionCount || wire.Records.Count != wire.RecordCount)
+        {
+            throw new FhmFormatException($"Invalid team tactic systems count {wire.RecordCount}.");
+        }
+
+        var result = new FhmTeamTacticsFile { VersionTag = wire.VersionTag };
+        foreach (var record in wire.Records)
+        {
+            result.Records.Add(new()
             {
-                GlobalId = reader.ReadInt32(),
-                ZoneGroupRaw = reader.ReadInt32(),
-                Name = reader.ReadQString(),
-                RatingA = reader.ReadInt32(),
-                RatingB = reader.ReadInt32(),
+                GlobalId = record.GlobalId,
+                ZoneGroupRaw = record.ZoneGroupRaw,
+                Name = record.Name.Value,
+                RatingA = record.RatingA,
+                RatingB = record.RatingB,
             });
         }
 
-        reader.EnsureEof("team_tactics.dat");
         return result;
     }
 
-    /// <inheritdoc />
-    public void WriteTo(FhmBinaryWriter writer)
+    public void WriteTo(Stream stream)
     {
-        writer.WriteInt32(VersionTag);
-        writer.WriteCount(Records.Count, "team tactic systems");
-        foreach (var record in Records)
+        ArgumentNullException.ThrowIfNull(stream);
+        if (Records.Count > MaximumCollectionCount)
         {
-            writer.WriteInt32(record.GlobalId);
-            writer.WriteInt32(record.ZoneGroupRaw);
-            writer.WriteQString(record.Name);
-            writer.WriteInt32(record.RatingA);
-            writer.WriteInt32(record.RatingB);
+            throw new FhmFormatException($"Invalid team tactic systems count {Records.Count}.");
         }
+
+        FhmTeamTacticsFileSerializer.Serialize(stream, new()
+        {
+            VersionTag = VersionTag,
+            RecordCount = Records.Count,
+            Records = Records.Select(record =>
+            {
+                ArgumentNullException.ThrowIfNull(record);
+                return new FhmTacticSystemData
+                {
+                    GlobalId = record.GlobalId,
+                    ZoneGroupRaw = record.ZoneGroupRaw,
+                    Name = new() { Value = record.Name },
+                    RatingA = record.RatingA,
+                    RatingB = record.RatingB,
+                };
+            }).ToList(),
+        });
     }
 }
 

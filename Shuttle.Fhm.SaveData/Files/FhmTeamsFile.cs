@@ -1,4 +1,5 @@
 using Shuttle.Fhm.SaveData.Binary;
+using Shuttle.Fhm.Serde.Teams;
 
 namespace Shuttle.Fhm.SaveData.Files;
 
@@ -14,30 +15,22 @@ public sealed class FhmTeamsFile : IFhmSaveFile
     /// <summary>Gets team records in serialized order.</summary>
     public IList<FhmTeamRecord> Teams { get; } = [];
 
-    internal static FhmTeamsFile Read(FhmBinaryReader reader)
+    internal static FhmTeamsFile Read(Stream stream)
     {
-        var result = new FhmTeamsFile
+        ArgumentNullException.ThrowIfNull(stream);
+        try
         {
-            VersionTag = reader.ReadInt32(),
-        };
-        var count = reader.ReadCount("teams");
-        for (var index = 0; index < count; index++)
-        {
-            result.Teams.Add(FhmTeamRecord.Read(reader));
+            return FhmTeamWireMapper.FromWire(FhmTeamsFileSerializer.Deserialize(stream));
         }
-
-        reader.EnsureEof("teams.dat");
-        return result;
+        catch (InvalidDataException exception)
+        {
+            throw new FhmFormatException(exception.Message);
+        }
     }
 
-    /// <inheritdoc />
-    public void WriteTo(FhmBinaryWriter writer)
+    public void WriteTo(Stream stream)
     {
-        writer.WriteInt32(VersionTag);
-        writer.WriteCount(Teams.Count, "teams");
-        foreach (var team in Teams)
-        {
-            team.WriteTo(writer);
-        }
+        ArgumentNullException.ThrowIfNull(stream);
+        FhmTeamsFileSerializer.Serialize(stream, FhmTeamWireMapper.ToWire(this));
     }
 }

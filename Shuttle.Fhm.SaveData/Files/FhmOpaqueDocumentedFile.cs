@@ -1,4 +1,4 @@
-using Shuttle.Fhm.SaveData.Binary;
+using System.Buffers.Binary;
 
 namespace Shuttle.Fhm.SaveData.Files;
 
@@ -24,13 +24,16 @@ public sealed class FhmOpaqueDocumentedFile : IFhmSaveFile
     public byte[] Payload { get; }
 
     /// <inheritdoc />
-    public void WriteTo(FhmBinaryWriter writer)
+    public void WriteTo(Stream stream)
     {
+        ArgumentNullException.ThrowIfNull(stream);
         if (Version is int version)
         {
-            writer.WriteInt32(version);
+            Span<byte> versionBytes = stackalloc byte[sizeof(int)];
+            BinaryPrimitives.WriteInt32BigEndian(versionBytes, version);
+            stream.Write(versionBytes);
         }
 
-        writer.WriteOpaqueBytes(new FhmOpaqueBytes(Payload));
+        stream.Write(Payload);
     }
 }

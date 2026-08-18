@@ -8,34 +8,103 @@ internal static class FhmFileCodecs
     {
         ArgumentNullException.ThrowIfNull(content);
         var normalized = relativePath.Replace('\\', '/');
-        using var stream = new MemoryStream(content, writable: false);
-        using var reader = new FhmBinaryReader(stream, leaveOpen: true);
+        if (string.Equals(normalized, "info.dat", StringComparison.OrdinalIgnoreCase))
+        {
+            using var infoStream = new MemoryStream(content, writable: false);
+            return FhmInfoFile.Read(infoStream);
+        }
+
+        if (normalized is "shot_type_mod.dat" or "tactical_settings_mod.dat")
+        {
+            using var catalogueStream = new MemoryStream(content, writable: false);
+            return FhmLengthPrefixedCatalogueFile.Read(normalized, hasCount: false, catalogueStream);
+        }
+
+        if (string.Equals(normalized, "tactic_templates.dat", StringComparison.OrdinalIgnoreCase))
+        {
+            using var templatesStream = new MemoryStream(content, writable: false);
+            return FhmTacticTemplatesFile.Read(templatesStream);
+        }
+
+        if (string.Equals(normalized, "team_tactics.dat", StringComparison.OrdinalIgnoreCase))
+        {
+            using var teamTacticsStream = new MemoryStream(content, writable: false);
+            return FhmTeamTacticsFile.Read(teamTacticsStream);
+        }
+
+        if (string.Equals(normalized, "leagues.dat", StringComparison.OrdinalIgnoreCase))
+        {
+            using var leaguesStream = new MemoryStream(content, writable: false);
+            return FhmLeaguesFile.Read(leaguesStream);
+        }
+
+        if (string.Equals(normalized, "tactics.dat", StringComparison.OrdinalIgnoreCase))
+        {
+            using var tacticsStream = new MemoryStream(content, writable: false);
+            return FhmTacticsFile.Read(tacticsStream);
+        }
+
+        if (string.Equals(normalized, "zone_event_mod.dat", StringComparison.OrdinalIgnoreCase))
+        {
+            using var zoneEventModifiersStream = new MemoryStream(content, writable: false);
+            return FhmZoneEventModifiersFile.Read(zoneEventModifiersStream);
+        }
+
+        if (string.Equals(normalized, "game_settings.dat", StringComparison.OrdinalIgnoreCase))
+        {
+            using var gameSettingsStream = new MemoryStream(content, writable: false);
+            return FhmGameSettingsFile.Read(gameSettingsStream);
+        }
+
+        if (string.Equals(normalized, "names.dat", StringComparison.OrdinalIgnoreCase))
+        {
+            using var namesStream = new MemoryStream(content, writable: false);
+            return FhmNamesFile.Read(namesStream);
+        }
+
+        if (string.Equals(normalized, "player_roles.dat", StringComparison.OrdinalIgnoreCase))
+        {
+            using var playerRolesStream = new MemoryStream(content, writable: false);
+            return FhmPlayerRolesFile.Read(playerRolesStream);
+        }
+
+        if (string.Equals(normalized, "players.dat", StringComparison.OrdinalIgnoreCase))
+        {
+            using var playersStream = new MemoryStream(content, writable: false);
+            return FhmPlayersFile.Read(playersStream);
+        }
+
+        if (string.Equals(normalized, "teams.dat", StringComparison.OrdinalIgnoreCase))
+        {
+            using var teamsStream = new MemoryStream(content, writable: false);
+            return FhmTeamsFile.Read(teamsStream);
+        }
+
+        if (string.Equals(normalized, "stored_lines.dat", StringComparison.OrdinalIgnoreCase))
+        {
+            using var storedLinesStream = new MemoryStream(content, writable: false);
+            return FhmStoredLinesFile.Read(storedLinesStream);
+        }
+
+        if (string.Equals(normalized, "trade.dat", StringComparison.OrdinalIgnoreCase))
+        {
+            using var tradeStream = new MemoryStream(content, writable: false);
+            return FhmTradeFile.Read(tradeStream);
+        }
+
+        if (string.Equals(normalized, "trade_history.dat", StringComparison.OrdinalIgnoreCase))
+        {
+            using var tradeHistoryStream = new MemoryStream(content, writable: false);
+            return FhmTradeHistoryFile.Read(tradeHistoryStream);
+        }
+
         if (normalized.StartsWith("set_play_", StringComparison.OrdinalIgnoreCase) &&
             normalized.EndsWith(".dat", StringComparison.OrdinalIgnoreCase))
         {
-            return FhmSetPlayFile.Read(normalized, reader);
+            using var setPlayStream = new MemoryStream(content, writable: false);
+            return FhmSetPlayFile.Read(normalized, setPlayStream);
         }
 
-        return normalized.ToLowerInvariant() switch
-        {
-            "info.dat" => FhmInfoFile.Read(reader),
-            "names.dat" => FhmNamesFile.Read(reader),
-            "player_roles.dat" => FhmPlayerRolesFile.Read(reader),
-            "team_tactics.dat" => FhmTeamTacticsFile.Read(reader),
-            "stored_lines.dat" => FhmStoredLinesFile.Read(reader),
-            "leagues.dat" => FhmLeaguesFile.Read(reader),
-            "tactic_templates.dat" => FhmTacticTemplatesFile.Read(reader),
-            "shot_type_mod.dat" => FhmLengthPrefixedCatalogueFile.Read(normalized, hasCount: false, reader),
-            "tactical_settings_mod.dat" => FhmLengthPrefixedCatalogueFile.Read(normalized, hasCount: false, reader),
-            "players.dat" => FhmPlayersFile.Read(reader),
-            "teams.dat" => FhmTeamsFile.Read(reader),
-            "trade.dat" => FhmTradeFile.Read(reader),
-            "trade_history.dat" => FhmTradeHistoryFile.Read(reader),
-            "tactics.dat" => FhmTacticsFile.Read(reader),
-            "zone_event_mod.dat" => FhmZoneEventModifiersFile.Read(reader),
-            "game_settings.dat" => FhmGameSettingsFile.Read(reader),
-            _ => null,
-        };
+        return null;
     }
-
 }

@@ -1,4 +1,6 @@
+using Shuttle.BinarySerde.Common.QFormat;
 using Shuttle.Fhm.SaveData.Binary;
+using Shuttle.Fhm.Serde.Leagues;
 
 namespace Shuttle.Fhm.SaveData.Files;
 
@@ -14,83 +16,104 @@ public sealed class FhmLeaguesFile : IFhmSaveFile
     /// <summary>Gets or sets the known league record.</summary>
     public FhmLeagueRecord League { get; set; } = new();
 
-    internal static FhmLeaguesFile Read(FhmBinaryReader reader)
+    internal static FhmLeaguesFile Read(Stream stream)
     {
-        var result = new FhmLeaguesFile { VersionTag = reader.ReadInt32() };
-        var count = reader.ReadCount("league records");
-        if (count != 1)
+        ArgumentNullException.ThrowIfNull(stream);
+        FhmLeaguesFileHeaderData header;
+        FhmLeagueRecordData wire;
+        try
         {
-            throw new FhmFormatException($"leagues.dat has {count} records; only the documented single-record boundary is supported.");
+            header = FhmLeaguesFileSerializer.DeserializeHeader(stream);
+            wire = FhmLeaguesFileSerializer.DeserializeRecord(stream);
+        }
+        catch (InvalidDataException exception)
+        {
+            throw new FhmFormatException(exception.Message);
+        }
+
+        if (header.RecordCount != 1)
+        {
+            throw new FhmFormatException($"leagues.dat has {header.RecordCount} records; only the documented single-record boundary is supported.");
+        }
+
+        if (wire.ConfigDoublesPrimary.Count != 17)
+        {
+            throw new FhmFormatException("leagues.dat requires 17 primary configuration doubles.");
         }
 
         var league = new FhmLeagueRecord
         {
-            LeagueId = reader.ReadInt32(),
-            Flag0 = reader.ReadByte(),
-            Flag1 = reader.ReadByte(),
-            Flag2 = reader.ReadByte(),
-            Name = reader.ReadQString(),
-            ShortName = reader.ReadQString(),
-            Abbreviation = reader.ReadQString(),
-            Nickname = reader.ReadQString(),
-            TypeParentId = reader.ReadUInt16(),
-            TypeLevelId = reader.ReadUInt16(),
-            ConfigDouble0 = reader.ReadDouble(),
-            EarlyInt0 = reader.ReadInt32(),
-            EarlyInt1 = reader.ReadInt32(),
+            LeagueId = wire.LeagueId,
+            Flag0 = wire.Flag0,
+            Flag1 = wire.Flag1,
+            Flag2 = wire.Flag2,
+            Name = wire.Name.Value,
+            ShortName = wire.ShortName.Value,
+            Abbreviation = wire.Abbreviation.Value,
+            Nickname = wire.Nickname.Value,
+            TypeParentId = wire.TypeParentId,
+            TypeLevelId = wire.TypeLevelId,
+            ConfigDouble0 = wire.ConfigDouble0,
+            EarlyInt0 = wire.EarlyInt0,
+            EarlyInt1 = wire.EarlyInt1,
+            ConfigInt0 = wire.ConfigInt0,
+            ConfigInt1 = wire.ConfigInt1,
+            ConfigUInt160 = wire.ConfigUInt160,
+            ConfigInt2 = wire.ConfigInt2,
+            ConfigUInt161 = wire.ConfigUInt161,
+            FoundingDate = new FhmDate(wire.FoundingDate.Year, wire.FoundingDate.Month, wire.FoundingDate.Day),
+            OpaqueLeagueBody = ReadRemaining(stream),
         };
-        for (var index = 0; index < league.ConfigDoublesPrimary.Length; index++)
-        {
-            league.ConfigDoublesPrimary[index] = reader.ReadDouble();
-        }
 
-        league.ConfigInt0 = reader.ReadInt32();
-        league.ConfigInt1 = reader.ReadInt32();
-        league.ConfigUInt160 = reader.ReadUInt16();
-        league.ConfigInt2 = reader.ReadInt32();
-        league.ConfigUInt161 = reader.ReadUInt16();
-        league.FoundingDate = reader.ReadDate();
-        league.OpaqueLeagueBody = reader.ReadRemaining();
-        result.League = league;
-        return result;
+        wire.ConfigDoublesPrimary.CopyTo(league.ConfigDoublesPrimary);
+        return new FhmLeaguesFile
+        {
+            VersionTag = header.VersionTag,
+            League = league,
+        };
     }
 
-    /// <inheritdoc />
-    public void WriteTo(FhmBinaryWriter writer)
+    public void WriteTo(Stream stream)
     {
-        writer.WriteInt32(VersionTag);
-        writer.WriteInt32(1);
+        ArgumentNullException.ThrowIfNull(stream);
         var league = League;
-        writer.WriteInt32(league.LeagueId);
-        writer.WriteByte(league.Flag0);
-        writer.WriteByte(league.Flag1);
-        writer.WriteByte(league.Flag2);
-        writer.WriteQString(league.Name);
-        writer.WriteQString(league.ShortName);
-        writer.WriteQString(league.Abbreviation);
-        writer.WriteQString(league.Nickname);
-        writer.WriteUInt16(league.TypeParentId);
-        writer.WriteUInt16(league.TypeLevelId);
-        writer.WriteDouble(league.ConfigDouble0);
-        writer.WriteInt32(league.EarlyInt0);
-        writer.WriteInt32(league.EarlyInt1);
         if (league.ConfigDoublesPrimary.Length != 17)
         {
             throw new FhmFormatException("leagues.dat requires 17 primary configuration doubles.");
         }
 
-        foreach (var value in league.ConfigDoublesPrimary)
+        FhmLeaguesFileSerializer.SerializeHeader(stream, new() { VersionTag = VersionTag, RecordCount = 1 });
+        FhmLeaguesFileSerializer.SerializeRecord(stream, new()
         {
-            writer.WriteDouble(value);
-        }
+            LeagueId = league.LeagueId,
+            Flag0 = league.Flag0,
+            Flag1 = league.Flag1,
+            Flag2 = league.Flag2,
+            Name = new() { Value = league.Name },
+            ShortName = new() { Value = league.ShortName },
+            Abbreviation = new() { Value = league.Abbreviation },
+            Nickname = new() { Value = league.Nickname },
+            TypeParentId = league.TypeParentId,
+            TypeLevelId = league.TypeLevelId,
+            ConfigDouble0 = league.ConfigDouble0,
+            EarlyInt0 = league.EarlyInt0,
+            EarlyInt1 = league.EarlyInt1,
+            ConfigDoublesPrimary = league.ConfigDoublesPrimary.ToList(),
+            ConfigInt0 = league.ConfigInt0,
+            ConfigInt1 = league.ConfigInt1,
+            ConfigUInt160 = league.ConfigUInt160,
+            ConfigInt2 = league.ConfigInt2,
+            ConfigUInt161 = league.ConfigUInt161,
+            FoundingDate = new() { Year = league.FoundingDate.Year, Month = league.FoundingDate.Month, Day = league.FoundingDate.Day },
+        });
+        stream.Write(league.OpaqueLeagueBody);
+    }
 
-        writer.WriteInt32(league.ConfigInt0);
-        writer.WriteInt32(league.ConfigInt1);
-        writer.WriteUInt16(league.ConfigUInt160);
-        writer.WriteInt32(league.ConfigInt2);
-        writer.WriteUInt16(league.ConfigUInt161);
-        writer.WriteDate(league.FoundingDate);
-        writer.WriteOpaqueBytes(new FhmOpaqueBytes(league.OpaqueLeagueBody));
+    private static byte[] ReadRemaining(Stream stream)
+    {
+        using var remaining = new MemoryStream();
+        stream.CopyTo(remaining);
+        return remaining.ToArray();
     }
 }
 

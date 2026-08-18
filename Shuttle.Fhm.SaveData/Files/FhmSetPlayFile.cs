@@ -1,10 +1,13 @@
 using Shuttle.Fhm.SaveData.Binary;
+using Shuttle.Fhm.Serde.SetPlays;
 
 namespace Shuttle.Fhm.SaveData.Files;
 
 /// <summary>One of the eight <c>set_play_*.dat</c> formation catalogues.</summary>
 public sealed class FhmSetPlayFile : IFhmSaveFile
 {
+    private const int MaximumCollectionCount = 10_000_000;
+
     /// <summary>Initializes a set-play catalogue for its root-relative filename.</summary>
     public FhmSetPlayFile(string relativePath)
     {
@@ -23,48 +26,90 @@ public sealed class FhmSetPlayFile : IFhmSaveFile
     /// <summary>Gets trailing documented but unresolved numeric catalogue records.</summary>
     public IList<FhmLengthPrefixedBlock> ExtraRecords { get; } = [];
 
-    internal static FhmSetPlayFile Read(string relativePath, FhmBinaryReader reader)
+    internal static FhmSetPlayFile Read(string relativePath, Stream stream)
     {
-        var result = new FhmSetPlayFile(relativePath) { Version = reader.ReadInt32() };
-        var formationCount = reader.ReadCount($"{relativePath} formations");
-        ReadBlocks(reader, result.Formations, formationCount, $"{relativePath} formation");
-        while (reader.Remaining > 0)
+        ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+        ArgumentNullException.ThrowIfNull(stream);
+
+        FhmSetPlayHeaderData header;
+        try
         {
-            ReadBlocks(reader, result.ExtraRecords, 1, $"{relativePath} extra record");
+            header = FhmSetPlayFileSerializer.DeserializeHeader(stream);
+        }
+        catch (InvalidDataException exception)
+        {
+            throw new FhmFormatException(exception.Message);
+        }
+
+        if (header.FormationCount < 0 || header.FormationCount > MaximumCollectionCount)
+        {
+            throw new FhmFormatException($"Invalid {relativePath} formations count {header.FormationCount}.");
+        }
+
+        var result = new FhmSetPlayFile(relativePath) { Version = header.Version };
+        ReadBlocks(stream, result.Formations, header.FormationCount, $"{relativePath} formation");
+        while (!stream.CanSeek || stream.Position < stream.Length)
+        {
+            ReadBlocks(stream, result.ExtraRecords, 1, $"{relativePath} extra record");
         }
 
         return result;
     }
 
-    /// <inheritdoc />
-    public void WriteTo(FhmBinaryWriter writer)
+    public void WriteTo(Stream stream)
     {
-        writer.WriteInt32(Version);
-        writer.WriteCount(Formations.Count, $"{RelativePath} formations");
-        WriteBlocks(writer, Formations, $"{RelativePath} formation");
-        WriteBlocks(writer, ExtraRecords, $"{RelativePath} extra record");
+        ArgumentNullException.ThrowIfNull(stream);
+        ValidateForWrite();
+        FhmSetPlayFileSerializer.SerializeHeader(stream, new FhmSetPlayHeaderData
+        {
+            Version = Version,
+            FormationCount = Formations.Count,
+        });
+        WriteBlocks(stream, Formations);
+        WriteBlocks(stream, ExtraRecords);
     }
 
-    private static void ReadBlocks(FhmBinaryReader reader, ICollection<FhmLengthPrefixedBlock> destination, int count, string description)
+    private static void ReadBlocks(Stream stream, ICollection<FhmLengthPrefixedBlock> destination, int count, string description)
     {
         for (var index = 0; index < count; index++)
         {
-            var length = reader.ReadInt32();
-            if (length < 0)
+            FhmSetPlayBlockData block;
+            try
+            {
+                block = FhmSetPlayFileSerializer.DeserializeBlock(stream);
+            }
+            catch (InvalidDataException exception)
+            {
+                throw new FhmFormatException(exception.Message);
+            }
+
+            if (block.ByteLength < 0)
             {
                 throw new FhmFormatException($"{description} has a negative byte length.");
             }
 
-            destination.Add(new FhmLengthPrefixedBlock(reader.ReadOpaqueBytes(length).Value));
+            destination.Add(new FhmLengthPrefixedBlock(block.Data));
         }
     }
 
-    private static void WriteBlocks(FhmBinaryWriter writer, IEnumerable<FhmLengthPrefixedBlock> blocks, string description)
+    private static void WriteBlocks(Stream stream, IEnumerable<FhmLengthPrefixedBlock> blocks)
     {
         foreach (var block in blocks)
         {
-            writer.WriteCount(block.Data.Length, $"{description} bytes");
-            writer.WriteOpaqueBytes(new FhmOpaqueBytes(block.Data));
+            ArgumentNullException.ThrowIfNull(block);
+            FhmSetPlayFileSerializer.SerializeBlock(stream, new FhmSetPlayBlockData
+            {
+                ByteLength = block.Data.Length,
+                Data = block.Data,
+            });
+        }
+    }
+
+    private void ValidateForWrite()
+    {
+        if (Formations.Count > MaximumCollectionCount)
+        {
+            throw new FhmFormatException($"Invalid {RelativePath} formations count {Formations.Count}.");
         }
     }
 }

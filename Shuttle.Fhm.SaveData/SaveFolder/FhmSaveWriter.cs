@@ -48,7 +48,6 @@ public sealed class FhmSaveWriter
         var path = FhmSavePath.Resolve(destinationDirectory, relativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         using var output = File.Create(path);
-        using var writer = new Binary.FhmBinaryWriter(output);
-        file.WriteTo(writer);
+        file.WriteTo(output);
     }
 }

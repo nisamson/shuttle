@@ -1,5 +1,5 @@
-using System.Diagnostics;
 using Shuttle.Fhm.SaveData.Binary;
+using Shuttle.Fhm.Serde.Settings;
 
 namespace Shuttle.Fhm.SaveData.Files;
 
@@ -64,61 +64,28 @@ public sealed class FhmGameSettingsFile : IFhmSaveFile
             : throw new InvalidOperationException($"Game setting {setting} cannot be returned as {typeof(T).Name}.");
     }
 
-    internal static FhmGameSettingsFile Read(FhmBinaryReader reader)
+    internal static FhmGameSettingsFile Read(Stream stream)
     {
+        var wire = FhmGameSettingsSerializer.Deserialize(stream);
         var result = new FhmGameSettingsFile();
         for (var index = 0; index < valueKinds.Length; index++)
         {
-            result.values[index] = ReadValue(reader, valueKinds[index]);
+            result.values[index] = wire.GetValue(index);
         }
 
-        reader.EnsureEof("game_settings.dat");
         return result;
     }
 
-    /// <inheritdoc />
-    public void WriteTo(FhmBinaryWriter writer)
+    public void WriteTo(Stream stream)
     {
+        var wire = new FhmGameSettingsData();
         for (var index = 0; index < valueKinds.Length; index++)
         {
-            WriteValue(writer, valueKinds[index], values[index] ?? DefaultValue(valueKinds[index]));
+            wire.SetValue(index, values[index] ?? DefaultValue(valueKinds[index]));
         }
+
+        FhmGameSettingsSerializer.Serialize(stream, wire);
     }
-
-    private static object? ReadValue(FhmBinaryReader reader, FhmGameSettingValueKind kind) => kind switch
-    {
-        FhmGameSettingValueKind.Byte => reader.ReadByte(),
-        FhmGameSettingValueKind.UInt16 => reader.ReadUInt16(),
-        FhmGameSettingValueKind.Int32 => reader.ReadInt32(),
-        FhmGameSettingValueKind.Double => reader.ReadDouble(),
-        FhmGameSettingValueKind.QString => reader.ReadQString(),
-        _ => throw new UnreachableException(),
-    };
-
-    private static void WriteValue(FhmBinaryWriter writer, FhmGameSettingValueKind kind, object? value)
-    {
-        switch (kind)
-        {
-            case FhmGameSettingValueKind.Byte:
-                writer.WriteByte((byte)value!);
-                break;
-            case FhmGameSettingValueKind.UInt16:
-                writer.WriteUInt16((ushort)value!);
-                break;
-            case FhmGameSettingValueKind.Int32:
-                writer.WriteInt32((int)value!);
-                break;
-            case FhmGameSettingValueKind.Double:
-                writer.WriteDouble((double)value!);
-                break;
-            case FhmGameSettingValueKind.QString:
-                writer.WriteQString((string?)value);
-                break;
-            default:
-                throw new UnreachableException();
-        }
-    }
-
     private static void ValidateValue(int index, object? value)
     {
         var expected = valueKinds[index] switch
@@ -128,7 +95,7 @@ public sealed class FhmGameSettingsFile : IFhmSaveFile
             FhmGameSettingValueKind.Int32 => typeof(int),
             FhmGameSettingValueKind.Double => typeof(double),
             FhmGameSettingValueKind.QString => typeof(string),
-            _ => throw new UnreachableException(),
+            _ => throw new InvalidOperationException($"Unsupported game setting value kind {valueKinds[index]}."),
         };
 
         if (value is null && valueKinds[index] == FhmGameSettingValueKind.QString)
@@ -149,7 +116,7 @@ public sealed class FhmGameSettingsFile : IFhmSaveFile
         FhmGameSettingValueKind.Int32 => 0,
         FhmGameSettingValueKind.Double => 0d,
         FhmGameSettingValueKind.QString => null,
-        _ => throw new UnreachableException(),
+        _ => throw new InvalidOperationException($"Unsupported game setting value kind {kind}."),
     };
 }
 

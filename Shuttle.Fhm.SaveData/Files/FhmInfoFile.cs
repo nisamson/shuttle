@@ -1,4 +1,4 @@
-using Shuttle.Fhm.SaveData.Binary;
+using Shuttle.Fhm.Serde.Info;
 
 namespace Shuttle.Fhm.SaveData.Files;
 
@@ -14,21 +14,22 @@ public sealed class FhmInfoFile : IFhmSaveFile
     /// <summary>Gets or sets the save or world name identifier.</summary>
     public string? NameId { get; set; }
 
-    internal static FhmInfoFile Read(FhmBinaryReader reader)
+    internal static FhmInfoFile Read(Stream stream)
     {
-        var result = new FhmInfoFile
+        var wire = FhmInfoFileSerializer.Deserialize(stream);
+        return new FhmInfoFile
         {
-            Description = reader.ReadQString(),
-            NameId = reader.ReadQString(),
+            Description = wire.Description.Value,
+            NameId = wire.NameId.Value,
         };
-        reader.EnsureEof("info.dat");
-        return result;
     }
 
-    /// <inheritdoc />
-    public void WriteTo(FhmBinaryWriter writer)
+    public void WriteTo(Stream stream)
     {
-        writer.WriteQString(Description);
-        writer.WriteQString(NameId);
+        FhmInfoFileSerializer.Serialize(stream, new FhmInfoFileData
+        {
+            Description = new() { Value = Description },
+            NameId = new() { Value = NameId },
+        });
     }
 }

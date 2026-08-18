@@ -1,10 +1,14 @@
 using Shuttle.Fhm.SaveData.Binary;
+using Shuttle.BinarySerde.Common.QFormat;
+using Shuttle.Fhm.Serde.PlayerRoles;
 
 namespace Shuttle.Fhm.SaveData.Files;
 
 /// <summary>The role catalogue in <c>player_roles.dat</c>.</summary>
 public sealed class FhmPlayerRolesFile : IFhmSaveFile
 {
+    internal const int MaximumCollectionCount = 10_000_000;
+
     /// <inheritdoc />
     public string RelativePath => "player_roles.dat";
 
@@ -14,27 +18,65 @@ public sealed class FhmPlayerRolesFile : IFhmSaveFile
     /// <summary>Gets role records in serialized order.</summary>
     public IList<FhmPlayerRoleDefinition> Records { get; } = [];
 
-    internal static FhmPlayerRolesFile Read(FhmBinaryReader reader)
+    internal static FhmPlayerRolesFile Read(Stream stream)
     {
-        var result = new FhmPlayerRolesFile { VersionTag = reader.ReadInt32() };
-        var count = reader.ReadCount("player role records");
-        for (var index = 0; index < count; index++)
+        ArgumentNullException.ThrowIfNull(stream);
+        FhmPlayerRolesFileData wire;
+        try
         {
-            result.Records.Add(FhmPlayerRoleDefinition.Read(reader));
+            wire = FhmPlayerRolesFileSerializer.Deserialize(stream);
+        }
+        catch (InvalidDataException exception)
+        {
+            throw new FhmFormatException(exception.Message);
         }
 
-        reader.EnsureEof("player_roles.dat");
+        ValidateWire(wire);
+        var result = new FhmPlayerRolesFile { VersionTag = wire.VersionTag };
+        foreach (var record in wire.Records)
+        {
+            result.Records.Add(FhmPlayerRoleDefinition.FromWire(record));
+        }
+
         return result;
     }
 
-    /// <inheritdoc />
-    public void WriteTo(FhmBinaryWriter writer)
+    public void WriteTo(Stream stream)
     {
-        writer.WriteInt32(VersionTag);
-        writer.WriteCount(Records.Count, "player role records");
+        ArgumentNullException.ThrowIfNull(stream);
+        ValidateForWrite();
+        FhmPlayerRolesFileSerializer.Serialize(stream, new FhmPlayerRolesFileData
+        {
+            VersionTag = VersionTag,
+            RecordCount = Records.Count,
+            Records = Records.Select(FhmPlayerRoleDefinition.ToWire).ToList(),
+        });
+    }
+
+    private static void ValidateWire(FhmPlayerRolesFileData wire)
+    {
+        if (wire.RecordCount < 0 || wire.RecordCount > MaximumCollectionCount || wire.Records.Count != wire.RecordCount)
+        {
+            throw new FhmFormatException($"Invalid player role records count {wire.RecordCount}.");
+        }
+
+        foreach (var record in wire.Records)
+        {
+            FhmPlayerRoleDefinition.ValidateWire(record);
+        }
+    }
+
+    private void ValidateForWrite()
+    {
+        if (Records.Count > MaximumCollectionCount)
+        {
+            throw new FhmFormatException($"Invalid player role records count {Records.Count}.");
+        }
+
         foreach (var record in Records)
         {
-            record.WriteTo(writer);
+            ArgumentNullException.ThrowIfNull(record);
+            record.ValidateForWrite();
         }
     }
 }
@@ -99,85 +141,107 @@ public sealed class FhmPlayerRoleDefinition
     /// <summary>Gets four serialized index lists.</summary>
     public IList<IList<byte>> IndexLists { get; } = [[], [], [], []];
 
-    internal static FhmPlayerRoleDefinition Read(FhmBinaryReader reader)
+    internal static FhmPlayerRoleDefinition FromWire(FhmPlayerRoleDefinitionData wire)
     {
+        ArgumentNullException.ThrowIfNull(wire);
         var result = new FhmPlayerRoleDefinition
         {
-            RoleId = reader.ReadInt32(),
-            Name = reader.ReadQString(),
+            RoleId = wire.RoleId,
+            Name = wire.Name.Value,
+            AppliesToForwards = wire.AppliesToForwards,
+            AppliesToDefencemen = wire.AppliesToDefencemen,
+            AppliesToGoalies = wire.AppliesToGoalies,
+            RoleFlags = wire.RoleFlags,
+            PositionCategory = wire.PositionCategory,
+            ShortName = wire.ShortName.Value,
+            TuningValueA = wire.TuningValueA,
+            TuningValueB = wire.TuningValueB,
+            Description = wire.Description.Value,
+            TuningValueC = wire.TuningValueC,
         };
-        ReadInts(reader, result.WeightGroupA);
-        ReadInts(reader, result.WeightGroupB);
-        ReadInts(reader, result.WeightGroupC);
-        ReadInts(reader, result.WeightGroupD);
-        result.AppliesToForwards = reader.ReadByte();
-        result.AppliesToDefencemen = reader.ReadByte();
-        result.AppliesToGoalies = reader.ReadByte();
-        result.RoleFlags = reader.ReadByte();
-        result.PositionCategory = reader.ReadUInt16();
-        result.ShortName = reader.ReadQString();
-        result.TuningValueA = reader.ReadUInt16();
-        result.TuningValueB = reader.ReadUInt16();
-        result.Description = reader.ReadQString();
-        result.TuningValueC = reader.ReadUInt16();
-        ReadInts(reader, result.WeightGroupE);
-        ReadInts(reader, result.WeightGroupF);
-        foreach (var list in result.IndexLists)
-        {
-            var count = reader.ReadCount("player role index list");
-            for (var index = 0; index < count; index++)
-            {
-                list.Add(reader.ReadByte());
-            }
-        }
 
+        CopyList(wire.WeightGroupA, result.WeightGroupA);
+        CopyList(wire.WeightGroupB, result.WeightGroupB);
+        CopyList(wire.WeightGroupC, result.WeightGroupC);
+        CopyList(wire.WeightGroupD, result.WeightGroupD);
+        CopyList(wire.WeightGroupE, result.WeightGroupE);
+        CopyList(wire.WeightGroupF, result.WeightGroupF);
+        CopyIndexList(wire.IndexListA, result.IndexLists[0]);
+        CopyIndexList(wire.IndexListB, result.IndexLists[1]);
+        CopyIndexList(wire.IndexListC, result.IndexLists[2]);
+        CopyIndexList(wire.IndexListD, result.IndexLists[3]);
         return result;
     }
 
-    internal void WriteTo(FhmBinaryWriter writer)
+    internal static FhmPlayerRoleDefinitionData ToWire(FhmPlayerRoleDefinition value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return new()
+        {
+            RoleId = value.RoleId,
+            Name = new QString { Value = value.Name },
+            WeightGroupA = value.WeightGroupA.ToList(),
+            WeightGroupB = value.WeightGroupB.ToList(),
+            WeightGroupC = value.WeightGroupC.ToList(),
+            WeightGroupD = value.WeightGroupD.ToList(),
+            AppliesToForwards = value.AppliesToForwards,
+            AppliesToDefencemen = value.AppliesToDefencemen,
+            AppliesToGoalies = value.AppliesToGoalies,
+            RoleFlags = value.RoleFlags,
+            PositionCategory = value.PositionCategory,
+            ShortName = new QString { Value = value.ShortName },
+            TuningValueA = value.TuningValueA,
+            TuningValueB = value.TuningValueB,
+            Description = new QString { Value = value.Description },
+            TuningValueC = value.TuningValueC,
+            WeightGroupE = value.WeightGroupE.ToList(),
+            WeightGroupF = value.WeightGroupF.ToList(),
+            IndexListA = ToWireIndexList(value.IndexLists[0]),
+            IndexListB = ToWireIndexList(value.IndexLists[1]),
+            IndexListC = ToWireIndexList(value.IndexLists[2]),
+            IndexListD = ToWireIndexList(value.IndexLists[3]),
+        };
+    }
+
+    internal static void ValidateWire(FhmPlayerRoleDefinitionData wire)
+    {
+        ArgumentNullException.ThrowIfNull(wire);
+        ValidateFixedLengths(
+            wire.WeightGroupA,
+            wire.WeightGroupB,
+            wire.WeightGroupC,
+            wire.WeightGroupD,
+            wire.WeightGroupE,
+            wire.WeightGroupF);
+        ValidateWireIndexList(wire.IndexListA);
+        ValidateWireIndexList(wire.IndexListB);
+        ValidateWireIndexList(wire.IndexListC);
+        ValidateWireIndexList(wire.IndexListD);
+    }
+
+    internal void ValidateForWrite()
     {
         ValidateLengths();
-        writer.WriteInt32(RoleId);
-        writer.WriteQString(Name);
-        WriteInts(writer, WeightGroupA);
-        WriteInts(writer, WeightGroupB);
-        WriteInts(writer, WeightGroupC);
-        WriteInts(writer, WeightGroupD);
-        writer.WriteByte(AppliesToForwards);
-        writer.WriteByte(AppliesToDefencemen);
-        writer.WriteByte(AppliesToGoalies);
-        writer.WriteByte(RoleFlags);
-        writer.WriteUInt16(PositionCategory);
-        writer.WriteQString(ShortName);
-        writer.WriteUInt16(TuningValueA);
-        writer.WriteUInt16(TuningValueB);
-        writer.WriteQString(Description);
-        writer.WriteUInt16(TuningValueC);
-        WriteInts(writer, WeightGroupE);
-        WriteInts(writer, WeightGroupF);
         foreach (var list in IndexLists)
         {
-            writer.WriteCount(list.Count, "player role index list");
-            foreach (var value in list)
-            {
-                writer.WriteByte(value);
-            }
+            ArgumentNullException.ThrowIfNull(list);
+            ValidateIndexListCount(list.Count);
         }
     }
 
-    private static void ReadInts(FhmBinaryReader reader, IList<int> destination)
+    private static void CopyList(IReadOnlyList<int> source, IList<int> destination)
     {
         for (var index = 0; index < destination.Count; index++)
         {
-            destination[index] = reader.ReadInt32();
+            destination[index] = source[index];
         }
     }
 
-    private static void WriteInts(FhmBinaryWriter writer, IEnumerable<int> values)
+    private static void CopyIndexList(QList<byte> source, ICollection<byte> destination)
     {
-        foreach (var value in values)
+        foreach (var value in source.Items)
         {
-            writer.WriteInt32(value);
+            destination.Add(value);
         }
     }
 
@@ -187,6 +251,48 @@ public sealed class FhmPlayerRoleDefinition
             WeightGroupD.Count != 4 || WeightGroupE.Count != 19 || WeightGroupF.Count != 9 || IndexLists.Count != 4)
         {
             throw new FhmFormatException("player role definition contains a malformed fixed-size vector.");
+        }
+    }
+
+    private static void ValidateFixedLengths(
+        IReadOnlyCollection<int> weightGroupA,
+        IReadOnlyCollection<int> weightGroupB,
+        IReadOnlyCollection<int> weightGroupC,
+        IReadOnlyCollection<int> weightGroupD,
+        IReadOnlyCollection<int> weightGroupE,
+        IReadOnlyCollection<int> weightGroupF)
+    {
+        if (weightGroupA.Count != FhmPlayerRoleDefinitionData.WeightGroupACount ||
+            weightGroupB.Count != FhmPlayerRoleDefinitionData.WeightGroupBCount ||
+            weightGroupC.Count != FhmPlayerRoleDefinitionData.WeightGroupCCount ||
+            weightGroupD.Count != FhmPlayerRoleDefinitionData.WeightGroupDCount ||
+            weightGroupE.Count != FhmPlayerRoleDefinitionData.WeightGroupECount ||
+            weightGroupF.Count != FhmPlayerRoleDefinitionData.WeightGroupFCount)
+        {
+            throw new FhmFormatException("player role definition contains a malformed fixed-size vector.");
+        }
+    }
+
+    private static QList<byte> ToWireIndexList(IList<byte> values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        ValidateIndexListCount(values.Count);
+        return new() { Length = values.Count, Items = values.ToList() };
+    }
+
+    private static void ValidateWireIndexList(QList<byte> list)
+    {
+        if (list is null || list.Length < 0 || list.Length > FhmPlayerRolesFile.MaximumCollectionCount || list.Items.Count != list.Length)
+        {
+            throw new FhmFormatException($"Invalid player role index list count {list?.Length}.");
+        }
+    }
+
+    private static void ValidateIndexListCount(int count)
+    {
+        if (count > FhmPlayerRolesFile.MaximumCollectionCount)
+        {
+            throw new FhmFormatException($"Invalid player role index list count {count}.");
         }
     }
 }

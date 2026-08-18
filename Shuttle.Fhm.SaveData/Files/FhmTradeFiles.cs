@@ -1,10 +1,14 @@
+using Shuttle.BinarySerde.Common.QFormat;
 using Shuttle.Fhm.SaveData.Binary;
+using Shuttle.Fhm.Serde.Trades;
 
 namespace Shuttle.Fhm.SaveData.Files;
 
 /// <summary>Active trade proposals in <c>trade.dat</c>.</summary>
 public sealed class FhmTradeFile : IFhmSaveFile
 {
+    private const int MaximumCollectionCount = 10_000_000;
+
     /// <inheritdoc />
     public string RelativePath => "trade.dat";
 
@@ -14,27 +18,96 @@ public sealed class FhmTradeFile : IFhmSaveFile
     /// <summary>Gets proposed trades in serialized order.</summary>
     public IList<FhmTradeRecord> Records { get; } = [];
 
-    internal static FhmTradeFile Read(FhmBinaryReader reader)
+    internal static FhmTradeFile Read(Stream stream)
     {
-        var result = new FhmTradeFile { VersionTag = reader.ReadInt32() };
-        var count = reader.ReadCount("active trades");
-        for (var index = 0; index < count; index++)
+        ArgumentNullException.ThrowIfNull(stream);
+        FhmTradeFileData wire;
+        try
         {
-            result.Records.Add(FhmTradeRecord.Read(reader));
+            wire = FhmTradeFileSerializer.Deserialize(stream);
+        }
+        catch (InvalidDataException exception)
+        {
+            throw new FhmFormatException(exception.Message);
         }
 
-        reader.EnsureEof("trade.dat");
+        ValidateWire(wire);
+        var result = new FhmTradeFile { VersionTag = wire.VersionTag };
+        foreach (var record in wire.Records)
+        {
+            result.Records.Add(FhmTradeRecord.FromWire(record));
+        }
+
         return result;
     }
 
-    /// <inheritdoc />
-    public void WriteTo(FhmBinaryWriter writer)
+    public void WriteTo(Stream stream)
     {
-        writer.WriteInt32(VersionTag);
-        writer.WriteCount(Records.Count, "active trades");
+        ArgumentNullException.ThrowIfNull(stream);
+        ValidateForWrite();
+        FhmTradeFileSerializer.Serialize(stream, new FhmTradeFileData
+        {
+            VersionTag = VersionTag,
+            TradeCount = Records.Count,
+            Records = Records.Select(FhmTradeRecord.ToWire).ToList(),
+        });
+    }
+
+    private static void ValidateWire(FhmTradeFileData wire)
+    {
+        if (wire.TradeCount < 0 || wire.TradeCount > MaximumCollectionCount || wire.Records.Count != wire.TradeCount)
+        {
+            throw new FhmFormatException($"Invalid active trades count {wire.TradeCount}.");
+        }
+
+        foreach (var record in wire.Records)
+        {
+            FhmTradeRecord.ValidateWire(record);
+        }
+    }
+
+    private void ValidateForWrite()
+    {
+        if (Records.Count > MaximumCollectionCount)
+        {
+            throw new FhmFormatException($"Invalid active trades count {Records.Count}.");
+        }
+
         foreach (var record in Records)
         {
-            record.WriteTo(writer);
+            ArgumentNullException.ThrowIfNull(record);
+            record.ValidateForWrite();
+        }
+    }
+
+    internal static void ValidateListCount(int count, string collectionName)
+    {
+        if (count < 0 || count > MaximumCollectionCount)
+        {
+            throw new FhmFormatException($"Invalid {collectionName} count {count}.");
+        }
+    }
+
+    internal static void ValidateWireList<T>(QList<T> list, string collectionName)
+    {
+        if (list is null || list.Length < 0 || list.Length > MaximumCollectionCount || list.Items.Count != list.Length)
+        {
+            throw new FhmFormatException($"Invalid {collectionName} count {list?.Length}.");
+        }
+    }
+
+    internal static QList<T> ToWireList<T>(IList<T> list, string collectionName)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+        ValidateListCount(list.Count, collectionName);
+        return new QList<T> { Length = list.Count, Items = list.ToList() };
+    }
+
+    internal static void CopyList<T>(QList<T> source, IList<T> destination)
+    {
+        foreach (var value in source.Items)
+        {
+            destination.Add(value);
         }
     }
 }
@@ -42,6 +115,8 @@ public sealed class FhmTradeFile : IFhmSaveFile
 /// <summary>Completed trade records in <c>trade_history.dat</c>.</summary>
 public sealed class FhmTradeHistoryFile : IFhmSaveFile
 {
+    private const int MaximumCollectionCount = 10_000_000;
+
     /// <inheritdoc />
     public string RelativePath => "trade_history.dat";
 
@@ -51,27 +126,65 @@ public sealed class FhmTradeHistoryFile : IFhmSaveFile
     /// <summary>Gets completed trades in serialized order.</summary>
     public IList<FhmTradeHistoryRecord> Records { get; } = [];
 
-    internal static FhmTradeHistoryFile Read(FhmBinaryReader reader)
+    internal static FhmTradeHistoryFile Read(Stream stream)
     {
-        var result = new FhmTradeHistoryFile { VersionTag = reader.ReadInt32() };
-        var count = reader.ReadCount("trade history");
-        for (var index = 0; index < count; index++)
+        ArgumentNullException.ThrowIfNull(stream);
+        FhmTradeHistoryFileData wire;
+        try
         {
-            result.Records.Add(FhmTradeHistoryRecord.Read(reader));
+            wire = FhmTradeHistoryFileSerializer.Deserialize(stream);
+        }
+        catch (InvalidDataException exception)
+        {
+            throw new FhmFormatException(exception.Message);
         }
 
-        reader.EnsureEof("trade_history.dat");
+        ValidateWire(wire);
+        var result = new FhmTradeHistoryFile { VersionTag = wire.VersionTag };
+        foreach (var record in wire.Records)
+        {
+            result.Records.Add(FhmTradeHistoryRecord.FromWire(record));
+        }
+
         return result;
     }
 
-    /// <inheritdoc />
-    public void WriteTo(FhmBinaryWriter writer)
+    public void WriteTo(Stream stream)
     {
-        writer.WriteInt32(VersionTag);
-        writer.WriteCount(Records.Count, "trade history");
+        ArgumentNullException.ThrowIfNull(stream);
+        ValidateForWrite();
+        FhmTradeHistoryFileSerializer.Serialize(stream, new FhmTradeHistoryFileData
+        {
+            VersionTag = VersionTag,
+            TradeCount = Records.Count,
+            Records = Records.Select(FhmTradeHistoryRecord.ToWire).ToList(),
+        });
+    }
+
+    private static void ValidateWire(FhmTradeHistoryFileData wire)
+    {
+        if (wire.TradeCount < 0 || wire.TradeCount > MaximumCollectionCount || wire.Records.Count != wire.TradeCount)
+        {
+            throw new FhmFormatException($"Invalid trade history count {wire.TradeCount}.");
+        }
+
+        foreach (var record in wire.Records)
+        {
+            FhmTradeHistoryRecord.ValidateWire(record);
+        }
+    }
+
+    private void ValidateForWrite()
+    {
+        if (Records.Count > MaximumCollectionCount)
+        {
+            throw new FhmFormatException($"Invalid trade history count {Records.Count}.");
+        }
+
         foreach (var record in Records)
         {
-            record.WriteTo(writer);
+            ArgumentNullException.ThrowIfNull(record);
+            record.ValidateForWrite();
         }
     }
 }
@@ -118,39 +231,82 @@ public sealed class FhmTradeRecord
     /// <summary>Gets two lists of signed-id/unsigned-value pairs.</summary>
     public IList<IList<FhmIntUInt16Pair>> PairLists { get; } = [[], []];
 
-    internal static FhmTradeRecord Read(FhmBinaryReader reader)
+    internal static FhmTradeRecord FromWire(FhmTradeRecordData wire)
     {
         var result = new FhmTradeRecord
         {
-            Field0 = reader.ReadInt32(),
-            Date = reader.ReadDate(),
+            Field0 = wire.Field0,
+            Date = new(wire.Date.Year, wire.Date.Month, wire.Date.Day),
+            Field4 = wire.Field4,
+            Field5 = wire.Field5,
+            Flag = wire.Flag,
+            Field14 = wire.Field14,
         };
-        ReadInts(reader, result.Fields1To3);
-        result.Field4 = reader.ReadUInt16();
-        result.Field5 = reader.ReadInt32();
-        ReadIntList(reader, result.AssetLists[0]);
-        ReadIntList(reader, result.AssetLists[1]);
-        ReadIntList(reader, result.AssetLists[2]);
-        ReadIntList(reader, result.AssetLists[3]);
-        ReadIntList(reader, result.AssetLists[4]);
-        result.InterleavedUnsignedFields[0] = reader.ReadUInt16();
-        ReadIntList(reader, result.AssetLists[5]);
-        result.InterleavedUnsignedFields[1] = reader.ReadUInt16();
-        ReadIntList(reader, result.AssetLists[6]);
-        result.InterleavedUnsignedFields[2] = reader.ReadUInt16();
-        ReadIntList(reader, result.AssetLists[7]);
-        result.InterleavedUnsignedFields[3] = reader.ReadUInt16();
-        ReadUInt16s(reader, result.Fields10And11);
-        ReadInts(reader, result.Fields12And13);
-        result.Flag = reader.ReadByte();
-        result.Field14 = reader.ReadUInt16();
-        ReadInts(reader, result.Fields15And16);
-        ReadPairs(reader, result.PairLists[0]);
-        ReadPairs(reader, result.PairLists[1]);
+        result.Fields1To3[0] = wire.Field1;
+        result.Fields1To3[1] = wire.Field2;
+        result.Fields1To3[2] = wire.Field3;
+        result.InterleavedUnsignedFields[0] = wire.InterleavedUnsignedField0;
+        result.InterleavedUnsignedFields[1] = wire.InterleavedUnsignedField1;
+        result.InterleavedUnsignedFields[2] = wire.InterleavedUnsignedField2;
+        result.InterleavedUnsignedFields[3] = wire.InterleavedUnsignedField3;
+        result.Fields10And11[0] = wire.Field10;
+        result.Fields10And11[1] = wire.Field11;
+        result.Fields12And13[0] = wire.Field12;
+        result.Fields12And13[1] = wire.Field13;
+        result.Fields15And16[0] = wire.Field15;
+        result.Fields15And16[1] = wire.Field16;
+
+        CopyAssetLists(wire, result.AssetLists);
+        CopyPairs(wire.PairList0, result.PairLists[0]);
+        CopyPairs(wire.PairList1, result.PairLists[1]);
         return result;
     }
 
-    internal void WriteTo(FhmBinaryWriter writer)
+    internal static FhmTradeRecordData ToWire(FhmTradeRecord value)
+    {
+        value.ValidateForWrite();
+        return new()
+        {
+            Field0 = value.Field0,
+            Date = ToQDate(value.Date),
+            Field1 = value.Fields1To3[0],
+            Field2 = value.Fields1To3[1],
+            Field3 = value.Fields1To3[2],
+            Field4 = value.Field4,
+            Field5 = value.Field5,
+            AssetList0 = FhmTradeFile.ToWireList(value.AssetLists[0], "trade id list"),
+            AssetList1 = FhmTradeFile.ToWireList(value.AssetLists[1], "trade id list"),
+            AssetList2 = FhmTradeFile.ToWireList(value.AssetLists[2], "trade id list"),
+            AssetList3 = FhmTradeFile.ToWireList(value.AssetLists[3], "trade id list"),
+            AssetList4 = FhmTradeFile.ToWireList(value.AssetLists[4], "trade id list"),
+            InterleavedUnsignedField0 = value.InterleavedUnsignedFields[0],
+            AssetList5 = FhmTradeFile.ToWireList(value.AssetLists[5], "trade id list"),
+            InterleavedUnsignedField1 = value.InterleavedUnsignedFields[1],
+            AssetList6 = FhmTradeFile.ToWireList(value.AssetLists[6], "trade id list"),
+            InterleavedUnsignedField2 = value.InterleavedUnsignedFields[2],
+            AssetList7 = FhmTradeFile.ToWireList(value.AssetLists[7], "trade id list"),
+            InterleavedUnsignedField3 = value.InterleavedUnsignedFields[3],
+            Field10 = value.Fields10And11[0],
+            Field11 = value.Fields10And11[1],
+            Field12 = value.Fields12And13[0],
+            Field13 = value.Fields12And13[1],
+            Flag = value.Flag,
+            Field14 = value.Field14,
+            Field15 = value.Fields15And16[0],
+            Field16 = value.Fields15And16[1],
+            PairList0 = ToWirePairs(value.PairLists[0]),
+            PairList1 = ToWirePairs(value.PairLists[1]),
+        };
+    }
+
+    internal static void ValidateWire(FhmTradeRecordData wire)
+    {
+        ValidateAssetLists(GetAssetLists(wire));
+        ValidatePairList(wire.PairList0);
+        ValidatePairList(wire.PairList1);
+    }
+
+    internal void ValidateForWrite()
     {
         RequireCount(AssetLists, 8, "trade asset lists");
         RequireLength(Fields1To3, 3, nameof(Fields1To3));
@@ -159,98 +315,14 @@ public sealed class FhmTradeRecord
         RequireLength(Fields12And13, 2, nameof(Fields12And13));
         RequireLength(Fields15And16, 2, nameof(Fields15And16));
         RequireCount(PairLists, 2, "trade pair lists");
-        writer.WriteInt32(Field0);
-        writer.WriteDate(Date);
-        WriteInts(writer, Fields1To3);
-        writer.WriteUInt16(Field4);
-        writer.WriteInt32(Field5);
-        WriteIntList(writer, AssetLists[0]);
-        WriteIntList(writer, AssetLists[1]);
-        WriteIntList(writer, AssetLists[2]);
-        WriteIntList(writer, AssetLists[3]);
-        WriteIntList(writer, AssetLists[4]);
-        writer.WriteUInt16(InterleavedUnsignedFields[0]);
-        WriteIntList(writer, AssetLists[5]);
-        writer.WriteUInt16(InterleavedUnsignedFields[1]);
-        WriteIntList(writer, AssetLists[6]);
-        writer.WriteUInt16(InterleavedUnsignedFields[2]);
-        WriteIntList(writer, AssetLists[7]);
-        writer.WriteUInt16(InterleavedUnsignedFields[3]);
-        WriteUInt16s(writer, Fields10And11);
-        WriteInts(writer, Fields12And13);
-        writer.WriteByte(Flag);
-        writer.WriteUInt16(Field14);
-        WriteInts(writer, Fields15And16);
-        WritePairs(writer, PairLists[0]);
-        WritePairs(writer, PairLists[1]);
-    }
-
-    internal static void ReadIntList(FhmBinaryReader reader, IList<int> list)
-    {
-        var count = reader.ReadCount("trade id list");
-        for (var index = 0; index < count; index++)
+        foreach (var list in AssetLists)
         {
-            list.Add(reader.ReadInt32());
+            FhmTradeFile.ToWireList(list, "trade id list");
         }
-    }
 
-    internal static void WriteIntList(FhmBinaryWriter writer, IList<int> list)
-    {
-        writer.WriteCount(list.Count, "trade id list");
-        foreach (var value in list)
+        foreach (var list in PairLists)
         {
-            writer.WriteInt32(value);
-        }
-    }
-
-    internal static void ReadPairs(FhmBinaryReader reader, IList<FhmIntUInt16Pair> list)
-    {
-        var count = reader.ReadCount("trade pair list");
-        for (var index = 0; index < count; index++)
-        {
-            list.Add(new FhmIntUInt16Pair(reader.ReadInt32(), reader.ReadUInt16()));
-        }
-    }
-
-    internal static void WritePairs(FhmBinaryWriter writer, IList<FhmIntUInt16Pair> list)
-    {
-        writer.WriteCount(list.Count, "trade pair list");
-        foreach (var value in list)
-        {
-            writer.WriteInt32(value.Id);
-            writer.WriteUInt16(value.Value);
-        }
-    }
-
-    internal static void ReadInts(FhmBinaryReader reader, int[] values)
-    {
-        for (var index = 0; index < values.Length; index++)
-        {
-            values[index] = reader.ReadInt32();
-        }
-    }
-
-    internal static void WriteInts(FhmBinaryWriter writer, IEnumerable<int> values)
-    {
-        foreach (var value in values)
-        {
-            writer.WriteInt32(value);
-        }
-    }
-
-    internal static void ReadUInt16s(FhmBinaryReader reader, ushort[] values)
-    {
-        for (var index = 0; index < values.Length; index++)
-        {
-            values[index] = reader.ReadUInt16();
-        }
-    }
-
-    internal static void WriteUInt16s(FhmBinaryWriter writer, IEnumerable<ushort> values)
-    {
-        foreach (var value in values)
-        {
-            writer.WriteUInt16(value);
+            FhmTradeFile.ValidateListCount(list.Count, "trade pair list");
         }
     }
 
@@ -278,6 +350,53 @@ public sealed class FhmTradeRecord
         if (values.Length != expected)
         {
             throw new FhmFormatException($"{name} must contain exactly {expected} items.");
+        }
+    }
+
+    private static QDate ToQDate(FhmDate date) => new() { Year = date.Year, Month = date.Month, Day = date.Day };
+
+    private static QList<FhmIntUInt16PairData> ToWirePairs(IList<FhmIntUInt16Pair> values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        FhmTradeFile.ValidateListCount(values.Count, "trade pair list");
+        return new()
+        {
+            Length = values.Count,
+            Items = values.Select(value => new FhmIntUInt16PairData { Id = value.Id, Value = value.Value }).ToList(),
+        };
+    }
+
+    private static void ValidatePairList(QList<FhmIntUInt16PairData> list) =>
+        FhmTradeFile.ValidateWireList(list, "trade pair list");
+
+    private static void ValidateAssetLists(IEnumerable<QList<int>> lists)
+    {
+        foreach (var list in lists)
+        {
+            FhmTradeFile.ValidateWireList(list, "trade id list");
+        }
+    }
+
+    private static QList<int>[] GetAssetLists(FhmTradeRecordData wire) =>
+    [
+        wire.AssetList0, wire.AssetList1, wire.AssetList2, wire.AssetList3,
+        wire.AssetList4, wire.AssetList5, wire.AssetList6, wire.AssetList7,
+    ];
+
+    private static void CopyAssetLists(FhmTradeRecordData source, IList<IList<int>> destination)
+    {
+        var lists = GetAssetLists(source);
+        for (var index = 0; index < lists.Length; index++)
+        {
+            FhmTradeFile.CopyList(lists[index], destination[index]);
+        }
+    }
+
+    private static void CopyPairs(QList<FhmIntUInt16PairData> source, IList<FhmIntUInt16Pair> destination)
+    {
+        foreach (var value in source.Items)
+        {
+            destination.Add(new(value.Id, value.Value));
         }
     }
 }
@@ -309,65 +428,128 @@ public sealed class FhmTradeHistoryRecord
     /// <summary>Gets or sets the trailing record flag.</summary>
     public byte Flag { get; set; }
 
-    internal static FhmTradeHistoryRecord Read(FhmBinaryReader reader)
+    internal static FhmTradeHistoryRecord FromWire(FhmTradeHistoryRecordData wire)
     {
         var result = new FhmTradeHistoryRecord
         {
-            Id = reader.ReadInt32(),
-            Date = reader.ReadDate(),
-            TeamA = reader.ReadInt32(),
-            TeamB = reader.ReadInt32(),
+            Id = wire.Id,
+            Date = new(wire.Date.Year, wire.Date.Month, wire.Date.Day),
+            TeamA = wire.TeamA,
+            TeamB = wire.TeamB,
+            Flag = wire.Flag,
         };
-        FhmTradeRecord.ReadInts(reader, result.Fields2And3);
-        foreach (var list in result.AssetLists)
-        {
-            FhmTradeRecord.ReadIntList(reader, list);
-        }
-
-        foreach (var list in result.DraftPickLists)
-        {
-            var count = reader.ReadCount("historical draft picks");
-            for (var index = 0; index < count; index++)
-            {
-                list.Add(new FhmDraftPickDescriptor(
-                    reader.ReadUInt16(), reader.ReadInt32(), reader.ReadInt32(), reader.ReadInt32(), reader.ReadUInt16(), reader.ReadUInt16()));
-            }
-        }
-
-        result.Flag = reader.ReadByte();
+        result.Fields2And3[0] = wire.Field2;
+        result.Fields2And3[1] = wire.Field3;
+        CopyAssetLists(wire, result.AssetLists);
+        CopyDraftPickList(wire.DraftPickList0, result.DraftPickLists[0]);
+        CopyDraftPickList(wire.DraftPickList1, result.DraftPickLists[1]);
         return result;
     }
 
-    internal void WriteTo(FhmBinaryWriter writer)
+    internal static FhmTradeHistoryRecordData ToWire(FhmTradeHistoryRecord value)
+    {
+        value.ValidateForWrite();
+        return new()
+        {
+            Id = value.Id,
+            Date = new() { Year = value.Date.Year, Month = value.Date.Month, Day = value.Date.Day },
+            TeamA = value.TeamA,
+            TeamB = value.TeamB,
+            Field2 = value.Fields2And3[0],
+            Field3 = value.Fields2And3[1],
+            AssetList0 = FhmTradeFile.ToWireList(value.AssetLists[0], "trade-history id list"),
+            AssetList1 = FhmTradeFile.ToWireList(value.AssetLists[1], "trade-history id list"),
+            AssetList2 = FhmTradeFile.ToWireList(value.AssetLists[2], "trade-history id list"),
+            AssetList3 = FhmTradeFile.ToWireList(value.AssetLists[3], "trade-history id list"),
+            AssetList4 = FhmTradeFile.ToWireList(value.AssetLists[4], "trade-history id list"),
+            AssetList5 = FhmTradeFile.ToWireList(value.AssetLists[5], "trade-history id list"),
+            AssetList6 = FhmTradeFile.ToWireList(value.AssetLists[6], "trade-history id list"),
+            AssetList7 = FhmTradeFile.ToWireList(value.AssetLists[7], "trade-history id list"),
+            AssetList8 = FhmTradeFile.ToWireList(value.AssetLists[8], "trade-history id list"),
+            AssetList9 = FhmTradeFile.ToWireList(value.AssetLists[9], "trade-history id list"),
+            DraftPickList0 = ToWireDraftPickList(value.DraftPickLists[0]),
+            DraftPickList1 = ToWireDraftPickList(value.DraftPickLists[1]),
+            Flag = value.Flag,
+        };
+    }
+
+    internal static void ValidateWire(FhmTradeHistoryRecordData wire)
+    {
+        foreach (var list in GetAssetLists(wire))
+        {
+            FhmTradeFile.ValidateWireList(list, "trade-history id list");
+        }
+
+        ValidateDraftPickList(wire.DraftPickList0);
+        ValidateDraftPickList(wire.DraftPickList1);
+    }
+
+    internal void ValidateForWrite()
     {
         FhmTradeRecord.RequireLength(Fields2And3, 2, nameof(Fields2And3));
         FhmTradeRecord.RequireCount(AssetLists, 10, "trade-history asset lists");
         FhmTradeRecord.RequireCount(DraftPickLists, 2, "trade-history draft-pick lists");
-        writer.WriteInt32(Id);
-        writer.WriteDate(Date);
-        writer.WriteInt32(TeamA);
-        writer.WriteInt32(TeamB);
-        FhmTradeRecord.WriteInts(writer, Fields2And3);
         foreach (var list in AssetLists)
         {
-            FhmTradeRecord.WriteIntList(writer, list);
+            FhmTradeFile.ToWireList(list, "trade-history id list");
         }
 
         foreach (var list in DraftPickLists)
         {
-            writer.WriteCount(list.Count, "historical draft picks");
-            foreach (var pick in list)
-            {
-                writer.WriteUInt16(pick.FieldUInt16);
-                writer.WriteInt32(pick.FieldInt0);
-                writer.WriteInt32(pick.FieldInt1);
-                writer.WriteInt32(pick.FieldInt2);
-                writer.WriteUInt16(pick.FieldUInt160);
-                writer.WriteUInt16(pick.FieldUInt161);
-            }
+            ArgumentNullException.ThrowIfNull(list);
+            FhmTradeFile.ValidateListCount(list.Count, "historical draft picks");
         }
+    }
 
-        writer.WriteByte(Flag);
+    private static QList<int>[] GetAssetLists(FhmTradeHistoryRecordData wire) =>
+    [
+        wire.AssetList0, wire.AssetList1, wire.AssetList2, wire.AssetList3, wire.AssetList4,
+        wire.AssetList5, wire.AssetList6, wire.AssetList7, wire.AssetList8, wire.AssetList9,
+    ];
+
+    private static void CopyAssetLists(FhmTradeHistoryRecordData source, IList<IList<int>> destination)
+    {
+        var lists = GetAssetLists(source);
+        for (var index = 0; index < lists.Length; index++)
+        {
+            FhmTradeFile.CopyList(lists[index], destination[index]);
+        }
+    }
+
+    private static QList<FhmDraftPickDescriptorData> ToWireDraftPickList(IList<FhmDraftPickDescriptor> values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        FhmTradeFile.ValidateListCount(values.Count, "historical draft picks");
+        return new()
+        {
+            Length = values.Count,
+            Items = values.Select(value => new FhmDraftPickDescriptorData
+            {
+                FieldUInt16 = value.FieldUInt16,
+                FieldInt0 = value.FieldInt0,
+                FieldInt1 = value.FieldInt1,
+                FieldInt2 = value.FieldInt2,
+                FieldUInt160 = value.FieldUInt160,
+                FieldUInt161 = value.FieldUInt161,
+            }).ToList(),
+        };
+    }
+
+    private static void ValidateDraftPickList(QList<FhmDraftPickDescriptorData> list) =>
+        FhmTradeFile.ValidateWireList(list, "historical draft picks");
+
+    private static void CopyDraftPickList(QList<FhmDraftPickDescriptorData> source, IList<FhmDraftPickDescriptor> destination)
+    {
+        foreach (var pick in source.Items)
+        {
+            destination.Add(new(
+                pick.FieldUInt16,
+                pick.FieldInt0,
+                pick.FieldInt1,
+                pick.FieldInt2,
+                pick.FieldUInt160,
+                pick.FieldUInt161));
+        }
     }
 }
 

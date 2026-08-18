@@ -1,4 +1,5 @@
 using Shuttle.Fhm.SaveData.Binary;
+using Shuttle.Fhm.Serde.Generic;
 
 namespace Shuttle.Fhm.SaveData.Files;
 
@@ -38,24 +39,35 @@ public sealed class FhmLengthPrefixedCatalogueFile : IFhmSaveFile
     /// <summary>Gets blocks in serialized order.</summary>
     public IList<FhmLengthPrefixedBlock> Blocks { get; } = [];
 
-    internal static FhmLengthPrefixedCatalogueFile Read(string relativePath, bool hasCount, FhmBinaryReader reader)
+    internal static FhmLengthPrefixedCatalogueFile Read(string relativePath, bool hasCount, Stream stream)
     {
-        var result = new FhmLengthPrefixedCatalogueFile(relativePath, hasCount) { Version = reader.ReadInt32() };
-        var declaredCount = hasCount ? reader.ReadCount($"{relativePath} records") : -1;
-        while (reader.Remaining > 0)
+        var header = hasCount
+            ? FhmLengthPrefixedCatalogueSerializer.DeserializeCountedHeader(stream)
+            : null;
+        var result = new FhmLengthPrefixedCatalogueFile(relativePath, hasCount)
+        {
+            Version = header?.Version ?? FhmLengthPrefixedCatalogueSerializer.DeserializeHeader(stream).Version,
+        };
+        var declaredCount = header?.Count ?? -1;
+        if (declaredCount < -1)
+        {
+            throw new FhmFormatException($"{relativePath} contains a negative block count.");
+        }
+
+        while (!stream.CanSeek || stream.Position < stream.Length)
         {
             if (hasCount && result.Blocks.Count >= declaredCount)
             {
                 throw new FhmFormatException($"{relativePath} has bytes after its declared block count.");
             }
 
-            var length = reader.ReadInt32();
-            if (length < 0)
+            var block = FhmLengthPrefixedCatalogueSerializer.DeserializeBlock(stream);
+            if (block.ByteLength < 0)
             {
                 throw new FhmFormatException($"{relativePath} contains a negative block length.");
             }
 
-            result.Blocks.Add(new FhmLengthPrefixedBlock(reader.ReadOpaqueBytes(length).Value));
+            result.Blocks.Add(new FhmLengthPrefixedBlock(block.Data));
         }
 
         if (hasCount && result.Blocks.Count != declaredCount)
@@ -66,19 +78,28 @@ public sealed class FhmLengthPrefixedCatalogueFile : IFhmSaveFile
         return result;
     }
 
-    /// <inheritdoc />
-    public void WriteTo(FhmBinaryWriter writer)
+    public void WriteTo(Stream stream)
     {
-        writer.WriteInt32(Version);
         if (HasCount)
         {
-            writer.WriteCount(Blocks.Count, $"{RelativePath} records");
+            FhmLengthPrefixedCatalogueSerializer.SerializeCountedHeader(stream, new FhmCountedCatalogueHeaderData
+            {
+                Version = Version,
+                Count = Blocks.Count,
+            });
+        }
+        else
+        {
+            FhmLengthPrefixedCatalogueSerializer.SerializeHeader(stream, new FhmCatalogueHeaderData { Version = Version });
         }
 
         foreach (var block in Blocks)
         {
-            writer.WriteCount(block.Data.Length, $"{RelativePath} block bytes");
-            writer.WriteOpaqueBytes(new FhmOpaqueBytes(block.Data));
+            FhmLengthPrefixedCatalogueSerializer.SerializeBlock(stream, new FhmLengthPrefixedBlockData
+            {
+                ByteLength = block.Data.Length,
+                Data = block.Data,
+            });
         }
     }
 }
@@ -98,40 +119,49 @@ public sealed class FhmTacticTemplatesFile : IFhmSaveFile
     /// <summary>Gets named templates in wire order.</summary>
     public IList<FhmTacticTemplate> Templates { get; } = [];
 
-    internal static FhmTacticTemplatesFile Read(FhmBinaryReader reader)
+    internal static FhmTacticTemplatesFile Read(Stream stream)
     {
-        var result = new FhmTacticTemplatesFile { Version = reader.ReadInt32() };
-        var count = reader.ReadCount("tactic templates");
-        for (var index = 0; index < count; index++)
+        var wire = FhmTacticTemplatesSerializer.Deserialize(stream);
+        if (wire.Count < 0 || wire.Count != wire.Templates.Count)
         {
-            result.Templates.Add(new FhmTacticTemplate(
-                reader.ReadQString(),
-                reader.ReadInt32(),
-                reader.ReadQString(),
-                reader.ReadOpaqueBytes(SettingsBlobLength).Value));
+            throw new FhmFormatException($"tactic_templates.dat expected {wire.Count} templates but found {wire.Templates.Count}.");
         }
 
-        reader.EnsureEof("tactic_templates.dat");
+        var result = new FhmTacticTemplatesFile { Version = wire.Version };
+        foreach (var template in wire.Templates)
+        {
+            result.Templates.Add(new(
+                template.InternalKey.Value,
+                template.TemplateIndex,
+                template.DisplayName.Value,
+                template.SettingsBlob));
+        }
+
         return result;
     }
 
-    /// <inheritdoc />
-    public void WriteTo(FhmBinaryWriter writer)
+    public void WriteTo(Stream stream)
     {
-        writer.WriteInt32(Version);
-        writer.WriteCount(Templates.Count, "tactic templates");
         foreach (var template in Templates)
         {
             if (template.SettingsBlob.Length != SettingsBlobLength)
             {
                 throw new FhmFormatException($"Tactic template settings blobs must be exactly {SettingsBlobLength} bytes.");
             }
-
-            writer.WriteQString(template.InternalKey);
-            writer.WriteInt32(template.TemplateIndex);
-            writer.WriteQString(template.DisplayName);
-            writer.WriteOpaqueBytes(new FhmOpaqueBytes(template.SettingsBlob));
         }
+
+        FhmTacticTemplatesSerializer.Serialize(stream, new FhmTacticTemplatesData
+        {
+            Version = Version,
+            Count = Templates.Count,
+            Templates = Templates.Select(template => new FhmTacticTemplateData
+            {
+                InternalKey = new() { Value = template.InternalKey },
+                TemplateIndex = template.TemplateIndex,
+                DisplayName = new() { Value = template.DisplayName },
+                SettingsBlob = template.SettingsBlob,
+            }).ToList(),
+        });
     }
 }
 
