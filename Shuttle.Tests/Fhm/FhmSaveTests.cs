@@ -1,16 +1,16 @@
 using System.Buffers.Binary;
 using Shuttle.BinarySerde.Common.QFormat;
-using Shuttle.Fhm.SaveData.Binary;
-using Shuttle.Fhm.SaveData.Files;
-using Shuttle.Fhm.SaveData.Model;
-using Shuttle.Fhm.SaveData.SaveFolder;
-using Shuttle.Fhm.Serde.Leagues;
-using Shuttle.Fhm.Serde.PlayerRoles;
-using Shuttle.Fhm.Serde.StoredLines;
-using Shuttle.Fhm.Serde.Tactics;
-using Shuttle.Fhm.Serde.Teams;
-using Shuttle.Fhm.Serde.Trades;
-using Shuttle.Fhm.Serde.ZoneEvents;
+using Shuttle.Fhm.Serde.Domain.Binary;
+using Shuttle.Fhm.Serde.Domain.Files;
+using Shuttle.Fhm.Serde.Domain.Model;
+using Shuttle.Fhm.Serde.Domain.SaveFolder;
+using Shuttle.Fhm.Serde.Wire.Leagues;
+using Shuttle.Fhm.Serde.Wire.PlayerRoles;
+using Shuttle.Fhm.Serde.Wire.StoredLines;
+using Shuttle.Fhm.Serde.Wire.Tactics;
+using Shuttle.Fhm.Serde.Wire.Teams;
+using Shuttle.Fhm.Serde.Wire.Trades;
+using Shuttle.Fhm.Serde.Wire.ZoneEvents;
 
 namespace Shuttle.Tests.Fhm;
 

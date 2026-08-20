@@ -113,6 +113,8 @@
     <PackageVersion Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageVersion Include="StreamJsonRpc" Version="2.25.29" />
     <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
+    <!-- EF Core SQLite 10.0.9 resolves vulnerable SQLitePCLRaw.lib.e_sqlite3 2.1.11. -->
+    <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.12-pre20260709125052" />
     <PackageVersion Include="System.Commandline" Version="2.0.2" />
     <PackageVersion Include="System.Linq.Async" Version="7.0.0" />
     <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.10" />

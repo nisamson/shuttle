@@ -1,7 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Shuttle.Shl.Api.Models.Common.Mixins;
-using SaveAttributes = Shuttle.Fhm.SaveData.Files.FhmPlayerAttributes;
+using SaveAttributes = Shuttle.Fhm.Serde.Domain.Files.FhmPlayerAttributes;
 
 namespace Shuttle.Fhm.Entities.Players;
 

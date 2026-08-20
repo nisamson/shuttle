@@ -1,7 +1,7 @@
-using Shuttle.Fhm.SaveData.Binary;
-using Shuttle.Fhm.SaveData.Files;
-using Shuttle.Fhm.SaveData.Model;
-using Shuttle.Fhm.SaveData.SaveFolder;
+using Shuttle.Fhm.Serde.Domain.Binary;
+using Shuttle.Fhm.Serde.Domain.Files;
+using Shuttle.Fhm.Serde.Domain.Model;
+using Shuttle.Fhm.Serde.Domain.SaveFolder;
 
 namespace Shuttle.Tests.Fhm;
 
