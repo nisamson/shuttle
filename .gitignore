@@ -492,6 +492,9 @@ $RECYCLE.BIN/
 *.sqlite
 *.sqlite3
 
+# Source project; its name intentionally ends in ".Sqlite".
+!/Shuttle.Fhm.Serde.Sqlite/
+
 # Shuttle.Fhm.Vision runtime capture output
 /Shuttle.Fhm.Vision/images/
 /Shuttle.Fhm.Vision/inspect/

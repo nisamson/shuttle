@@ -19,6 +19,11 @@ public enum PlayerPosition {
 
 public static class PositionExtensions {
 
+    private static readonly IEnumerable<PlayerPosition> AllSkaterPositions = [
+        PlayerPosition.Center, PlayerPosition.LeftWing, PlayerPosition.RightWing, PlayerPosition.LeftDefense,
+        PlayerPosition.RightDefense
+    ];
+
     extension(PlayerPosition playerPosition) {
 
         public string ToShortString() {
@@ -82,6 +87,8 @@ public static class PositionExtensions {
         public bool IsLeft => playerPosition.HasFlag(PlayerPosition.Left);
         public bool IsRight => playerPosition.HasFlag(PlayerPosition.Right);
         public bool IsGoalie => playerPosition is { IsDefense: true, IsLeft: false, IsRight: false };
+
+        public static IEnumerable<PlayerPosition> SkaterPositions() => AllSkaterPositions;
     }
 }
 
@@ -92,8 +99,10 @@ public class PositionConverter : JsonConverter<PlayerPosition> {
         if (str == null) {
             throw new JsonException("Position string is null");
         }
+
         return PlayerPosition.FromString(str);
     }
+
     public override void Write(Utf8JsonWriter writer, PlayerPosition value, JsonSerializerOptions options) {
         writer.WriteStringValue(value.ToShortString());
     }

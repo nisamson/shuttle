@@ -10,8 +10,10 @@ doc: |
   count followed by that many consecutive, self-delimiting player records.
 
   Names are referenced through `names.dat`. The `internal_identity` field is
-  the cross-file identity used by `teams.dat` lineup slots. In version 58 it
-  equals the player's zero-based record ordinal.
+  the cross-file identity used by `teams.dat` lineup slots. In the validated
+  version-58 save corpus it equals the player's zero-based record ordinal;
+  it is not runtime-wide unique because active and retired player pools
+  overlap.
 
   The record model exposes the 58 rating attributes, position-rating vector,
   selected tactical roles, aggregate skater/goalie statistics, and detailed
@@ -52,19 +54,25 @@ types:
         type: s4
         repeat: expr
         repeat-expr: 6
+        doc: |
+          Partially decoded signed values. Element 4 is the TeamId emitted by
+          FHM's CSV exports.
       - id: unknown_s4_01
         type: s4
       - id: internal_identity
         type: s4
         doc: |
-          Cross-file player identity used by `teams.dat` lineup slots. In
-          version 58 this equals this record's zero-based ordinal.
+          Cross-file player identity used by `teams.dat` lineup slots. In the
+          validated version-58 save corpus this equals this record's
+          zero-based ordinal.
       - id: unknown_string_01
         type: fhm_common::qstring
-      - id: unknown_string_02
+      - id: unused_string_01
         type: fhm_common::qstring
-      - id: unknown_string_03
+        doc: Unused string; FHM load/save preserves a non-empty probe unchanged.
+      - id: unused_string_02
         type: fhm_common::qstring
+        doc: Unused string; FHM load/save preserves a non-empty probe unchanged.
       - id: unknown_u2_values_02
         type: u2
         repeat: expr
@@ -309,6 +317,9 @@ types:
         type: s4
         repeat: expr
         repeat-expr: 4
+        doc: |
+          Partially decoded signed values. Element 0 is the FranchiseId
+          emitted by FHM's CSV exports.
       - id: primary_role
         type: optional_role_instance
       - id: supplementary_role
@@ -326,7 +337,13 @@ types:
       - id: unknown_s4_values_08
         type: s4
         repeat: expr
-        repeat-expr: 3
+        repeat-expr: 2
+      - id: exported_player_id
+        type: s4
+        doc: |
+          PlayerId emitted by FHM's CSV exports. This is distinct from
+          internal_identity, which is the zero-based players.dat record
+          ordinal used by in-game cross-file references.
       - id: unknown_dated_u2_records
         type: dated_u2_record_list
       - id: unknown_f8_values_07

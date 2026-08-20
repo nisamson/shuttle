@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -28,6 +28,10 @@
     <ProjectReference Include="..\Shuttle.Api\Shuttle.Api.csproj" />
     <ProjectReference Include="..\Shuttle.Api.Client\Shuttle.Api.Client.csproj" />
     <ProjectReference Include="..\Shuttle.Analysis\Shuttle.Analysis.csproj" />
+    <ProjectReference Include="..\Shuttle.BinarySerde.Common\Shuttle.BinarySerde.Common.csproj" />
+    <ProjectReference Include="..\Shuttle.Fhm.Serde\Shuttle.Fhm.Serde.csproj" />
+    <ProjectReference Include="..\Shuttle.Fhm.Entities\Shuttle.Fhm.Entities.csproj" />
+    <ProjectReference Include="..\Shuttle.Fhm.Serde.Sqlite\Shuttle.Fhm.Serde.Sqlite.csproj" />
   </ItemGroup>
 
   <ItemGroup>
