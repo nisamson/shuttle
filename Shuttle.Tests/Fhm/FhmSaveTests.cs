@@ -154,16 +154,20 @@ public sealed class FhmSaveTests
             Assert.Equal((byte)19, first.RatingAttributes.ShootingAccuracy);
             Assert.Null(first.UnusedString01);
             Assert.Equal(string.Empty, first.UnusedString02);
-            Assert.Single(first.Contracts);
+            var contract = Assert.Single(first.Contracts);
+            Assert.Equal(FhmPlayerContract.MaximumYears, contract.Salaries.Count);
+            Assert.Equal(1_645_340, contract.Salaries[0].MajorLeagueSalary);
+            Assert.Equal(345_000, contract.Salaries[0].MinorLeagueSalary);
+            Assert.Null(contract.Salaries[1].MajorLeagueSalary);
             Assert.Single(first.AggregateSkaterStats01);
             Assert.Equal((ushort)99, first.AggregateSkaterStats01[0].GameType.RawValue);
             Assert.False(first.AggregateSkaterStats01[0].GameType.IsKnown);
             Assert.Equal((ushort)536, first.DetailedSkaterGameStats[0].OnIceShotsFor);
             Assert.Single(first.UnknownRecordList03);
             Assert.Single(first.UnknownU1S4PairList);
-            Assert.NotNull(first.PrimaryRole);
-            Assert.Equal((ushort)3, first.PrimaryRole!.ShootingTendencyValue);
-            Assert.Null(first.SupplementaryRole);
+            Assert.NotNull(first.TacticalRole);
+            Assert.Equal((ushort)3, first.TacticalRole!.ShootingTendencyValue);
+            Assert.Null(first.SecondaryTacticalRole);
 
             new FhmSaveWriter().Write(loaded, rewritten);
             Assert.Equal(sourceBytes, File.ReadAllBytes(Path.Combine(rewritten, "players.dat")));
@@ -179,10 +183,115 @@ public sealed class FhmSaveTests
             Assert.Equal((byte)21, mutatedPlayers.Players[1].RatingAttributes.Speed);
             Assert.Equal((ushort)12345, mutatedPlayers.Players[1].PositionRatings.UnknownCentreRaw);
         }
+
         finally
         {
             Directory.Delete(root, recursive: true);
         }
+    }
+
+    [Fact]
+    public void PersonnelFile_RoundTripsOpaqueRecordsAndEditableFields()
+    {
+        var bytes = CreatePersonnelFileBytes(
+            (0, 1, 0, FhmPersonnelJob.GeneralManager),
+            (1, 2, 0, FhmPersonnelJob.HeadCoach));
+        using var input = new MemoryStream(bytes, writable: false);
+        var file = FhmPersonnelFile.Read(input);
+
+        Assert.Equal(35, file.Version);
+        Assert.Equal(2, file.NextPersonnelId);
+        Assert.Equal(2, file.Records.Count);
+        var generalManager = file.Records[0];
+        Assert.Equal(1, generalManager.FirstNameNameId);
+        Assert.Equal(1, generalManager.SurnameNameId);
+        Assert.Null(generalManager.NicknameNameId);
+        Assert.Equal(new FhmDate(1973, 1, 2), generalManager.BirthDate);
+        Assert.Equal((ushort)150, generalManager.NationalityId);
+        Assert.Equal(71_151, generalManager.BirthCityId);
+        Assert.Equal((ushort)50, generalManager.Reputation);
+        Assert.Equal((ushort)122, generalManager.BasedInLocationId);
+        Assert.Null(generalManager.PhysicalTraining);
+        Assert.Equal(0, generalManager.TeamRecordIndex);
+        Assert.Equal(FhmPersonnelJob.GeneralManager, generalManager.Job);
+        Assert.Equal(8, generalManager.CoachingGoalies);
+        Assert.Equal(FhmOffensivePreference.Offensive, generalManager.OffensivePreference);
+        Assert.Equal(FhmLineMatchingTendency.Passive, generalManager.LineMatchingTendency);
+        Assert.Equal(FhmGoalieHandlingTendency.Conservative, generalManager.GoalieHandlingTendency);
+        Assert.Equal(FhmVeteranPreference.Balanced, generalManager.VeteranPreference);
+        Assert.Equal(FhmInnovationTendency.Innovative, generalManager.InnovationTendency);
+        Assert.Equal(FhmLoyaltyTendency.VeryLoyal, generalManager.LoyaltyTendency);
+
+        generalManager.CoachingGoalies = 17;
+        generalManager.LineMatchingTendency = FhmLineMatchingTendency.VeryAggressive;
+        generalManager.GoalieHandlingTendency = FhmGoalieHandlingTendency.VeryAggressive;
+        generalManager.VeteranPreference = FhmVeteranPreference.LovesVeterans;
+        generalManager.InnovationTendency = FhmInnovationTendency.VeryInnovative;
+        generalManager.LoyaltyTendency = FhmLoyaltyTendency.VeryRuthless;
+        generalManager.FirstNameNameId = 2;
+        generalManager.NicknameNameId = 2;
+        generalManager.BirthDate = new(1981, 2, 3);
+        generalManager.NationalityId = 151;
+        generalManager.BirthCityId = 71_152;
+        generalManager.Reputation = 75;
+        generalManager.BasedInLocationId = 123;
+        generalManager.Salary = 400_123;
+        generalManager.ContractLength = 7;
+        generalManager.Job = FhmPersonnelJob.GmHeadCoach;
+        using var output = new MemoryStream();
+        file.WriteTo(output);
+
+        using var rewritten = new MemoryStream(output.ToArray(), writable: false);
+        var result = FhmPersonnelFile.Read(rewritten).Records[0];
+        Assert.Equal(17, result.CoachingGoalies);
+        Assert.Equal(2, result.FirstNameNameId);
+        Assert.Equal(2, result.NicknameNameId);
+        Assert.Equal(new FhmDate(1981, 2, 3), result.BirthDate);
+        Assert.Equal((ushort)151, result.NationalityId);
+        Assert.Equal(71_152, result.BirthCityId);
+        Assert.Equal((ushort)75, result.Reputation);
+        Assert.Equal((ushort)123, result.BasedInLocationId);
+        Assert.Equal(400_123, result.Salary);
+        Assert.Equal<byte?>(7, result.ContractLength);
+        Assert.Equal(FhmPersonnelJob.GmHeadCoach, result.Job);
+        Assert.Equal(FhmLineMatchingTendency.VeryAggressive, result.LineMatchingTendency);
+        Assert.Equal(FhmGoalieHandlingTendency.VeryAggressive, result.GoalieHandlingTendency);
+        Assert.Equal(FhmVeteranPreference.LovesVeterans, result.VeteranPreference);
+        Assert.Equal(FhmInnovationTendency.VeryInnovative, result.InnovationTendency);
+        Assert.Equal(FhmLoyaltyTendency.VeryRuthless, result.LoyaltyTendency);
+        Assert.Equal(bytes[8 + 0x24], output.ToArray()[8 + 0x24]);
+    }
+
+    [Fact]
+    public void PersonnelFile_PreservesSparsePersonnelIdentities()
+    {
+        var bytes = CreatePersonnelFileBytes(
+            (0, 1, null, FhmPersonnelJob.GeneralManager),
+            (2, 2, null, FhmPersonnelJob.Scout));
+        BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(4, sizeof(int)), 4);
+
+        using var input = new MemoryStream(bytes, writable: false);
+        var file = FhmPersonnelFile.Read(input);
+        using var output = new MemoryStream();
+        file.WriteTo(output);
+
+        Assert.Equal(4, file.NextPersonnelId);
+        Assert.Equal([0, 2], file.Records.Select(value => value.PersonnelId));
+        Assert.Equal(bytes, output.ToArray());
+    }
+
+    [Fact]
+    public void TeamTail_ExposesPersonnelSlotsInsideOpaquePrefix()
+    {
+        var tail = new FhmTeamTail();
+
+        tail.GeneralManagerPersonnelId = 12;
+        tail.HeadCoachPersonnelId = 34;
+
+        Assert.Equal(12, tail.GeneralManagerPersonnelId);
+        Assert.Equal(34, tail.HeadCoachPersonnelId);
+        Assert.Equal(12, BinaryPrimitives.ReadInt32BigEndian(tail.Pre2Prefix.Value.AsSpan(0x0F, sizeof(int))));
+        Assert.Equal(34, BinaryPrimitives.ReadInt32BigEndian(tail.Pre2Prefix.Value.AsSpan(0x0B, sizeof(int))));
     }
 
     [Fact]
@@ -196,7 +305,7 @@ public sealed class FhmSaveTests
         Assert.Equal(source.ExportedPlayerId, result.ExportedPlayerId);
         Assert.Equal(source.UnknownString01, result.UnknownString01);
         Assert.Equal(source.UnknownRecordList01[0].Data.Value, result.UnknownRecordList01[0].Data.Value);
-        Assert.Equal(source.PrimaryRole!.TendencyValue, result.PrimaryRole!.TendencyValue);
+        Assert.Equal(source.TacticalRole!.TendencyValue, result.TacticalRole!.TendencyValue);
     }
 
     [Fact]
@@ -792,7 +901,8 @@ public sealed class FhmSaveTests
         first.UnknownPairList01.Add(new FhmFixed8Record { Data = new FhmOpaqueBytes([1, 2, 3, 4, 5, 6, 7, 8]) });
 
         var contract = new FhmPlayerContract { UnknownS401 = 17, UnknownDate01 = new FhmDate(2024, 7, 1), UnknownF801 = 12.5 };
-        contract.UnknownS4List.Add(22);
+        contract.Salaries[0].MajorLeagueSalary = 1_645_340;
+        contract.Salaries[0].MinorLeagueSalary = 345_000;
         contract.UnknownU1List01.Add(1);
         contract.UnknownU1List02.Add(2);
         first.Contracts.Add(contract);
@@ -844,7 +954,7 @@ public sealed class FhmSaveTests
         first.DatedStringRecords.Add(new FhmDatedStringRecord { JulianDay = 2460000, UnknownU101 = 4, Text = "event" });
         first.UnknownRecordList02.Add(new FhmFixed8Record { Data = new FhmOpaqueBytes([8, 7, 6, 5, 4, 3, 2, 1]) });
         first.UnknownRecordList03.Add(new FhmFixed23Record { Data = new FhmOpaqueBytes([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]) });
-        first.PrimaryRole = new FhmPlayerRoleInstance { RoleId = 8, AttackingUseOverride = 1, AttackingTendencyValue = 3, ShootingUseOverride = 1, ShootingTendencyValue = 3, ReservedTendencyValue = 2 };
+        first.TacticalRole = new FhmPlayerRoleInstance { RoleId = 8, AttackingUseOverride = 1, AttackingTendencyValue = 3, ShootingUseOverride = 1, ShootingTendencyValue = 3, ReservedTendencyValue = 2 };
         first.UnknownU1PairList.Add(new FhmFixed2Record { Value01 = 5, Value02 = 6 });
         first.UnknownDatedU2Records.Add(new FhmDatedUshortRecord { Date = new FhmDate(2026, 1, 1) });
         first.UnknownF8Values07[0] = 1.5;
@@ -869,6 +979,68 @@ public sealed class FhmSaveTests
         players.Players.Add(second);
         return players;
     }
+
+    internal static byte[] CreatePersonnelFileBytes(
+        params (int PersonnelId, int SurnameNameId, int? TeamRecordIndex, FhmPersonnelJob Job)[] records)
+    {
+        const int headerLength = 8;
+        const int recordLength = 0x1B6;
+        var bytes = new byte[headerLength + (records.Length * recordLength)];
+        BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(0, sizeof(int)), 35);
+        BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(4, sizeof(int)), records.Length);
+        foreach (var (record, ordinal) in records.Select((value, index) => (value, index)))
+        {
+            var start = headerLength + (ordinal * recordLength);
+            BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(start, sizeof(int)), record.SurnameNameId);
+            BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(start + 4, sizeof(int)), record.SurnameNameId);
+            BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(start + 8, sizeof(int)), -1);
+            BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(start + 0x0C, sizeof(int)), 1973 + ordinal);
+            BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(start + 0x10, sizeof(int)), 1);
+            BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(start + 0x14, sizeof(int)), 2);
+            WritePersonnelUInt16(bytes, start, 0x18, 150);
+            BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(start + 0x1C, sizeof(int)), 71_151);
+            BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(start + 0x20, sizeof(int)), -1);
+            BinaryPrimitives.WriteInt32BigEndian(
+                bytes.AsSpan(start + 0x28, sizeof(int)),
+                record.TeamRecordIndex ?? -1);
+            BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(start + 0x30, sizeof(int)), record.PersonnelId);
+            bytes[start + 0x42] = (byte)record.Job;
+            WritePersonnelUInt16(bytes, start, 0x4C, 4);
+            WritePersonnelUInt16(bytes, start, 0x4E, (ushort)FhmOffensivePreference.Offensive);
+            WritePersonnelUInt16(bytes, start, 0x50, 9);
+            WritePersonnelUInt16(bytes, start, 0x52, (ushort)FhmPhysicalPreference.Physical);
+            WritePersonnelUInt16(bytes, start, 0x54, 14);
+            WritePersonnelUInt16(bytes, start, 0x56, 9);
+            WritePersonnelUInt16(bytes, start, 0x58, 8);
+            WritePersonnelUInt16(bytes, start, 0x5A, 10);
+            WritePersonnelUInt16(bytes, start, 0x5C, 8);
+            WritePersonnelUInt16(bytes, start, 0x5E, 5);
+            WritePersonnelUInt16(bytes, start, 0x6A, 50);
+            BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(start + 0x6E, sizeof(int)), 400_000);
+            bytes[start + 0x99] = 8;
+            bytes[start + 0xE5] = 0;
+            WritePersonnelUInt16(bytes, start, 0xF5, 12);
+            WritePersonnelUInt16(bytes, start, 0xF7, 10);
+            WritePersonnelUInt16(bytes, start, 0xF9, 122);
+            WritePersonnelUInt16(bytes, start, 0x123, 6);
+            WritePersonnelUInt16(bytes, start, 0x12D, 9);
+            WritePersonnelUInt16(bytes, start, 0x12F, 8);
+            WritePersonnelUInt16(bytes, start, 0x133, 3);
+            WritePersonnelUInt16(bytes, start, 0x135, 12);
+            WritePersonnelUInt16(bytes, start, 0x137, 0);
+            WritePersonnelUInt16(bytes, start, 0x17E, (ushort)FhmLineMatchingTendency.Passive);
+            WritePersonnelUInt16(bytes, start, 0x180, (ushort)FhmGoalieHandlingTendency.Conservative);
+            WritePersonnelUInt16(bytes, start, 0x182, (ushort)FhmVeteranPreference.Balanced);
+            WritePersonnelUInt16(bytes, start, 0x184, (ushort)FhmInnovationTendency.Innovative);
+            WritePersonnelUInt16(bytes, start, 0x186, (ushort)FhmLoyaltyTendency.VeryLoyal);
+            bytes[start + 0x24] = 0x5A;
+        }
+
+        return bytes;
+    }
+
+    private static void WritePersonnelUInt16(byte[] bytes, int start, int offset, ushort value) =>
+        BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(start + offset, sizeof(ushort)), value);
 
     private static void Add(FhmSave save, IFhmSaveFile file) => save.Files.Add(file.RelativePath, file);
 

@@ -264,7 +264,11 @@ public sealed class FhmPlayerContractData
     [FieldOrder(2)] public int UnknownS401 { get; set; }
     [FieldOrder(3)] public QDate UnknownDate01 { get; set; } = new();
     [FieldOrder(4)] public double UnknownF801 { get; set; }
-    [FieldOrder(5)] public QList<int> UnknownS4List { get; set; } = new();
+    /// <summary>
+    /// Fourteen major/minor salary pairs. Each pair is major salary followed by minor salary;
+    /// -1 means the contract does not extend through that year.
+    /// </summary>
+    [FieldOrder(5)] public QList<int> Salaries { get; set; } = new();
     [FieldOrder(6), FieldCount(3)] public List<ushort> UnknownU2Values02 { get; set; } = [];
     [FieldOrder(7)] public int UnknownS402 { get; set; }
     [FieldOrder(8)] public ushort UnknownU201 { get; set; }

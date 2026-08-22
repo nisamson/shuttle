@@ -1,5 +1,24 @@
 ﻿namespace Shuttle.Shl.Api.Models.Common.Mixins;
 
+public interface IHiddenAttributes {
+    int BigGames { get; }
+    int Consistency { get; }
+    int Greed { get; }
+    int Adaptability { get; }
+    int Loyalty { get; }
+    int Coachability { get; }
+    int Aging { get; }
+    int Sportsmanship { get; }
+    int PassShootTendency { get; }
+    int Controversy { get; }
+    int HandleCritics { get; }
+    int HandleFailure { get; }
+    int HandleSuccess { get; }
+    int Intelligence { get; }
+    int Mood { get; }
+    int DevelopmentRate { get; }
+}
+
 public interface IOffensiveRatings {
     int Screening { get; }
     int GettingOpen { get; }

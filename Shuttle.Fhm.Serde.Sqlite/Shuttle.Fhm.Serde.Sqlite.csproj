@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Shuttle.Fhm.Serde\Shuttle.Fhm.Serde.csproj" />
+    <ProjectReference Include="..\Shuttle.Shl.Api.Models\Shuttle.Shl.Api.Models.csproj" />
   </ItemGroup>
 
 </Project>

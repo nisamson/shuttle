@@ -3,6 +3,7 @@ using System.Reflection;
 using BinarySerialization;
 using Shuttle.BinarySerde.Common.QFormat;
 using Shuttle.Fhm.Serde.Domain.Binary;
+using Shuttle.Fhm.Serde.Domain.Model;
 using Shuttle.Fhm.Serde.Wire.Players;
 
 namespace Shuttle.Fhm.Serde.Domain.Files;
@@ -17,6 +18,12 @@ internal static class FhmPlayerWireMapper
         ArgumentNullException.ThrowIfNull(value);
         var result = new FhmPlayerRecordData();
         CopyObject(value, result);
+        result.PrimaryRole = (FhmOptionalPlayerRoleInstanceData)ConvertValue(
+            value.TacticalRole,
+            typeof(FhmOptionalPlayerRoleInstanceData))!;
+        result.SupplementaryRole = (FhmOptionalPlayerRoleInstanceData)ConvertValue(
+            value.SecondaryTacticalRole,
+            typeof(FhmOptionalPlayerRoleInstanceData))!;
         ValidateWire(result);
         return result;
     }
@@ -27,6 +34,12 @@ internal static class FhmPlayerWireMapper
         ValidateWire(value);
         var result = new FhmPlayerRecord();
         CopyObject(value, result);
+        result.TacticalRole = (FhmPlayerRoleInstance?)ConvertValue(
+            value.PrimaryRole,
+            typeof(FhmPlayerRoleInstance));
+        result.SecondaryTacticalRole = (FhmPlayerRoleInstance?)ConvertValue(
+            value.SupplementaryRole,
+            typeof(FhmPlayerRoleInstance));
         return result;
     }
 
@@ -122,6 +135,24 @@ internal static class FhmPlayerWireMapper
                 : ConvertValue(optionalRole.Value, typeof(FhmPlayerRoleInstance));
         }
 
+        if (targetType == typeof(QList<int>) && value is IEnumerable<FhmContractYearSalary> salaries)
+        {
+            var values = salaries
+                .SelectMany(salary => new[]
+                {
+                    salary.MajorLeagueSalary ?? FhmNullConstants.Null,
+                    salary.MinorLeagueSalary ?? FhmNullConstants.Null,
+                })
+                .ToList();
+            if (values.Count != FhmPlayerContract.MaximumYears * 2)
+            {
+                throw new FhmFormatException(
+                    $"Player contract contains {values.Count / 2} salary years; expected {FhmPlayerContract.MaximumYears}.");
+            }
+
+            return new QList<int> { Length = values.Count, Items = values };
+        }
+
         if (value is null)
         {
             return null;
@@ -172,6 +203,26 @@ internal static class FhmPlayerWireMapper
     {
         var elementType = GetCollectionElementType(destination.GetType())
             ?? throw new InvalidOperationException($"Cannot determine collection element type for '{destination.GetType().FullName}'.");
+        if (elementType == typeof(FhmContractYearSalary) && source is QList<int> salaryValues)
+        {
+            if (salaryValues.Items.Count != FhmPlayerContract.MaximumYears * 2)
+            {
+                throw new FhmFormatException(
+                    $"Player contract contains {salaryValues.Items.Count} salary values; expected {FhmPlayerContract.MaximumYears * 2}.");
+            }
+
+            for (var year = 0; year < FhmPlayerContract.MaximumYears; year++)
+            {
+                destination[year] = new FhmContractYearSalary
+                {
+                    MajorLeagueSalary = ToNullableSalary(salaryValues.Items[year * 2]),
+                    MinorLeagueSalary = ToNullableSalary(salaryValues.Items[(year * 2) + 1]),
+                };
+            }
+
+            return;
+        }
+
         var items = GetItems(source).ToList();
         if (destination.IsFixedSize)
         {
@@ -194,6 +245,13 @@ internal static class FhmPlayerWireMapper
             destination.Add(ConvertValue(item, elementType));
         }
     }
+
+    private static int? ToNullableSalary(int value) =>
+        value == FhmNullConstants.Null
+            ? null
+            : value >= 0
+                ? value
+                : throw new FhmFormatException($"Player contract contains invalid salary value {value}.");
 
     private static IEnumerable<object?> GetItems(object? source)
     {

@@ -203,10 +203,23 @@ public sealed class FhmTeamPostUnit
 /// <summary>The team tail preceding and following tactical settings.</summary>
 public sealed class FhmTeamTail
 {
+    private const int HeadCoachPersonnelIdOffset = 0x0B;
+    private const int GeneralManagerPersonnelIdOffset = 0x0F;
+
     public FhmOpaqueBytes Pre { get; set; } = new(new byte[32]);
     /// <summary>Gets opaque 12-byte records whose validated word count is three times this count.</summary>
     public IList<FhmOpaqueBytes> UnknownMRecords { get; } = [];
     public FhmOpaqueBytes Pre2Prefix { get; set; } = new(new byte[139]);
+    public int HeadCoachPersonnelId
+    {
+        get => ReadPre2PrefixInt32(HeadCoachPersonnelIdOffset);
+        set => WritePre2PrefixInt32(HeadCoachPersonnelIdOffset, value);
+    }
+    public int GeneralManagerPersonnelId
+    {
+        get => ReadPre2PrefixInt32(GeneralManagerPersonnelIdOffset);
+        set => WritePre2PrefixInt32(GeneralManagerPersonnelIdOffset, value);
+    }
     /// <summary>Gets or sets current fan happiness on the 1..100 scale when <see cref="UnknownMRecords"/> is empty.</summary>
     public ushort FanHappiness { get; set; }
     public FhmOpaqueBytes Pre2Suffix { get; set; } = new(new byte[21]);
@@ -215,6 +228,12 @@ public sealed class FhmTeamTail
     public string? WebsiteUrl { get; set; }
     public FhmTeamTacticsSettings Tactics { get; set; } = new();
     public FhmTeamTailRest Rest { get; set; } = new();
+
+    private int ReadPre2PrefixInt32(int offset) =>
+        System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(Pre2Prefix.Value.AsSpan(offset, sizeof(int)));
+
+    private void WritePre2PrefixInt32(int offset, int value) =>
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(Pre2Prefix.Value.AsSpan(offset, sizeof(int)), value);
 }
 
 /// <summary>A retired-number record.</summary>

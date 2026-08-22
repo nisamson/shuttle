@@ -17,47 +17,70 @@ public sealed class FhmSaveSqliteContext : DbContext
     /// <summary>Gets exact baseline content for every source file.</summary>
     public DbSet<SaveFile> Files => Set<SaveFile>();
 
-    /// <summary>Gets master-name, name-list, and nation-scalar projections.</summary>
-    public DbSet<NameProjection> Names => Set<NameProjection>();
+    /// <summary>Gets editable master names.</summary>
+    public DbSet<Name> Names => Set<Name>();
+    /// <summary>Gets nation-specific first-name and surname list entries.</summary>
+    public DbSet<NameListEntry> NameListEntries => Set<NameListEntry>();
+    /// <summary>Gets nation-indexed name scalars.</summary>
+    public DbSet<NameScalar> NameScalars => Set<NameScalar>();
 
-    /// <summary>Gets editable player profile projections.</summary>
-    public DbSet<PlayerProjection> Players => Set<PlayerProjection>();
+    /// <summary>Gets editable player profile entities.</summary>
+    public DbSet<Player> Players => Set<Player>();
 
-    /// <summary>Gets editable player rating projections.</summary>
-    public DbSet<PlayerAttributesProjection> PlayerAttributes => Set<PlayerAttributesProjection>();
+    /// <summary>Gets editable player rating entities.</summary>
+    public DbSet<PlayerAttributes> PlayerAttributes => Set<PlayerAttributes>();
 
-    /// <summary>Gets editable team profile projections.</summary>
-    public DbSet<TeamProjection> Teams => Set<TeamProjection>();
+    /// <summary>Gets editable player contract entities.</summary>
+    public DbSet<PlayerContract> PlayerContracts => Set<PlayerContract>();
+
+    /// <summary>Gets editable annual player contract salary entities.</summary>
+    public DbSet<PlayerContractYear> PlayerContractYears => Set<PlayerContractYear>();
+
+    public DbSet<PlayerRoleCatalogue> TacticalRoleCatalogues => Set<PlayerRoleCatalogue>();
+    public DbSet<PlayerRoleDefinition> TacticalRoles => Set<PlayerRoleDefinition>();
+    public DbSet<PlayerRoleWeight> TacticalRoleWeights => Set<PlayerRoleWeight>();
+    public DbSet<PlayerRoleIndexEntry> TacticalRoleIndexEntries => Set<PlayerRoleIndexEntry>();
+    public DbSet<PlayerRoleAssignment> PlayerTacticalRoleAssignments => Set<PlayerRoleAssignment>();
+    public DbSet<PlayerRoleTendencyValue> PlayerTacticalRoleTendencyValues => Set<PlayerRoleTendencyValue>();
+
+    /// <summary>Gets editable staff entities.</summary>
+    public DbSet<Personnel> Personnel => Set<Personnel>();
+
+    /// <summary>Gets editable team profile entities.</summary>
+    public DbSet<Team> Teams => Set<Team>();
 
     /// <summary>Gets editable fixed-order game-setting values.</summary>
-    public DbSet<GameSettingProjection> GameSettings => Set<GameSettingProjection>();
+    public DbSet<GameSetting> GameSettings => Set<GameSetting>();
 
-    /// <summary>Gets stored-line projections.</summary>
-    public DbSet<StoredLineProjection> StoredLines => Set<StoredLineProjection>();
+    /// <summary>Gets stored-line entities.</summary>
+    public DbSet<StoredLine> StoredLines => Set<StoredLine>();
 
-    /// <summary>Gets stored-line player-slot and lock projections.</summary>
-    public DbSet<StoredLineSlotProjection> StoredLineSlots => Set<StoredLineSlotProjection>();
+    /// <summary>Gets stored-line player-slot and lock entities.</summary>
+    public DbSet<StoredLineSlot> StoredLineSlots => Set<StoredLineSlot>();
 
-    /// <summary>Gets team-tactics catalogue projections.</summary>
-    public DbSet<TacticSystemProjection> TacticSystems => Set<TacticSystemProjection>();
+    /// <summary>Gets team-tactics catalogue entities.</summary>
+    public DbSet<TacticSystem> TacticSystems => Set<TacticSystem>();
 
-    /// <summary>Gets team-owned embedded tactical-settings projections.</summary>
-    public DbSet<TeamTacticProjection> TeamTactics => Set<TeamTacticProjection>();
+    /// <summary>Gets team-owned embedded tactical-settings entities.</summary>
+    public DbSet<TeamTactic> TeamTactics => Set<TeamTactic>();
 
-    /// <summary>Gets headers for tactic-related file projections.</summary>
-    public DbSet<TacticFileProjection> TacticFiles => Set<TacticFileProjection>();
+    /// <summary>Gets player slots from each team's active game lineup.</summary>
+    public DbSet<TeamActiveLineSlot> TeamActiveLineSlots => Set<TeamActiveLineSlot>();
 
-    /// <summary>Gets editable tactic-template projections.</summary>
-    public DbSet<TacticTemplateProjection> TacticTemplates => Set<TacticTemplateProjection>();
+    /// <summary>Gets headers for tactic-related file entities.</summary>
+    public DbSet<TacticFile> TacticFiles => Set<TacticFile>();
 
-    /// <summary>Gets editable set-play formation and trailing-record projections.</summary>
-    public DbSet<SetPlayProjection> SetPlays => Set<SetPlayProjection>();
+    /// <summary>Gets editable tactic-template entities.</summary>
+    public DbSet<TacticTemplate> TacticTemplates => Set<TacticTemplate>();
+
+    /// <summary>Gets editable set-play formation and trailing-record entities.</summary>
+    public DbSet<SetPlay> SetPlays => Set<SetPlay>();
 
     /// <summary>Gets editable modifier-catalogue blocks and grids.</summary>
-    public DbSet<ModifierCatalogueProjection> ModifierCatalogues => Set<ModifierCatalogueProjection>();
+    public DbSet<ModifierCatalogue> ModifierCatalogues => Set<ModifierCatalogue>();
 
-    /// <summary>Gets the tactics.dat projection.</summary>
-    public DbSet<TacticsProjection> Tactics => Set<TacticsProjection>();
+    /// <summary>Gets the tactics.dat entity.</summary>
+    public DbSet<Tactics> Tactics => Set<Tactics>();
 
     /// <summary>Builds SQLite options for a database file.</summary>
     public static DbContextOptions<FhmSaveSqliteContext> CreateOptions(string databasePath)
