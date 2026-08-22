@@ -30,7 +30,6 @@
     <ProjectReference Include="..\Shuttle.Analysis\Shuttle.Analysis.csproj" />
     <ProjectReference Include="..\Shuttle.BinarySerde.Common\Shuttle.BinarySerde.Common.csproj" />
     <ProjectReference Include="..\Shuttle.Fhm.Serde\Shuttle.Fhm.Serde.csproj" />
-    <ProjectReference Include="..\Shuttle.Fhm.Entities\Shuttle.Fhm.Entities.csproj" />
     <ProjectReference Include="..\Shuttle.Fhm.Serde.Sqlite\Shuttle.Fhm.Serde.Sqlite.csproj" />
   </ItemGroup>
 

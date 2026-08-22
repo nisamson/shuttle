@@ -113,12 +113,15 @@ public sealed class FhmPlayerRoleInstance
 /// <summary>A structurally delineated player contract.</summary>
 public sealed class FhmPlayerContract
 {
+    public const int MaximumYears = 14;
+
     public IList<int> UnknownS4Values01 { get; } = new int[2];
     public IList<ushort> UnknownU2Values01 { get; } = new ushort[2];
     public int UnknownS401 { get; set; }
     public FhmDate UnknownDate01 { get; set; }
     public double UnknownF801 { get; set; }
-    public IList<int> UnknownS4List { get; } = [];
+    public IList<FhmContractYearSalary> Salaries { get; } =
+        Enumerable.Range(0, MaximumYears).Select(_ => new FhmContractYearSalary()).ToArray();
     public IList<ushort> UnknownU2Values02 { get; } = new ushort[3];
     public int UnknownS402 { get; set; }
     public ushort UnknownU201 { get; set; }
@@ -141,6 +144,27 @@ public sealed class FhmPlayerContract
     public IList<byte> UnknownU1List01 { get; } = [];
     public IList<byte> UnknownU1List02 { get; } = [];
     public IList<byte> UnknownU1Values07 { get; } = new byte[3];
+}
+
+/// <summary>Major- and minor-league salary values for one contract year.</summary>
+public sealed class FhmContractYearSalary
+{
+    public int? MajorLeagueSalary
+    {
+        get;
+        set => field = ValidateSalary(value, nameof(MajorLeagueSalary));
+    }
+
+    public int? MinorLeagueSalary
+    {
+        get;
+        set => field = ValidateSalary(value, nameof(MinorLeagueSalary));
+    }
+
+    private static int? ValidateSalary(int? value, string parameterName) =>
+        value is null or >= 0
+            ? value
+            : throw new ArgumentOutOfRangeException(parameterName, value, "Contract salaries cannot be negative.");
 }
 
 /// <summary>One aggregate skater-statistics record.</summary>

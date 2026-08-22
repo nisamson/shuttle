@@ -18,17 +18,49 @@ file. Unedited export returns documented baseline files as raw byte containers
 and restores opaque files directly; therefore a save-folder → SQLite →
 save-folder conversion is byte-equivalent.
 
-Projection edits are update-only. Export compares source key and ordinal sets
+Entity edits are update-only. Export compares source key and ordinal sets
 with the parsed baseline and rejects inserts, deletes, reorders, identity
 changes, invalid dates/ratings/settings, invalid references, or malformed
 fixed-size payloads. The check applies equally to EF Core and direct-SQL
 edits. A rejected export returns no `FhmSave` for writing.
 
-The editable boundary includes names; player profiles, positions, and rating
-vectors; team profiles and embedded tactical settings; game settings; stored
-lines; tactic systems/templates; set plays; tactics; and the supported
-modifier catalogues. Fields outside those projections, all opaque files, and
-the player serialized-record backing remain baseline-preserved.
+The editable boundary includes names; player profiles, positions, contracts,
+contract roles, tactical-role assignments, tactical-role definitions, and
+rating vectors; personnel jobs, ratings, employment, and contracts; team
+profiles, staff relationships, active lineups, and embedded tactical settings; game settings;
+stored lines; tactic systems/templates; set plays; tactics; and the supported
+modifier catalogues. Unknown fields, opaque files, and serialized-record
+backing remain baseline-preserved.
+
+`Personnel.TeamId` resolves the `personal.dat` team record index to the stable
+`Teams.TeamId` key. `Team.Staff`, `Team.GeneralManager`, and `Team.HeadCoach`
+expose employment relationships; export synchronizes the explicit GM and head
+coach personnel slots in `teams.dat`.
+
+`TeamActiveLineSlots` normalizes the thirteen `teams.dat` active-line groups by
+stable team ID, `FhmLineGroup`, and slot ordinal. Each populated slot references
+`Players.InternalId`; an empty slot is stored as null. These are the team's
+current game lines and are distinct from user-named `stored_lines.dat` records.
+
+The player team reference is also normalized: `players.dat` stores the team's
+record index, while `Players.TeamId` stores the stable `Teams.TeamId`. Import
+and export translate between those two identity spaces.
+
+Player roles are represented as three distinct systems:
+
+- `Players.PrimaryContractRole` is the `FhmPlayingRole` contract archetype.
+- `Players.SupplementaryContractRole` is the `FhmSquadStatus` contract status.
+- `TacticalRoles` is the data-driven tactical-role catalogue from
+  `player_roles.dat`. `PlayerTacticalRoleAssignments` links a player and tactical or
+  secondary-tactical slot to one catalogue entry, and
+  `PlayerTacticalRoleTendencyValues` stores all nine per-assignment override
+  flag/value pairs.
+
+The tactical catalogue's fixed requirement vectors are normalized in
+`TacticalRoleWeights`; its four variable index lists are normalized in
+`TacticalRoleIndexEntries`. Export requires each fixed vector to retain its
+defined length, each vector/list to have contiguous ordinals, and every
+tactical assignment to contain exactly the nine known tendency rows.
 
 ## Component and projection diagram
 
@@ -77,6 +109,8 @@ classDiagram
         +Names
         +Players
         +PlayerAttributes
+        +PlayerRoles
+        +PlayerRoleAssignments
         +Teams
         +GameSettings
         +StoredLines
@@ -95,40 +129,62 @@ classDiagram
         +Kind SaveFileKind
         +Content byte[]
     }
-    class NameProjection {
+    class Name {
         +CollectionKind string
         +Ordinal int
         +NameId int
         +Text string
     }
-    class PlayerProjection {
+    class Player {
         +InternalId int
         +RecordOrdinal int
         +ExternalId int
         +SerializedRecord byte[]
     }
-    class PlayerAttributesProjection {
+    class PlayerAttributes {
         +RecordOrdinal int
         +Rating columns
     }
-    class TeamProjection {
+    class PlayerRoleDefinition {
+        +RoleId int
+        +Name string
+        +PositionCategory int
+        +Requirement weights
+    }
+    class PlayerRoleAssignment {
+        +PlayerInternalId int
+        +Slot PlayerRoleSlot
+        +RoleId int
+        +Nine tendency overrides
+    }
+    class Personnel {
+        +PersonnelId int
+        +TeamId int?
+        +Job FhmPersonnelJob
+        +Salary int
+        +ContractLength int?
+        +Rating columns
+        +Five personality tendencies
+        +SerializedRecord byte[]
+    }
+    class Team {
         +RecordOrdinal int
         +TeamId int
         +City string
         +Nickname string
     }
-    class GameSettingProjection {
+    class GameSetting {
         +SettingOrdinal int
         +ValueKind string
         +IntegerValue long
         +RealValue double
         +TextValue string
     }
-    class StoredLineProjection {
+    class StoredLine {
         +LineOrdinal int
         +Name string
     }
-    class TacticProjection {
+    class Tactic {
         +FilePath string
         +RecordOrdinal int
         +RawEnumValues
@@ -150,21 +206,29 @@ classDiagram
 
     FhmSaveSqliteContext --> SaveManifest
     FhmSaveSqliteContext --> SaveFile : lossless baseline
-    FhmSaveSqliteContext --> NameProjection : editable
-    FhmSaveSqliteContext --> PlayerProjection : editable
-    FhmSaveSqliteContext --> PlayerAttributesProjection : editable
-    FhmSaveSqliteContext --> TeamProjection : editable
-    FhmSaveSqliteContext --> GameSettingProjection : editable
-    FhmSaveSqliteContext --> StoredLineProjection : editable
-    FhmSaveSqliteContext --> TacticProjection : editable
+    FhmSaveSqliteContext --> Name : editable
+    FhmSaveSqliteContext --> Player : editable
+    FhmSaveSqliteContext --> PlayerAttributes : editable
+    FhmSaveSqliteContext --> PlayerRoleDefinition
+    FhmSaveSqliteContext --> PlayerRoleAssignment : editable
+    FhmSaveSqliteContext --> Personnel : editable
+    FhmSaveSqliteContext --> Team : editable
+    FhmSaveSqliteContext --> GameSetting : editable
+    FhmSaveSqliteContext --> StoredLine : editable
+    FhmSaveSqliteContext --> Tactic : editable
 
-    PlayerProjection --> PlayerAttributesProjection : 1 to 1
-    PlayerProjection --> SaveFile : players.dat backing
-    NameProjection --> SaveFile : names.dat backing
-    TeamProjection --> SaveFile : teams.dat backing
-    GameSettingProjection --> SaveFile : game_settings.dat backing
-    StoredLineProjection --> SaveFile : stored_lines.dat backing
-    TacticProjection --> SaveFile : tactic-related backing
+    Player --> PlayerAttributes : 1 to 1
+    Player --> PlayerRoleAssignment : tactical slots
+    PlayerRoleAssignment --> PlayerRoleDefinition : selected role
+    Player --> SaveFile : players.dat backing
+    Personnel --> Team : employed by
+    Personnel --> Name : first name, surname, nickname
+    Personnel --> SaveFile : personal.dat backing
+    Name --> SaveFile : names.dat backing
+    Team --> SaveFile : teams.dat backing
+    GameSetting --> SaveFile : game_settings.dat backing
+    StoredLine --> SaveFile : stored_lines.dat backing
+    Tactic --> SaveFile : tactic-related backing
 ```
 
 ## Usage

@@ -131,10 +131,24 @@ public sealed class FhmPlayerRecord
     public IList<ushort> UnknownU2Values16 { get; } = new ushort[2];
     public string? UnknownString04 { get; set; }
     public IList<ushort> UnknownU2Values17 { get; } = new ushort[2];
+    /// <summary>The broad playing archetype recorded in the player's contract.</summary>
+    public FhmEnumValue<FhmPlayingRole> PrimaryContractRole
+    {
+        get => new(UnknownU2Values17[0]);
+        set => UnknownU2Values17[0] = value.RawValue;
+    }
+    /// <summary>The supplementary squad status recorded in the player's contract.</summary>
+    public FhmEnumValue<FhmSquadStatus> SupplementaryContractRole
+    {
+        get => new(UnknownU2Values17[1]);
+        set => UnknownU2Values17[1] = value.RawValue;
+    }
     public IList<int> UnknownS4Values07 { get; } = new int[4];
     public int FranchiseId { get => UnknownS4Values07[0]; set => UnknownS4Values07[0] = value; }
-    public FhmPlayerRoleInstance? PrimaryRole { get; set; }
-    public FhmPlayerRoleInstance? SupplementaryRole { get; set; }
+    /// <summary>The player's primary data-driven tactical assignment from player_roles.dat.</summary>
+    public FhmPlayerRoleInstance? TacticalRole { get; set; }
+    /// <summary>The player's optional second data-driven tactical assignment from player_roles.dat.</summary>
+    public FhmPlayerRoleInstance? SecondaryTacticalRole { get; set; }
     public IList<ushort> UnknownU2Values18 { get; } = new ushort[2];
     public IList<byte> UnknownU1Values09 { get; } = new byte[2];
     public IList<FhmFixed2Record> UnknownU1PairList { get; } = [];

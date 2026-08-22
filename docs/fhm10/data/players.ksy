@@ -309,10 +309,14 @@ types:
         repeat-expr: 2
       - id: unknown_string_04
         type: fhm_common::qstring
-      - id: unknown_u2_values_17
+      - id: primary_contract_role
         type: u2
-        repeat: expr
-        repeat-expr: 2
+        enum: fhm_common::playing_role
+        doc: Broad playing archetype used by the player's contract.
+      - id: supplementary_contract_role
+        type: u2
+        enum: fhm_common::squad_status
+        doc: Supplementary contract squad status, such as star player or prospect.
       - id: unknown_s4_values_07
         type: s4
         repeat: expr
@@ -763,8 +767,12 @@ types:
         type: fhm_common::qdate
       - id: unknown_f8_01
         type: f8
-      - id: unknown_s4_list
+      - id: salaries
         type: s4_list
+        doc: |
+          Fourteen contract-year pairs. Each pair stores the major-league
+          salary followed by the minor-league salary. A value of -1 means the
+          contract does not extend through that year.
       - id: unknown_u2_values_02
         type: u2
         repeat: expr

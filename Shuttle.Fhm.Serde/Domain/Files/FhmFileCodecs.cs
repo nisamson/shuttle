@@ -74,6 +74,12 @@ internal static class FhmFileCodecs
             return FhmPlayersFile.Read(playersStream);
         }
 
+        if (string.Equals(normalized, "personal.dat", StringComparison.OrdinalIgnoreCase))
+        {
+            using var personnelStream = new MemoryStream(content, writable: false);
+            return FhmPersonnelFile.Read(personnelStream);
+        }
+
         if (string.Equals(normalized, "teams.dat", StringComparison.OrdinalIgnoreCase))
         {
             using var teamsStream = new MemoryStream(content, writable: false);
