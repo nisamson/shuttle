@@ -7,7 +7,7 @@ namespace Shuttle.Fhm.Serde.Sqlite.Entities;
 /// <summary>One player slot in a team's active game lineup.</summary>
 public sealed class TeamActiveLineSlot
 {
-    public int TeamId { get; set; }
+    public int TeamRecordOrdinal { get; set; }
     public FhmLineGroup Group { get; set; }
     public int SlotOrdinal { get; set; }
     public int? PlayerInternalId { get; set; }
@@ -30,11 +30,11 @@ public sealed class TeamActiveLineSlotConfiguration : IEntityTypeConfiguration<T
                     "CK_TeamActiveLineSlots_SlotOrdinal",
                     "SlotOrdinal >= 0");
             });
-        builder.HasKey(value => new { value.TeamId, value.Group, value.SlotOrdinal });
+        builder.HasKey(value => new { value.TeamRecordOrdinal, value.Group, value.SlotOrdinal });
         builder.Property(value => value.Group).HasConversion<int>();
         builder.HasOne(value => value.Team)
             .WithMany(value => value.ActiveLineSlots)
-            .HasForeignKey(value => value.TeamId)
+            .HasForeignKey(value => value.TeamRecordOrdinal)
             .OnDelete(DeleteBehavior.Cascade);
         builder.HasOne(value => value.Player)
             .WithMany()

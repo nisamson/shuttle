@@ -126,13 +126,16 @@ public sealed class FhmTradeHistoryFile : IFhmSaveFile
     /// <summary>Gets completed trades in serialized order.</summary>
     public IList<FhmTradeHistoryRecord> Records { get; } = [];
 
+    /// <summary>Gets or sets opaque bytes that follow the declared trade-history records.</summary>
+    public byte[] TrailingOpaqueBytes { get; set; } = [];
+
     internal static FhmTradeHistoryFile Read(Stream stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
         FhmTradeHistoryFileData wire;
         try
         {
-            wire = FhmTradeHistoryFileSerializer.Deserialize(stream);
+            wire = FhmTradeHistoryFileSerializer.DeserializeWithTrailingContent(stream);
         }
         catch (InvalidDataException exception)
         {
@@ -146,6 +149,9 @@ public sealed class FhmTradeHistoryFile : IFhmSaveFile
             result.Records.Add(FhmTradeHistoryRecord.FromWire(record));
         }
 
+        using var trailingContent = new MemoryStream();
+        stream.CopyTo(trailingContent);
+        result.TrailingOpaqueBytes = trailingContent.ToArray();
         return result;
     }
 
@@ -159,13 +165,20 @@ public sealed class FhmTradeHistoryFile : IFhmSaveFile
             TradeCount = Records.Count,
             Records = Records.Select(FhmTradeHistoryRecord.ToWire).ToList(),
         });
+        stream.Write(TrailingOpaqueBytes);
     }
 
     private static void ValidateWire(FhmTradeHistoryFileData wire)
     {
-        if (wire.TradeCount < 0 || wire.TradeCount > MaximumCollectionCount || wire.Records.Count != wire.TradeCount)
+        if (wire.TradeCount < 0 || wire.TradeCount > MaximumCollectionCount)
         {
             throw new FhmFormatException($"Invalid trade history count {wire.TradeCount}.");
+        }
+
+        if (wire.Records.Count != wire.TradeCount)
+        {
+            throw new FhmUnsupportedFormatException(
+                $"trade_history.dat declares {wire.TradeCount} records but its modeled layout decodes {wire.Records.Count}.");
         }
 
         foreach (var record in wire.Records)
@@ -176,6 +189,7 @@ public sealed class FhmTradeHistoryFile : IFhmSaveFile
 
     private void ValidateForWrite()
     {
+        ArgumentNullException.ThrowIfNull(TrailingOpaqueBytes);
         if (Records.Count > MaximumCollectionCount)
         {
             throw new FhmFormatException($"Invalid trade history count {Records.Count}.");

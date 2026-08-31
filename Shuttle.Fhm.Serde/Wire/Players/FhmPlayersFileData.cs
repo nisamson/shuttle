@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using BinarySerialization;
 using Shuttle.BinarySerde.Common.QFormat;
 
@@ -10,6 +9,13 @@ public sealed class FhmPlayersFileData
     [FieldOrder(0)] public int FormatVersion { get; set; }
     [FieldOrder(1)] public int PlayerCount { get; set; }
     [FieldOrder(2), FieldCount(nameof(PlayerCount))] public List<FhmPlayerRecordData> Players { get; set; } = [];
+}
+
+/// <summary>The fixed header preceding self-delimiting player records.</summary>
+internal sealed class FhmPlayersFileHeaderData
+{
+    [FieldOrder(0)] public int FormatVersion { get; set; }
+    [FieldOrder(1)] public int PlayerCount { get; set; }
 }
 
 /// <summary>One complete player record.</summary>
@@ -216,44 +222,9 @@ public sealed class FhmPlayerRoleInstanceData
 }
 
 /// <summary>FHM's -1-or-role optional tactical-role representation.</summary>
-public sealed class FhmOptionalPlayerRoleInstanceData : IBinarySerializable
+public sealed class FhmOptionalPlayerRoleInstanceData
 {
     public FhmPlayerRoleInstanceData? Value { get; set; }
-
-    public void Serialize(Stream stream, Endianness endianness, BinarySerializationContext context)
-    {
-        ArgumentNullException.ThrowIfNull(stream);
-        if (endianness != Endianness.Big)
-        {
-            throw new NotSupportedException("FHM player roles require big-endian serialization.");
-        }
-
-        Span<byte> presence = stackalloc byte[sizeof(int)];
-        BinaryPrimitives.WriteInt32BigEndian(presence, Value is null ? -1 : 0);
-        stream.Write(presence);
-        if (Value is not null)
-        {
-            QSerializerFactory.Serialize(stream, Value);
-        }
-    }
-
-    public void Deserialize(Stream stream, Endianness endianness, BinarySerializationContext context)
-    {
-        ArgumentNullException.ThrowIfNull(stream);
-        if (endianness != Endianness.Big)
-        {
-            throw new NotSupportedException("FHM player roles require big-endian serialization.");
-        }
-
-        Span<byte> presence = stackalloc byte[sizeof(int)];
-        stream.ReadExactly(presence);
-        Value = BinaryPrimitives.ReadInt32BigEndian(presence) switch
-        {
-            -1 => null,
-            0 => QSerializerFactory.DeserializeOne<FhmPlayerRoleInstanceData>(stream),
-            var value => throw new InvalidDataException($"Invalid player role presence {value}."),
-        };
-    }
 }
 
 /// <summary>A player contract.</summary>
@@ -402,24 +373,4 @@ public sealed class FhmByteInt32PairData
 {
     [FieldOrder(0)] public byte UnknownU1 { get; set; }
     [FieldOrder(1)] public int UnknownS4 { get; set; }
-}
-
-/// <summary>Serializes complete and standalone <c>players.dat</c> records.</summary>
-public static class FhmPlayersFileSerializer
-{
-    /// <summary>Deserializes a complete <c>players.dat</c> stream.</summary>
-    public static FhmPlayersFileData Deserialize(Stream stream) =>
-        QSerializerFactory.Deserialize<FhmPlayersFileData>(stream, "players.dat");
-
-    /// <summary>Serializes a complete <c>players.dat</c> stream.</summary>
-    public static void Serialize(Stream stream, FhmPlayersFileData value) =>
-        QSerializerFactory.Serialize(stream, value);
-
-    /// <summary>Deserializes one self-delimiting player record.</summary>
-    public static FhmPlayerRecordData DeserializeRecord(Stream stream) =>
-        QSerializerFactory.DeserializeOne<FhmPlayerRecordData>(stream);
-
-    /// <summary>Serializes one player record without a surrounding file container.</summary>
-    public static void SerializeRecord(Stream stream, FhmPlayerRecordData value) =>
-        QSerializerFactory.Serialize(stream, value);
 }

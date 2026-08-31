@@ -20,12 +20,23 @@ public sealed class FhmSaveWriter
         var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in save.Files.Values)
         {
+            var relativePath = FhmSavePath.NormalizeRelativePath(file.RelativePath);
+            if (FhmSaveAuxiliaryPaths.IsIgnored(relativePath))
+            {
+                continue;
+            }
+
             WriteDocumentedFile(destinationDirectory, paths, file);
         }
 
         foreach (var file in save.OpaqueFiles)
         {
             var relativePath = FhmSavePath.NormalizeRelativePath(file.RelativePath);
+            if (FhmSaveAuxiliaryPaths.IsIgnored(relativePath))
+            {
+                continue;
+            }
+
             if (!paths.Add(relativePath))
             {
                 throw new FhmFormatException($"Duplicate save-file path '{relativePath}'.");

@@ -7,8 +7,10 @@
     <ItemGroup>
         <PackageReference Include="BinarySerializer" />
         <PackageReference Include="JetBrains.Annotations" />
+        <PackageReference Include="Mapster" />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\Shuttle.BinarySerde.Common\Shuttle.BinarySerde.Common.csproj" />
+        <ProjectReference Include="..\Shuttle.BinarySerde.Dsl\Shuttle.BinarySerde.Dsl.csproj" />
     </ItemGroup>
 </Project>

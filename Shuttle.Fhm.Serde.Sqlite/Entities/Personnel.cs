@@ -17,7 +17,7 @@ public sealed class Personnel
     public DateOnly BirthDate { get; set; }
     public int NationalityId { get; set; }
     public int BirthCityId { get; set; }
-    public int? TeamId { get; set; }
+    public int? TeamRecordOrdinal { get; set; }
     public Team? Team { get; set; }
     public FhmPersonnelJob Job { get; set; }
     public int? Negotiating { get; set; }
@@ -92,11 +92,6 @@ public sealed class PersonnelConfiguration : IEntityTypeConfiguration<Personnel>
                 table.HasCheckConstraint("CK_Personnel_NationalityId", "NationalityId BETWEEN 0 AND 65535");
                 table.HasCheckConstraint("CK_Personnel_Reputation", "Reputation BETWEEN 0 AND 100");
                 table.HasCheckConstraint("CK_Personnel_BasedInLocationId", "BasedInLocationId BETWEEN 0 AND 65535");
-                table.HasCheckConstraint("CK_Personnel_LineMatchingTendency", "LineMatchingTendency BETWEEN 0 AND 4");
-                table.HasCheckConstraint("CK_Personnel_GoalieHandlingTendency", "GoalieHandlingTendency BETWEEN 0 AND 4");
-                table.HasCheckConstraint("CK_Personnel_VeteranPreference", "VeteranPreference BETWEEN 0 AND 4");
-                table.HasCheckConstraint("CK_Personnel_InnovationTendency", "InnovationTendency BETWEEN 0 AND 4");
-                table.HasCheckConstraint("CK_Personnel_LoyaltyTendency", "LoyaltyTendency BETWEEN 0 AND 4");
             });
         builder.HasKey(value => value.PersonnelId);
         builder.Property(value => value.PersonnelId).ValueGeneratedNever();
@@ -115,7 +110,7 @@ public sealed class PersonnelConfiguration : IEntityTypeConfiguration<Personnel>
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(value => value.Team)
             .WithMany(value => value.Staff)
-            .HasForeignKey(value => value.TeamId)
+            .HasForeignKey(value => value.TeamRecordOrdinal)
             .OnDelete(DeleteBehavior.Restrict);
         builder.Navigation(value => value.FirstName).AutoInclude();
         builder.Navigation(value => value.Surname).AutoInclude();

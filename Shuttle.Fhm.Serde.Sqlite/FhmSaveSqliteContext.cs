@@ -17,6 +17,9 @@ public sealed class FhmSaveSqliteContext : DbContext
     /// <summary>Gets exact baseline content for every source file.</summary>
     public DbSet<SaveFile> Files => Set<SaveFile>();
 
+    /// <summary>Gets ordered chunks for baseline files too large for one SQLite BLOB.</summary>
+    public DbSet<SaveFileChunk> FileChunks => Set<SaveFileChunk>();
+
     /// <summary>Gets editable master names.</summary>
     public DbSet<Name> Names => Set<Name>();
     /// <summary>Gets nation-specific first-name and surname list entries.</summary>

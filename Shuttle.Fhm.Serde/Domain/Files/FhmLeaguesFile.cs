@@ -21,10 +21,13 @@ public sealed class FhmLeaguesFile : IFhmSaveFile
         ArgumentNullException.ThrowIfNull(stream);
         FhmLeaguesFileHeaderData header;
         FhmLeagueRecordData wire;
+        byte[] opaqueLeagueBody;
         try
         {
-            header = FhmLeaguesFileSerializer.DeserializeHeader(stream);
-            wire = FhmLeaguesFileSerializer.DeserializeRecord(stream);
+            using var reader = FhmLeaguesFileSerializer.CreateReader(stream);
+            header = reader.Header;
+            wire = reader.ReadRecord();
+            opaqueLeagueBody = reader.ReadRemaining();
         }
         catch (InvalidDataException exception)
         {
@@ -62,7 +65,7 @@ public sealed class FhmLeaguesFile : IFhmSaveFile
             ConfigInt2 = wire.ConfigInt2,
             ConfigUInt161 = wire.ConfigUInt161,
             FoundingDate = new FhmDate(wire.FoundingDate.Year, wire.FoundingDate.Month, wire.FoundingDate.Day),
-            OpaqueLeagueBody = ReadRemaining(stream),
+            OpaqueLeagueBody = opaqueLeagueBody,
         };
 
         wire.ConfigDoublesPrimary.CopyTo(league.ConfigDoublesPrimary);
@@ -107,13 +110,6 @@ public sealed class FhmLeaguesFile : IFhmSaveFile
             FoundingDate = new() { Year = league.FoundingDate.Year, Month = league.FoundingDate.Month, Day = league.FoundingDate.Day },
         });
         stream.Write(league.OpaqueLeagueBody);
-    }
-
-    private static byte[] ReadRemaining(Stream stream)
-    {
-        using var remaining = new MemoryStream();
-        stream.CopyTo(remaining);
-        return remaining.ToArray();
     }
 }
 

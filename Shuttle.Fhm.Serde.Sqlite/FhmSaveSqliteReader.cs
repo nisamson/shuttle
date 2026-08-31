@@ -30,6 +30,11 @@ public sealed class FhmSaveSqliteReader
         }
 
         var files = await context.Files.AsNoTracking().ToListAsync(cancellationToken);
+        var fileChunks = await context.FileChunks.AsNoTracking()
+            .OrderBy(value => value.RelativePath)
+            .ThenBy(value => value.Ordinal)
+            .ToListAsync(cancellationToken);
+        files = RehydrateFileContents(files, fileChunks);
         ValidateBaselineFiles(files, manifest);
 
         var names = await context.Names.AsNoTracking().ToListAsync(cancellationToken);
@@ -63,7 +68,7 @@ public sealed class FhmSaveSqliteReader
         var output = CreateRawSave(files);
         var nameIds = new HashSet<int>();
         var playerIds = new HashSet<int>();
-        var playerRoleIds = new HashSet<int>();
+        var playerRoleIds = new HashSet<InGameRole>();
 
         var namesFile = GetDocumented<FhmNamesFile>(baseline, "names.dat");
         if (namesFile is not null)
@@ -321,6 +326,61 @@ public sealed class FhmSaveSqliteReader
         }
     }
 
+    private static List<SaveFile> RehydrateFileContents(
+        IReadOnlyCollection<SaveFile> files,
+        IReadOnlyCollection<SaveFileChunk> chunks)
+    {
+        var chunksByPath = chunks.GroupBy(value => value.RelativePath, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, StringComparer.OrdinalIgnoreCase);
+        var result = new List<SaveFile>(files.Count);
+
+        foreach (var file in files)
+        {
+            if (!chunksByPath.Remove(file.RelativePath, out var fileChunks))
+            {
+                result.Add(file);
+                continue;
+            }
+
+            if (file.Content.Length != 0)
+            {
+                throw new InvalidDataException($"Chunked baseline save file '{file.RelativePath}' also has inline content.");
+            }
+
+            var orderedChunks = fileChunks.OrderBy(value => value.Ordinal).ToArray();
+            if (!orderedChunks.Select(value => value.Ordinal).SequenceEqual(Enumerable.Range(0, orderedChunks.Length)))
+            {
+                throw new InvalidDataException($"Chunked baseline save file '{file.RelativePath}' has non-contiguous chunk ordinals.");
+            }
+
+            var length = orderedChunks.Aggregate(
+                0L,
+                (total, chunk) => checked(total + chunk.Content.Length));
+            if (length > int.MaxValue)
+            {
+                throw new InvalidDataException($"Chunked baseline save file '{file.RelativePath}' exceeds the supported size.");
+            }
+
+            var content = new byte[(int)length];
+            var offset = 0;
+            foreach (var chunk in orderedChunks)
+            {
+                Buffer.BlockCopy(chunk.Content, 0, content, offset, chunk.Content.Length);
+                offset += chunk.Content.Length;
+            }
+
+            file.Content = content;
+            result.Add(file);
+        }
+
+        if (chunksByPath.Count > 0)
+        {
+            throw new InvalidDataException("Baseline content chunks reference missing source files.");
+        }
+
+        return result;
+    }
+
     private static FhmSave CreateRawSave(IEnumerable<SaveFile> files)
     {
         var result = new FhmSave();
@@ -493,7 +553,7 @@ public sealed class FhmSaveSqliteReader
         IReadOnlyCollection<PlayerRoleAssignment> roleAssignments,
         IReadOnlyCollection<PlayerRoleTendencyValue> roleTendencies,
         IReadOnlyCollection<Team> teams,
-        ISet<int> roleIds,
+        ISet<InGameRole> roleIds,
         ISet<int> playerIds)
     {
         RequireExactKeys(entities, Enumerable.Range(0, file.Players.Count).ToHashSet(), value => value.RecordOrdinal, nameof(Player));
@@ -514,7 +574,7 @@ public sealed class FhmSaveSqliteReader
         var tendencies = roleTendencies
             .GroupBy(value => (value.PlayerInternalId, value.Slot))
             .ToDictionary(group => group.Key, group => group.ToArray());
-        var teamRecordIndicesById = teams.ToDictionary(value => value.TeamId, value => value.RecordIndex);
+        var teamRecordIndicesByOrdinal = teams.ToDictionary(value => value.RecordOrdinal, value => value.RecordIndex);
         var expectedPlayerIds = file.Players.Select(value => value.InternalIdentity).ToHashSet();
         if (roleAssignments.Any(value => !expectedPlayerIds.Contains(value.PlayerInternalId)))
         {
@@ -538,7 +598,10 @@ public sealed class FhmSaveSqliteReader
             }
 
             ValidatePlayer(row, ordinal);
-            var teamRecordIndex = ResolveTeamRecordIndex(row.TeamId, teamRecordIndicesById, $"player {row.InternalId}");
+            var teamRecordIndex = ResolveTeamRecordIndex(
+                row.TeamRecordOrdinal,
+                teamRecordIndicesByOrdinal,
+                $"player {row.InternalId}");
             changed |= ApplyPlayer(player, row, teamRecordIndex);
             changed |= ApplyAttributes(player.RatingAttributes, ratingRow, ordinal);
             changed |= ApplyContracts(
@@ -571,7 +634,7 @@ public sealed class FhmSaveSqliteReader
         IReadOnlyCollection<PlayerRoleDefinition> definitions,
         IReadOnlyCollection<PlayerRoleWeight> weights,
         IReadOnlyCollection<PlayerRoleIndexEntry> indexEntries,
-        ISet<int> roleIds)
+        ISet<InGameRole> roleIds)
     {
         RequireExactKeys(catalogues, new HashSet<int> { 1 }, value => value.Id, nameof(PlayerRoleCatalogue));
         var catalogue = catalogues.Single();
@@ -607,7 +670,7 @@ public sealed class FhmSaveSqliteReader
             ValidatePlayerRoleDefinition(row);
             var role = new FhmPlayerRoleDefinition
             {
-                RoleId = row.RoleId,
+                RoleId = (int)row.RoleId,
                 Name = row.Name,
                 AppliesToForwards = checked((byte)row.AppliesToForwards),
                 AppliesToDefencemen = checked((byte)row.AppliesToDefencemen),
@@ -620,15 +683,15 @@ public sealed class FhmSaveSqliteReader
                 Description = row.Description,
                 TuningValueC = checked((ushort)row.TuningValueC),
             };
-            ApplyPlayerRoleWeights(role.RoleId, role.WeightGroupA, PlayerRoleWeightGroup.A, 8, weightsByRoleAndGroup);
-            ApplyPlayerRoleWeights(role.RoleId, role.WeightGroupB, PlayerRoleWeightGroup.B, 13, weightsByRoleAndGroup);
-            ApplyPlayerRoleWeights(role.RoleId, role.WeightGroupC, PlayerRoleWeightGroup.C, 17, weightsByRoleAndGroup);
-            ApplyPlayerRoleWeights(role.RoleId, role.WeightGroupD, PlayerRoleWeightGroup.D, 4, weightsByRoleAndGroup);
-            ApplyPlayerRoleWeights(role.RoleId, role.WeightGroupE, PlayerRoleWeightGroup.E, 19, weightsByRoleAndGroup);
-            ApplyPlayerRoleWeights(role.RoleId, role.WeightGroupF, PlayerRoleWeightGroup.F, 9, weightsByRoleAndGroup);
+            ApplyPlayerRoleWeights((InGameRole)role.RoleId, role.WeightGroupA, PlayerRoleWeightGroup.A, 8, weightsByRoleAndGroup);
+            ApplyPlayerRoleWeights((InGameRole)role.RoleId, role.WeightGroupB, PlayerRoleWeightGroup.B, 13, weightsByRoleAndGroup);
+            ApplyPlayerRoleWeights((InGameRole)role.RoleId, role.WeightGroupC, PlayerRoleWeightGroup.C, 17, weightsByRoleAndGroup);
+            ApplyPlayerRoleWeights((InGameRole)role.RoleId, role.WeightGroupD, PlayerRoleWeightGroup.D, 4, weightsByRoleAndGroup);
+            ApplyPlayerRoleWeights((InGameRole)role.RoleId, role.WeightGroupE, PlayerRoleWeightGroup.E, 19, weightsByRoleAndGroup);
+            ApplyPlayerRoleWeights((InGameRole)role.RoleId, role.WeightGroupF, PlayerRoleWeightGroup.F, 9, weightsByRoleAndGroup);
             foreach (var list in Enum.GetValues<PlayerRoleIndexList>())
             {
-                var rows = indicesByRoleAndList.GetValueOrDefault((role.RoleId, list)) ?? [];
+                var rows = indicesByRoleAndList.GetValueOrDefault(((InGameRole)role.RoleId, list)) ?? [];
                 RequireExactKeys(
                     rows,
                     Enumerable.Range(0, rows.Length).ToHashSet(),
@@ -672,11 +735,11 @@ public sealed class FhmSaveSqliteReader
     }
 
     private static void ApplyPlayerRoleWeights(
-        int roleId,
+        InGameRole roleId,
         IList<int> destination,
         PlayerRoleWeightGroup group,
         int expectedCount,
-        IReadOnlyDictionary<(int RoleId, PlayerRoleWeightGroup Group), PlayerRoleWeight[]> weights)
+        IReadOnlyDictionary<(InGameRole RoleId, PlayerRoleWeightGroup Group), PlayerRoleWeight[]> weights)
     {
         var rows = weights.GetValueOrDefault((roleId, group)) ?? [];
         RequireExactKeys(
@@ -695,7 +758,7 @@ public sealed class FhmSaveSqliteReader
         PlayerRoleSlot slot,
         PlayerRoleAssignment? assignment,
         IReadOnlyDictionary<(int PlayerInternalId, PlayerRoleSlot Slot), PlayerRoleTendencyValue[]> tendencies,
-        ISet<int> roleIds,
+        ISet<InGameRole> roleIds,
         int playerOrdinal)
     {
         var destination = slot == PlayerRoleSlot.Tactical ? player.TacticalRole : player.SecondaryTacticalRole;
@@ -714,7 +777,7 @@ public sealed class FhmSaveSqliteReader
                 Enum.GetValues<PlayerRoleTendency>().ToHashSet(),
                 value => value.Tendency,
                 $"player record {playerOrdinal} {slot} role tendencies");
-            replacement = new FhmPlayerRoleInstance { RoleId = assignment.RoleId };
+            replacement = new FhmPlayerRoleInstance { RoleId = (int)assignment.RoleId };
             foreach (var row in rows)
             {
                 if (row.UseOverride is < byte.MinValue or > byte.MaxValue
@@ -928,18 +991,18 @@ public sealed class FhmSaveSqliteReader
     private static int ToWireReference(int? reference) => reference ?? FhmNullConstants.Null;
 
     private static int ResolveTeamRecordIndex(
-        int? teamId,
-        IReadOnlyDictionary<int, int> teamRecordIndicesById,
+        int? teamRecordOrdinal,
+        IReadOnlyDictionary<int, int> teamRecordIndicesByOrdinal,
         string owner)
     {
-        if (teamId is null)
+        if (teamRecordOrdinal is null)
         {
             return FhmNullConstants.Null;
         }
 
-        if (!teamRecordIndicesById.TryGetValue(teamId.Value, out var recordIndex))
+        if (!teamRecordIndicesByOrdinal.TryGetValue(teamRecordOrdinal.Value, out var recordIndex))
         {
-            throw new InvalidDataException($"{owner} references missing stable team ID {teamId.Value}.");
+            throw new InvalidDataException($"{owner} references missing team record ordinal {teamRecordOrdinal.Value}.");
         }
 
         return recordIndex;
@@ -956,39 +1019,39 @@ public sealed class FhmSaveSqliteReader
         RequireExactKeys(entities, Enumerable.Range(0, file.Teams.Count).ToHashSet(), value => value.RecordOrdinal, nameof(Team));
         RequireExactKeys(
             tactics,
-            file.Teams.Select(value => value.TeamId).ToHashSet(),
-            value => value.TeamId,
+            Enumerable.Range(0, file.Teams.Count).ToHashSet(),
+            value => value.TeamRecordOrdinal,
             nameof(TeamTactic));
         var rows = entities.ToDictionary(value => value.RecordOrdinal);
-        var tacticRows = tactics.ToDictionary(value => value.TeamId);
+        var tacticRows = tactics.ToDictionary(value => value.TeamRecordOrdinal);
         var expectedActiveLineSlotKeys = GetTeamActiveLineSlotKeys(file);
         RequireExactKeys(
             activeLineSlots,
             expectedActiveLineSlotKeys,
-            value => (value.TeamId, value.Group, value.SlotOrdinal),
+            value => (value.TeamRecordOrdinal, value.Group, value.SlotOrdinal),
             nameof(TeamActiveLineSlot));
         var activeLineSlotRows = activeLineSlots.ToDictionary(
-            value => (value.TeamId, value.Group, value.SlotOrdinal));
-        var teamIds = new HashSet<int>();
+            value => (value.TeamRecordOrdinal, value.Group, value.SlotOrdinal));
+        var teamRecordIndicesByOrdinal = entities.ToDictionary(value => value.RecordOrdinal, value => value.RecordIndex);
         var changed = false;
 
         foreach (var (team, ordinal) in file.Teams.Select((value, index) => (value, index)).ToArray())
         {
             var row = rows[ordinal];
-            if (row.RecordIndex != team.RecordIndex || row.TeamId != team.TeamId || !teamIds.Add(row.TeamId))
+            if (row.RecordIndex != team.RecordIndex || row.TeamId != team.TeamId)
             {
-                throw new InvalidDataException($"Teams entity record {ordinal} changes an immutable identity or duplicates TeamId {row.TeamId}.");
+                throw new InvalidDataException($"Teams entity record {ordinal} changes an immutable identity.");
             }
 
             ValidateTeam(row, ordinal);
-            changed |= ApplyTeam(team, row);
+            changed |= ApplyTeam(team, row, teamRecordIndicesByOrdinal);
             if (personnelFile is not null)
             {
                 changed |= ApplyTeamPersonnel(team, personnelFile.Records);
             }
-            changed |= ApplyTeamActiveLines(team, activeLineSlotRows, playerIds);
+            changed |= ApplyTeamActiveLines(team, ordinal, activeLineSlotRows, playerIds);
 
-            var tacticRow = tacticRows[team.TeamId];
+            var tacticRow = tacticRows[ordinal];
             var sourceSettings = FhmSaveSqliteWriter.SerializeTeamTactics(team.Tail.Tactics);
             if (tacticRow.SerializedSettings.Length != sourceSettings.Length)
             {
@@ -1014,13 +1077,13 @@ public sealed class FhmSaveSqliteReader
     private static HashSet<(int, FhmLineGroup, int)> GetTeamActiveLineSlotKeys(FhmTeamsFile file)
     {
         var result = new HashSet<(int, FhmLineGroup, int)>();
-        foreach (var team in file.Teams)
+        foreach (var (team, teamRecordOrdinal) in file.Teams.Select((value, index) => (value, index)))
         {
             foreach (var line in team.ActiveLines.Lists)
             {
                 for (var slotOrdinal = 0; slotOrdinal < line.PlayerReferences.Count; slotOrdinal++)
                 {
-                    result.Add((team.TeamId, line.Group, slotOrdinal));
+                    result.Add((teamRecordOrdinal, line.Group, slotOrdinal));
                 }
             }
         }
@@ -1030,6 +1093,7 @@ public sealed class FhmSaveSqliteReader
 
     private static bool ApplyTeamActiveLines(
         FhmTeamRecord team,
+        int teamRecordOrdinal,
         IReadOnlyDictionary<(int, FhmLineGroup, int), TeamActiveLineSlot> rows,
         ISet<int> playerIds)
     {
@@ -1038,7 +1102,7 @@ public sealed class FhmSaveSqliteReader
         {
             for (var slotOrdinal = 0; slotOrdinal < line.PlayerReferences.Count; slotOrdinal++)
             {
-                var row = rows[(team.TeamId, line.Group, slotOrdinal)];
+                var row = rows[(teamRecordOrdinal, line.Group, slotOrdinal)];
                 if (row.PlayerInternalId is { } playerId)
                 {
                     ValidateReference(
@@ -1071,7 +1135,7 @@ public sealed class FhmSaveSqliteReader
             value => value.PersonnelId,
             nameof(Personnel));
         var rows = entities.ToDictionary(value => value.PersonnelId);
-        var teamsById = teams.ToDictionary(value => value.TeamId);
+        var teamsByRecordOrdinal = teams.ToDictionary(value => value.RecordOrdinal);
         var changed = false;
 
         foreach (var record in file.Records)
@@ -1102,12 +1166,12 @@ public sealed class FhmSaveSqliteReader
             }
 
             int? teamRecordIndex = null;
-            if (row.TeamId is int teamId)
+            if (row.TeamRecordOrdinal is int teamRecordOrdinal)
             {
-                if (!teamsById.TryGetValue(teamId, out var team))
+                if (!teamsByRecordOrdinal.TryGetValue(teamRecordOrdinal, out var team))
                 {
                     throw new InvalidDataException(
-                        $"Personnel entity {record.PersonnelId} references missing team ID {teamId}.");
+                        $"Personnel entity {record.PersonnelId} references missing team record ordinal {teamRecordOrdinal}.");
                 }
 
                 teamRecordIndex = team.RecordIndex;
@@ -1203,20 +1267,12 @@ public sealed class FhmSaveSqliteReader
 
     private static void ValidatePersonnel(Personnel row)
     {
-        if (!Enum.IsDefined(row.Job)
-            || !Enum.IsDefined(row.OffensivePreference)
-            || !Enum.IsDefined(row.PhysicalPreference)
-            || !Enum.IsDefined(row.LineMatchingTendency)
-            || !Enum.IsDefined(row.GoalieHandlingTendency)
-            || !Enum.IsDefined(row.VeteranPreference)
-            || !Enum.IsDefined(row.InnovationTendency)
-            || !Enum.IsDefined(row.LoyaltyTendency)
-            || row.ContractLength is < 1 or > byte.MaxValue
+        if (row.ContractLength is < 1 or > byte.MaxValue
             || row.NationalityId is < 0 or > ushort.MaxValue
             || row.Reputation is < 0 or > 100
             || row.BasedInLocationId is < 0 or > ushort.MaxValue)
         {
-            throw new InvalidDataException($"Personnel entity {row.PersonnelId} contains an invalid enum, range, or contract length.");
+            throw new InvalidDataException($"Personnel entity {row.PersonnelId} contains an invalid range or contract length.");
         }
 
         _ = row.BirthDate;
@@ -1294,8 +1350,19 @@ public sealed class FhmSaveSqliteReader
         }
     }
 
-    private static bool ApplyTeam(FhmTeamRecord destination, Team source)
+    private static bool ApplyTeam(
+        FhmTeamRecord destination,
+        Team source,
+        IReadOnlyDictionary<int, int> teamRecordIndicesByOrdinal)
     {
+        var affiliateParentRecordIndex = ResolveTeamRecordIndex(
+            source.AffiliateParentRecordOrdinal,
+            teamRecordIndicesByOrdinal,
+            "team affiliate parent");
+        var secondaryAffiliateParentRecordIndex = ResolveTeamRecordIndex(
+            source.SecondaryAffiliateParentRecordOrdinal,
+            teamRecordIndicesByOrdinal,
+            "team secondary affiliate parent");
         var changed =
             destination.InternalCode != source.InternalCode ||
             destination.InternalCode2 != source.InternalCode2 ||
@@ -1303,8 +1370,8 @@ public sealed class FhmSaveSqliteReader
             destination.City != source.City ||
             destination.Nickname != source.Nickname ||
             destination.NicknamePlacement != source.NicknamePlacement ||
-            destination.AffiliateParentId != ToWireReference(source.AffiliateParentId) ||
-            destination.AffiliateParentId2 != ToWireReference(source.AffiliateParentId2) ||
+            destination.AffiliateParentId != affiliateParentRecordIndex ||
+            destination.AffiliateParentId2 != secondaryAffiliateParentRecordIndex ||
             destination.LeagueId != source.LeagueId ||
             destination.ConferenceId != source.ConferenceId ||
             destination.DivisionId != source.DivisionId ||
@@ -1322,8 +1389,8 @@ public sealed class FhmSaveSqliteReader
         destination.City = source.City;
         destination.Nickname = source.Nickname;
         destination.NicknamePlacement = checked((byte)source.NicknamePlacement);
-        destination.AffiliateParentId = ToWireReference(source.AffiliateParentId);
-        destination.AffiliateParentId2 = ToWireReference(source.AffiliateParentId2);
+        destination.AffiliateParentId = affiliateParentRecordIndex;
+        destination.AffiliateParentId2 = secondaryAffiliateParentRecordIndex;
         destination.LeagueId = source.LeagueId;
         destination.ConferenceId = source.ConferenceId;
         destination.DivisionId = source.DivisionId;

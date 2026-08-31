@@ -84,6 +84,29 @@ public sealed class FhmTeamsFileTests
         }
     }
 
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(10_000_001)]
+    public void TeamsFile_RejectsInvalidCountBeforeAllocating(int count)
+    {
+        var root = CreateTestRoot();
+        try
+        {
+            var bytes = new byte[sizeof(int) * 2];
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(bytes, 10);
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(sizeof(int)), count);
+            File.WriteAllBytes(Path.Combine(root, "teams.dat"), bytes);
+
+            var exception = Assert.Throws<FhmFormatException>(() => ReadTeams(root));
+
+            Assert.Equal($"Invalid teams count {count}.", exception.Message);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public void TeamsFile_RejectsInvalidRosterDelimiterAndSelectorOrdering()
     {

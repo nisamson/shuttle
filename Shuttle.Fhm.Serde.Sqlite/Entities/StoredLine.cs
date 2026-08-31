@@ -11,7 +11,7 @@ public sealed class StoredLine
     /// <summary>Gets or sets the line name.</summary>
     public string? Name { get; set; }
     /// <summary>Gets or sets the inferred owning team when every populated slot belongs to that team.</summary>
-    public int? TeamId { get; set; }
+    public int? TeamRecordOrdinal { get; set; }
     /// <summary>Gets or sets the inferred owning team.</summary>
     public Team? Team { get; set; }
     /// <summary>Gets the player slots in this stored line.</summary>
@@ -46,7 +46,7 @@ public sealed class StoredLineConfiguration : IEntityTypeConfiguration<StoredLin
         builder.Property(value => value.LineOrdinal).ValueGeneratedNever();
         builder.HasOne(value => value.Team)
             .WithMany(value => value.StoredLines)
-            .HasForeignKey(value => value.TeamId)
+            .HasForeignKey(value => value.TeamRecordOrdinal)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

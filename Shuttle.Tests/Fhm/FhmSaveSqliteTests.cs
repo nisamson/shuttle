@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Shuttle.Fhm.Serde.Domain.Binary;
 using Shuttle.Fhm.Serde.Domain.Files;
 using Shuttle.Fhm.Serde.Domain.Model;
@@ -31,6 +33,38 @@ public sealed class FhmSaveSqliteTests
     }
 
     [Fact]
+    public async Task TeamReportService_ResolvesTeamPlayersLinesAndTactics()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var root = CreateTestRoot();
+        try
+        {
+            var database = Path.Combine(root, "save.sqlite");
+            await new FhmSaveSqliteWriter().WriteAsync(CreateSave(), database, cancellationToken);
+
+            var report = await new TeamReportService().GetAsync(database, "Original City", cancellationToken);
+
+            Assert.Equal("Original City", report.Team.Name);
+            var player = Assert.Single(report.Players);
+            Assert.Equal("Original Original", player.Name);
+            Assert.Equal("Goalie", player.PrimaryPosition);
+            Assert.Equal("Synthetic Tactical Role", Assert.Single(player.TacticalRoles).Name);
+            var line = Assert.Single(report.CurrentLines);
+            Assert.Equal("Even Strength Forwards", line.Group);
+            Assert.Equal(["Original Original"], line.Players);
+            Assert.Equal("Global settings", report.CurrentTactics.Selectors[0].Scope);
+            Assert.Equal("Breakout", report.CurrentTactics.Selectors[0].Systems[0].Zone);
+
+            var reports = await new TeamReportService().GetAllAsync(database, cancellationToken);
+            Assert.Collection(reports, value => Assert.Equal("Original City", value.Team.Name));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task WriteAsync_StoresWireSentinelsAsNull()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -47,13 +81,114 @@ public sealed class FhmSaveSqliteTests
                 command.CommandText = "SELECT CommonNameId FROM Players WHERE RecordOrdinal = 0;";
                 Assert.IsType<DBNull>(await command.ExecuteScalarAsync(cancellationToken));
 
-                command.CommandText = "SELECT AffiliateParentId FROM Teams WHERE TeamId = 1;";
+                command.CommandText = "SELECT AffiliateParentRecordOrdinal FROM Teams WHERE RecordOrdinal = 0;";
                 Assert.IsType<DBNull>(await command.ExecuteScalarAsync(cancellationToken));
             }
             finally
             {
                 await context.Database.CloseConnectionAsync();
             }
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task WriteAsync_ExcludesAuxiliarySaveFiles()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var root = CreateTestRoot();
+        try
+        {
+            var database = Path.Combine(root, "save.sqlite");
+            var save = CreateSave();
+            save.OpaqueFiles.Add(new FhmOpaqueFile("graphics/logo.png", [0]));
+            save.OpaqueFiles.Add(new FhmOpaqueFile("import_export/bundle.zip", [1]));
+            save.OpaqueFiles.Add(new FhmOpaqueFile("rs_one/restore.dat", [2]));
+            await new FhmSaveSqliteWriter().WriteAsync(save, database, cancellationToken);
+
+            await using var context = new FhmSaveSqliteContext(FhmSaveSqliteContext.CreateOptions(database));
+            Assert.DoesNotContain(
+                await context.Files.Select(file => file.RelativePath).ToListAsync(cancellationToken),
+                path => path.StartsWith("graphics/", StringComparison.OrdinalIgnoreCase) ||
+                    path.StartsWith("import_export/", StringComparison.OrdinalIgnoreCase) ||
+                    path.StartsWith("rs", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task WriteFromDirectoryAsync_StreamsLargeOpaqueFileIntoOrderedChunks()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var root = CreateTestRoot();
+        try
+        {
+            var source = Path.Combine(root, "source");
+            var destination = Path.Combine(root, "destination");
+            var database = Path.Combine(root, "save.sqlite");
+            new FhmSaveWriter().Write(CreateSave(), source);
+            var opaqueDirectory = Path.Combine(source, "assets");
+            Directory.CreateDirectory(opaqueDirectory);
+            var opaqueContent = new byte[(32 * 1024 * 1024) + 37];
+            for (var index = 0; index < opaqueContent.Length; index++)
+            {
+                opaqueContent[index] = (byte)(index % byte.MaxValue);
+            }
+
+            var opaquePath = Path.Combine(opaqueDirectory, "large-unmodeled.bin");
+            await File.WriteAllBytesAsync(opaquePath, opaqueContent, cancellationToken);
+
+            await new FhmSaveSqliteWriter().WriteFromDirectoryAsync(source, database, cancellationToken);
+
+            await using (var context = new FhmSaveSqliteContext(FhmSaveSqliteContext.CreateOptions(database)))
+            {
+                var file = await context.Files.SingleAsync(
+                    value => value.RelativePath == "assets/large-unmodeled.bin",
+                    cancellationToken);
+                Assert.Equal(SaveFileKind.Opaque, file.Kind);
+                Assert.Empty(file.Content);
+                var chunks = await context.FileChunks
+                    .Where(value => value.RelativePath == file.RelativePath)
+                    .OrderBy(value => value.Ordinal)
+                    .ToListAsync(cancellationToken);
+                Assert.Equal([0, 1], chunks.Select(value => value.Ordinal));
+                Assert.Equal(32 * 1024 * 1024, chunks[0].Content.Length);
+                Assert.Equal(37, chunks[1].Content.Length);
+            }
+
+            var exported = await new FhmSaveSqliteReader().ReadAsync(database, cancellationToken);
+            new FhmSaveWriter().Write(exported, destination);
+            AssertFoldersEqual(source, destination);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task WriteAsync_StoresPlayerTacticalRolesAsInGameRoleEnums()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var root = CreateTestRoot();
+        try
+        {
+            var database = Path.Combine(root, "save.sqlite");
+            await new FhmSaveSqliteWriter().WriteAsync(CreateSave(), database, cancellationToken);
+
+            await using var context = new FhmSaveSqliteContext(FhmSaveSqliteContext.CreateOptions(database));
+            Assert.Equal(InGameRole.BackcheckingForward, await context.TacticalRoles
+                .Select(value => value.RoleId)
+                .SingleAsync(cancellationToken));
+            Assert.Equal(InGameRole.BackcheckingForward, await context.PlayerTacticalRoleAssignments
+                .Select(value => value.RoleId)
+                .SingleAsync(cancellationToken));
         }
         finally
         {
@@ -149,7 +284,7 @@ public sealed class FhmSaveSqliteTests
                     """,
                     cancellationToken);
                 await context.Database.ExecuteSqlRawAsync(
-                    "UPDATE Personnel SET TeamId = NULL WHERE PersonnelId = 1",
+                    "UPDATE Personnel SET TeamRecordOrdinal = NULL WHERE PersonnelId = 1",
                     cancellationToken);
                 await context.Database.ExecuteSqlRawAsync(
                     "UPDATE Teams SET City = 'Edited City'",
@@ -171,7 +306,7 @@ public sealed class FhmSaveSqliteTests
                     new object[] { editedTeamTactics },
                     cancellationToken);
                 await context.Database.ExecuteSqlRawAsync(
-                    "UPDATE TeamActiveLineSlots SET PlayerInternalId = NULL WHERE TeamId = 1 AND \"Group\" = 0 AND SlotOrdinal = 0",
+                    "UPDATE TeamActiveLineSlots SET PlayerInternalId = NULL WHERE TeamRecordOrdinal = 0 AND \"Group\" = 0 AND SlotOrdinal = 0",
                     cancellationToken);
                 await context.Database.ExecuteSqlRawAsync(
                     "UPDATE TacticTemplates SET DisplayName = 'Edited Template'",
@@ -270,7 +405,7 @@ public sealed class FhmSaveSqliteTests
             Assert.Equal("Original", player.FirstNameText);
             Assert.Equal("Original", player.SurnameText);
             Assert.Equal(new DateOnly(2000, 1, 1), player.BirthDate);
-            Assert.Equal(1, player.Team?.TeamId);
+            Assert.Equal(0, player.Team?.RecordOrdinal);
             Assert.NotNull(player.Attributes);
             Assert.Equal(player.PositionAffinity.Goalie, player.PositionAffinity.GetRating(player.PrimaryPosition));
             Assert.Equal(FhmPlayingRole.Goalscorer, player.PrimaryContractRole);
@@ -315,7 +450,7 @@ public sealed class FhmSaveSqliteTests
             var storedLine = await context.StoredLines
                 .Include(value => value.Slots)
                 .SingleAsync(cancellationToken);
-            Assert.Equal(1, storedLine.Team?.TeamId);
+            Assert.Equal(0, storedLine.Team?.RecordOrdinal);
             Assert.Equal(player.InternalId, Assert.Single(storedLine.Slots).Player?.InternalId);
         }
         finally
@@ -363,7 +498,7 @@ public sealed class FhmSaveSqliteTests
     }
 
     [Fact]
-    public async Task Schema_RejectsInvalidPersonnelPersonalityTendency()
+    public async Task Schema_PreservesUnknownPersonnelTendencyAndRejectsInvalidRating()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var root = CreateTestRoot();
@@ -373,9 +508,19 @@ public sealed class FhmSaveSqliteTests
             await new FhmSaveSqliteWriter().WriteAsync(CreateSave(), database, cancellationToken);
             await using var context = new FhmSaveSqliteContext(FhmSaveSqliteContext.CreateOptions(database));
 
+            await context.Database.ExecuteSqlRawAsync(
+                "UPDATE Personnel SET LoyaltyTendency = 5 WHERE PersonnelId = 0",
+                cancellationToken);
+            Assert.Equal(
+                (FhmLoyaltyTendency)5,
+                await context.Personnel
+                    .Where(value => value.PersonnelId == 0)
+                    .Select(value => value.LoyaltyTendency)
+                    .SingleAsync(cancellationToken));
+
             var exception = await Assert.ThrowsAsync<SqliteException>(
                 () => context.Database.ExecuteSqlRawAsync(
-                    "UPDATE Personnel SET LoyaltyTendency = 5 WHERE PersonnelId = 0",
+                    "UPDATE Personnel SET Negotiating = 21 WHERE PersonnelId = 0",
                     cancellationToken));
 
             Assert.Equal(19, exception.SqliteErrorCode);
@@ -416,6 +561,101 @@ public sealed class FhmSaveSqliteTests
             exception = await Assert.ThrowsAsync<InvalidDataException>(
                 () => new FhmSaveSqliteReader().ReadAsync(database, cancellationToken));
             Assert.Contains("inserted, deleted, or reordered", exception.Message);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ImportExport_AllowsDuplicateDecodedTeamIdsAndUsesRecordOrdinalsForRelationships()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var root = CreateTestRoot();
+        try
+        {
+            var database = Path.Combine(root, "save.sqlite");
+            var destination = Path.Combine(root, "destination");
+            await new FhmSaveSqliteWriter().WriteAsync(CreateDuplicateTeamIdsSave(), database, cancellationToken);
+
+            await using (var context = new FhmSaveSqliteContext(FhmSaveSqliteContext.CreateOptions(database)))
+            {
+                var teamRows = await context.Teams
+                    .OrderBy(team => team.RecordOrdinal)
+                    .ToListAsync(cancellationToken);
+                Assert.Equal([1, 1], teamRows.Select(team => team.TeamId));
+                Assert.Equal([0, 1], teamRows.Select(team => team.RecordOrdinal));
+                Assert.Equal([0, 1], await context.Players
+                    .OrderBy(player => player.InternalId)
+                    .Select(player => player.TeamRecordOrdinal)
+                    .ToListAsync(cancellationToken));
+                Assert.Equal([0, 1], await context.TeamTactics
+                    .OrderBy(tactic => tactic.TeamRecordOrdinal)
+                    .Select(tactic => tactic.TeamRecordOrdinal)
+                    .ToListAsync(cancellationToken));
+                Assert.Equal([0, 1], await context.TeamActiveLineSlots
+                    .OrderBy(slot => slot.TeamRecordOrdinal)
+                    .Select(slot => slot.TeamRecordOrdinal)
+                    .ToListAsync(cancellationToken));
+            }
+
+            var exported = await new FhmSaveSqliteReader().ReadAsync(database, cancellationToken);
+            new FhmSaveWriter().Write(exported, destination);
+            var reloaded = new FhmSaveReader().Read(destination);
+            var players = Assert.IsType<FhmPlayersFile>(reloaded.Files["players.dat"]).Players;
+            var teams = Assert.IsType<FhmTeamsFile>(reloaded.Files["teams.dat"]).Teams;
+
+            Assert.Equal([1, 1], teams.Select(team => team.TeamId));
+            Assert.Equal([0, 1], teams.Select(team => team.RecordIndex));
+            Assert.Equal([0, 1], players.OrderBy(player => player.InternalIdentity).Select(player => player.TeamId));
+            Assert.Equal([0, 1], teams
+                .Select((team, ordinal) => (team, ordinal))
+                .OrderBy(value => value.ordinal)
+                .Select(value => value.team.ActiveLines.Lists[(int)FhmLineGroup.EvenStrengthForwards].PlayerReferences.Single()));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Migration_ConvertsExistingTeamRelationshipsToRecordOrdinals()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var root = CreateTestRoot();
+        try
+        {
+            var database = Path.Combine(root, "save.sqlite");
+            await using var context = new FhmSaveSqliteContext(FhmSaveSqliteContext.CreateOptions(database));
+            var migrator = context.Database.GetService<IMigrator>();
+            await migrator.MigrateAsync("20260824000000_AddSaveFileChunks", cancellationToken);
+            await context.Database.ExecuteSqlRawAsync(
+                """
+                INSERT INTO "Teams" (
+                    "TeamId", "RecordOrdinal", "RecordIndex", "Flag1", "NicknamePlacement",
+                    "LeagueId", "ConferenceId", "DivisionId", "LocationId", "MarketSize",
+                    "FanLoyalty", "Finance1", "Finance2", "Finance3", "Finance4")
+                VALUES (10, 3, 77, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+                INSERT INTO "Players" (
+                    "InternalId", "RecordOrdinal", "ExternalId", "BirthDate", "TeamId",
+                    "Goalie", "LeftDefense", "RightDefense", "LeftWing", "Center", "RightWing",
+                    "PrimaryContractRole", "SupplementaryContractRole", "SerializedRecord")
+                VALUES (9, 0, 0, '2000-01-01', 10, 0, 0, 0, 0, 0, 0, 0, 0, X'00');
+                INSERT INTO "TeamTactics" ("TeamId", "SerializedSettings") VALUES (10, X'00');
+                INSERT INTO "StoredLines" ("LineOrdinal", "Name", "TeamId") VALUES (0, 'Legacy', 10);
+                INSERT INTO "TeamActiveLineSlots" ("TeamId", "Group", "SlotOrdinal", "PlayerInternalId")
+                VALUES (10, 0, 0, NULL);
+                """,
+                cancellationToken);
+
+            await migrator.MigrateAsync(targetMigration: null, cancellationToken: cancellationToken);
+
+            Assert.Equal(3, (await context.Players.SingleAsync(cancellationToken)).TeamRecordOrdinal);
+            Assert.Equal(3, (await context.TeamTactics.SingleAsync(cancellationToken)).TeamRecordOrdinal);
+            Assert.Equal(3, (await context.StoredLines.SingleAsync(cancellationToken)).TeamRecordOrdinal);
+            Assert.Equal(3, (await context.TeamActiveLineSlots.SingleAsync(cancellationToken)).TeamRecordOrdinal);
         }
         finally
         {
@@ -531,6 +771,38 @@ public sealed class FhmSaveSqliteTests
 
         Add(save, new FhmTacticsFile { Version = 1, TacticCount = 1, RecordsOpaque = [6] });
         save.OpaqueFiles.Add(new FhmOpaqueFile("nested/opaque.bin", [10, 20, 30]));
+        return save;
+    }
+
+    private static FhmSave CreateDuplicateTeamIdsSave()
+    {
+        var save = CreateSave();
+        var players = Assert.IsType<FhmPlayersFile>(save.Files["players.dat"]);
+        players.Players.Add(new FhmPlayerRecord
+        {
+            InternalIdentity = 1,
+            ExportedPlayerId = 11,
+            FirstNameId = 1,
+            SurnameId = 1,
+            CommonNameId = FhmNullConstants.Null,
+            BirthDate = new(2001, 1, 1),
+            TeamId = 1,
+            FranchiseId = 1,
+            PrimaryContractRole = new((ushort)FhmPlayingRole.Goalscorer),
+            SupplementaryContractRole = new((ushort)FhmSquadStatus.StarPlayer),
+        });
+
+        var teams = Assert.IsType<FhmTeamsFile>(save.Files["teams.dat"]);
+        var duplicateTeamId = new FhmTeamRecord
+        {
+            RecordIndex = 1,
+            TeamId = 1,
+            AffiliateParentId = FhmNullConstants.Null,
+            AffiliateParentId2 = FhmNullConstants.Null,
+            City = "Duplicate City",
+        };
+        duplicateTeamId.ActiveLines.Lists[(int)FhmLineGroup.EvenStrengthForwards].PlayerReferences.Add(1);
+        teams.Teams.Add(duplicateTeamId);
         return save;
     }
 

@@ -68,6 +68,20 @@ public sealed class FhmNamesFileTests
         Assert.Contains("unread bytes", exception.Message);
     }
 
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(10_000_001)]
+    public void NamesFile_RejectsInvalidMasterNameCountBeforeAllocating(int count)
+    {
+        var bytes = new byte[sizeof(int) * 2];
+        BinaryPrimitives.WriteInt32BigEndian(bytes, 0);
+        BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(sizeof(int)), count);
+
+        var exception = Assert.Throws<FhmFormatException>(() => ReadNames(bytes));
+
+        Assert.Equal($"Invalid names.dat master names count {count}.", exception.Message);
+    }
+
     private static FhmNamesFile ReadNames(byte[] bytes)
     {
         var root = CreateTestRoot();

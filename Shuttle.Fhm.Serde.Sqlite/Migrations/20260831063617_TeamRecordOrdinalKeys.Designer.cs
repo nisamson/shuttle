@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Shuttle.Fhm.Serde.Sqlite;
 
@@ -10,9 +11,11 @@ using Shuttle.Fhm.Serde.Sqlite;
 namespace Shuttle.Fhm.Serde.Sqlite.Migrations
 {
     [DbContext(typeof(FhmSaveSqliteContext))]
-    partial class FhmSaveSqliteContextModelSnapshot : ModelSnapshot
+    [Migration("20260831063617_TeamRecordOrdinalKeys")]
+    partial class TeamRecordOrdinalKeys
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
@@ -293,7 +296,15 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
 
                             t.HasCheckConstraint("CK_Personnel_EvaluatePotential", "EvaluatePotential BETWEEN 0 AND 20");
 
+                            t.HasCheckConstraint("CK_Personnel_GoalieHandlingTendency", "GoalieHandlingTendency BETWEEN 0 AND 4");
+
                             t.HasCheckConstraint("CK_Personnel_IngameTactics", "IngameTactics BETWEEN 0 AND 20");
+
+                            t.HasCheckConstraint("CK_Personnel_InnovationTendency", "InnovationTendency BETWEEN 0 AND 4");
+
+                            t.HasCheckConstraint("CK_Personnel_LineMatchingTendency", "LineMatchingTendency BETWEEN 0 AND 4");
+
+                            t.HasCheckConstraint("CK_Personnel_LoyaltyTendency", "LoyaltyTendency BETWEEN 0 AND 4");
 
                             t.HasCheckConstraint("CK_Personnel_Motivation", "Motivation BETWEEN 0 AND 20");
 
@@ -314,6 +325,8 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
                             t.HasCheckConstraint("CK_Personnel_Tactics", "Tactics BETWEEN 0 AND 20");
 
                             t.HasCheckConstraint("CK_Personnel_TrainerSkill", "TrainerSkill BETWEEN 0 AND 20");
+
+                            t.HasCheckConstraint("CK_Personnel_VeteranPreference", "VeteranPreference BETWEEN 0 AND 4");
                         });
                 });
 

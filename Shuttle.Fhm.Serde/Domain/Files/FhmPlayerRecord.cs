@@ -11,7 +11,7 @@ public sealed class FhmPlayerRecord
     public byte[] ToBytes()
     {
         using var stream = new MemoryStream();
-        FhmPlayersFileSerializer.SerializeRecord(stream, FhmPlayerWireMapper.ToWire(this));
+        FhmPlayersFileSerializer.SerializeRecordValidated(stream, FhmPlayerWireMapper.ToWire(this));
         return stream.ToArray();
     }
 
@@ -21,13 +21,7 @@ public sealed class FhmPlayerRecord
         using var stream = new MemoryStream(bytes.ToArray(), writable: false);
         try
         {
-            var result = FhmPlayerWireMapper.FromWire(FhmPlayersFileSerializer.DeserializeRecord(stream));
-            if (stream.Position != stream.Length)
-            {
-                throw new FhmFormatException($"player record contains unread bytes at offset {stream.Position}.");
-            }
-
-            return result;
+            return FhmPlayerWireMapper.FromWire(FhmPlayersFileSerializer.DeserializeRecordExact(stream));
         }
         catch (InvalidDataException exception)
         {
