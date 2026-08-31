@@ -95,11 +95,11 @@ public sealed class FhmSaveSqliteWriter
             databasePath,
             options,
             sourcePaths.Count,
-            context =>
-            {
-                AddDirectorySourceFiles(context, sourcePaths, options.SourceProgress, cancellationToken);
-                return Task.CompletedTask;
-            },
+            context => AddDirectorySourceFilesAsync(
+                context,
+                sourcePaths,
+                options.SourceProgress,
+                cancellationToken),
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -358,7 +358,7 @@ public sealed class FhmSaveSqliteWriter
             .ToList();
     }
 
-    private static void AddDirectorySourceFiles(
+    private static async Task AddDirectorySourceFilesAsync(
         FhmSaveSqliteContext context,
         IEnumerable<SourcePath> sourcePaths,
         IProgress<FhmSaveReadProgress>? progress,
@@ -366,6 +366,7 @@ public sealed class FhmSaveSqliteWriter
     {
         var teamRecordOrdinalsByRecordIndex = new Dictionary<int, int>();
         var playerTeamRecordOrdinals = new Dictionary<int, int?>();
+        var teamFilesWithDeferredActiveLines = new List<FhmTeamsFile>();
         foreach (var sourcePath in sourcePaths)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -387,6 +388,26 @@ public sealed class FhmSaveSqliteWriter
                 MaximumInlineFileContentLength,
                 chunk => InsertBaselineChunk(context, sourcePath.RelativePath, chunkOrdinal++, chunk));
             progress?.Report(new FhmSaveReadProgress("Decoding", sourcePath.RelativePath));
+            if (sourcePath.RelativePath.Equals("players.dat", StringComparison.OrdinalIgnoreCase))
+            {
+                await BulkInsertAsync(context, cancellationToken).ConfigureAwait(false);
+                await AddStreamedPlayersAsync(
+                    context,
+                    capture,
+                    playerTeamRecordOrdinals,
+                    teamRecordOrdinalsByRecordIndex,
+                    cancellationToken).ConfigureAwait(false);
+                capture.Drain();
+                var playerContent = capture.Complete();
+                if (playerContent.InlineContent is { } inlinePlayerContent)
+                {
+                    UpdateBaselineFileContent(context, sourcePath.RelativePath, inlinePlayerContent);
+                }
+
+                progress?.Report(new FhmSaveReadProgress("Decoded", sourcePath.RelativePath));
+                continue;
+            }
+
             var documented = kind == SaveFileKind.Documented
                 ? FhmSaveFileFactory.TryRead(sourcePath.RelativePath, capture)
                 : null;
@@ -419,6 +440,13 @@ public sealed class FhmSaveSqliteWriter
                     }
                 }
 
+                AddTeams(
+                    context,
+                    teams,
+                    teamRecordOrdinalsByRecordIndex,
+                    includeActiveLineSlots: false);
+                teamFilesWithDeferredActiveLines.Add(teams);
+                continue;
             }
             else if (documented is FhmPlayersFile players)
             {
@@ -442,6 +470,11 @@ public sealed class FhmSaveSqliteWriter
                 documented,
                 playerTeamRecordOrdinals,
                 teamRecordOrdinalsByRecordIndex);
+        }
+
+        foreach (var teams in teamFilesWithDeferredActiveLines)
+        {
+            AddTeamActiveLineSlots(context, teams);
         }
     }
 
@@ -523,8 +556,10 @@ public sealed class FhmSaveSqliteWriter
     }
 
     private static int GetProjectionPriority(string relativePath) =>
-        relativePath.Equals("teams.dat", StringComparison.OrdinalIgnoreCase) ? 0 :
-        relativePath.Equals("players.dat", StringComparison.OrdinalIgnoreCase) ? 1 : 2;
+        relativePath.Equals("names.dat", StringComparison.OrdinalIgnoreCase) ? 0 :
+        relativePath.Equals("player_roles.dat", StringComparison.OrdinalIgnoreCase) ? 1 :
+        relativePath.Equals("teams.dat", StringComparison.OrdinalIgnoreCase) ? 2 :
+        relativePath.Equals("players.dat", StringComparison.OrdinalIgnoreCase) ? 3 : 4;
 
     private static void AddBaselineContent(
         FhmSaveSqliteContext context,
@@ -793,55 +828,93 @@ public sealed class FhmSaveSqliteWriter
     {
         foreach (var (player, ordinal) in file.Players.Select((value, index) => (value, index)))
         {
-            context.Players.Add(new Player
+            AddPlayer(context, player, ordinal, teamRecordOrdinalsByRecordIndex);
+        }
+    }
+
+    private static async Task AddStreamedPlayersAsync(
+        FhmSaveSqliteContext context,
+        Stream source,
+        IDictionary<int, int?> playerTeamRecordOrdinals,
+        IReadOnlyDictionary<int, int> teamRecordOrdinalsByRecordIndex,
+        CancellationToken cancellationToken)
+    {
+        using var reader = new FhmPlayersFileReader(source);
+        var ordinal = 0;
+        foreach (var player in reader)
+        {
+            var teamRecordOrdinal = ResolveTeamRecordOrdinal(
+                player.TeamId,
+                teamRecordOrdinalsByRecordIndex,
+                $"player {player.InternalIdentity}");
+            if (!playerTeamRecordOrdinals.TryAdd(player.InternalIdentity, teamRecordOrdinal))
             {
-                RecordOrdinal = ordinal,
-                InternalId = player.InternalIdentity,
-                ExternalId = player.ExportedPlayerId,
-                FirstNameId = ToNullableReference(player.FirstNameId),
-                SurnameId = ToNullableReference(player.SurnameId),
-                CommonNameId = ToNullableReference(player.CommonNameId),
-                BirthDate = new DateOnly(player.BirthDate.Year, player.BirthDate.Month, player.BirthDate.Day),
-                TeamRecordOrdinal = ResolveTeamRecordOrdinal(
-                    player.TeamId,
-                    teamRecordOrdinalsByRecordIndex,
-                    $"player {player.InternalIdentity}"),
-                FranchiseId = ToNullableReference(player.FranchiseId),
-                PrimaryContractRole = player.PrimaryContractRole.Value,
-                SupplementaryContractRole = player.SupplementaryContractRole.Value,
-                PositionAffinity = new PlayerPositionAffinity
-                {
-                    Goalie = player.PositionRatings.Goalie,
-                    LeftDefense = player.PositionRatings.LeftDefenceman,
-                    RightDefense = player.PositionRatings.RightDefenceman,
-                    LeftWing = player.PositionRatings.LeftWing,
-                    Center = player.PositionRatings.Centre,
-                    RightWing = player.PositionRatings.RightWing,
-                },
-                SerializedRecord = player.ToBytes(),
+                throw new InvalidDataException($"Players file contains duplicate internal identity {player.InternalIdentity}.");
+            }
+
+            AddPlayer(context, player, ordinal++, teamRecordOrdinalsByRecordIndex);
+            if (ordinal % SqliteBulkInsertBatchSize == 0)
+            {
+                await BulkInsertAsync(context, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        await BulkInsertAsync(context, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static void AddPlayer(
+        FhmSaveSqliteContext context,
+        FhmPlayerRecord player,
+        int ordinal,
+        IReadOnlyDictionary<int, int> teamRecordOrdinalsByRecordIndex)
+    {
+        context.Players.Add(new Player
+        {
+            RecordOrdinal = ordinal,
+            InternalId = player.InternalIdentity,
+            ExternalId = player.ExportedPlayerId,
+            FirstNameId = ToNullableReference(player.FirstNameId),
+            SurnameId = ToNullableReference(player.SurnameId),
+            CommonNameId = ToNullableReference(player.CommonNameId),
+            BirthDate = new DateOnly(player.BirthDate.Year, player.BirthDate.Month, player.BirthDate.Day),
+            TeamRecordOrdinal = ResolveTeamRecordOrdinal(
+                player.TeamId,
+                teamRecordOrdinalsByRecordIndex,
+                $"player {player.InternalIdentity}"),
+            FranchiseId = ToNullableReference(player.FranchiseId),
+            PrimaryContractRole = player.PrimaryContractRole.Value,
+            SupplementaryContractRole = player.SupplementaryContractRole.Value,
+            PositionAffinity = new PlayerPositionAffinity
+            {
+                Goalie = player.PositionRatings.Goalie,
+                LeftDefense = player.PositionRatings.LeftDefenceman,
+                RightDefense = player.PositionRatings.RightDefenceman,
+                LeftWing = player.PositionRatings.LeftWing,
+                Center = player.PositionRatings.Centre,
+                RightWing = player.PositionRatings.RightWing,
+            },
+            SerializedRecord = player.ToBytes(),
+        });
+        context.PlayerAttributes.Add(ToPlayerAttributes(player.InternalIdentity, player.RatingAttributes));
+        AddPlayerRoleAssignment(context, player.InternalIdentity, PlayerRoleSlot.Tactical, player.TacticalRole);
+        AddPlayerRoleAssignment(context, player.InternalIdentity, PlayerRoleSlot.SecondaryTactical, player.SecondaryTacticalRole);
+        foreach (var (contract, contractOrdinal) in player.Contracts.Select((value, index) => (value, index)))
+        {
+            context.PlayerContracts.Add(new PlayerContract
+            {
+                PlayerInternalId = player.InternalIdentity,
+                ContractOrdinal = contractOrdinal,
             });
-            context.PlayerAttributes.Add(ToPlayerAttributes(player.InternalIdentity, player.RatingAttributes));
-            AddPlayerRoleAssignment(context, player.InternalIdentity, PlayerRoleSlot.Tactical, player.TacticalRole);
-            AddPlayerRoleAssignment(context, player.InternalIdentity, PlayerRoleSlot.SecondaryTactical, player.SecondaryTacticalRole);
-            foreach (var (contract, contractOrdinal) in player.Contracts.Select((value, index) => (value, index)))
+            foreach (var (salary, yearOrdinal) in contract.Salaries.Select((value, index) => (value, index)))
             {
-                context.PlayerContracts.Add(new PlayerContract
+                context.PlayerContractYears.Add(new PlayerContractYear
                 {
                     PlayerInternalId = player.InternalIdentity,
                     ContractOrdinal = contractOrdinal,
+                    YearNumber = yearOrdinal + 1,
+                    MajorLeagueSalary = salary.MajorLeagueSalary,
+                    MinorLeagueSalary = salary.MinorLeagueSalary,
                 });
-                foreach (var (salary, yearOrdinal) in contract.Salaries.Select((value, index) => (value, index)))
-                {
-                    context.PlayerContractYears.Add(new PlayerContractYear
-                    {
-                        PlayerInternalId = player.InternalIdentity,
-                        ContractOrdinal = contractOrdinal,
-                        YearNumber = yearOrdinal + 1,
-                        MajorLeagueSalary = salary.MajorLeagueSalary,
-                        MinorLeagueSalary = salary.MinorLeagueSalary,
-                    });
-                }
-
             }
         }
     }
@@ -1005,7 +1078,8 @@ public sealed class FhmSaveSqliteWriter
     private static void AddTeams(
         FhmSaveSqliteContext context,
         FhmTeamsFile file,
-        IReadOnlyDictionary<int, int> teamRecordOrdinalsByRecordIndex)
+        IReadOnlyDictionary<int, int> teamRecordOrdinalsByRecordIndex,
+        bool includeActiveLineSlots = true)
     {
         foreach (var (team, ordinal) in file.Teams.Select((value, index) => (value, index)))
         {
@@ -1044,6 +1118,18 @@ public sealed class FhmSaveSqliteWriter
                 TeamRecordOrdinal = ordinal,
                 SerializedSettings = SerializeTeamTactics(team.Tail.Tactics),
             });
+        }
+
+        if (includeActiveLineSlots)
+        {
+            AddTeamActiveLineSlots(context, file);
+        }
+    }
+
+    private static void AddTeamActiveLineSlots(FhmSaveSqliteContext context, FhmTeamsFile file)
+    {
+        foreach (var (team, ordinal) in file.Teams.Select((value, index) => (value, index)))
+        {
             foreach (var line in team.ActiveLines.Lists)
             {
                 foreach (var (playerId, slotOrdinal) in line.PlayerReferences.Select((value, index) => (value, index)))

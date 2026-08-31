@@ -173,6 +173,59 @@ public sealed class FhmSaveSqliteTests
     }
 
     [Fact]
+    public async Task WriteFromDirectoryAsync_StreamsPlayersInBoundedBatches()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var root = CreateTestRoot();
+        try
+        {
+            var source = Path.Combine(root, "source");
+            var destination = Path.Combine(root, "destination");
+            var database = Path.Combine(root, "save.sqlite");
+            var save = CreateSave();
+            var players = Assert.IsType<FhmPlayersFile>(save.Files["players.dat"]);
+            for (var playerId = 1; playerId <= 250; playerId++)
+            {
+                players.Players.Add(new FhmPlayerRecord
+                {
+                    InternalIdentity = playerId,
+                    ExportedPlayerId = playerId + 10,
+                    FirstNameId = 1,
+                    SurnameId = 1,
+                    CommonNameId = FhmNullConstants.Null,
+                    BirthDate = new(2000, 1, 1),
+                    TeamId = 0,
+                    FranchiseId = 1,
+                    PrimaryContractRole = new((ushort)FhmPlayingRole.Goalscorer),
+                    SupplementaryContractRole = new((ushort)FhmSquadStatus.StarPlayer),
+                });
+            }
+
+            new FhmSaveWriter().Write(save, source);
+            await new FhmSaveSqliteWriter().WriteFromDirectoryAsync(source, database, cancellationToken);
+
+            await using (var context = new FhmSaveSqliteContext(FhmSaveSqliteContext.CreateOptions(database)))
+            {
+                var storedPlayers = await context.Players
+                    .OrderBy(player => player.RecordOrdinal)
+                    .ToListAsync(cancellationToken);
+                Assert.Equal(251, storedPlayers.Count);
+                Assert.Equal(Enumerable.Range(0, 251), storedPlayers.Select(player => player.RecordOrdinal));
+                Assert.All(storedPlayers, player => Assert.Equal(0, player.TeamRecordOrdinal));
+            }
+
+            new FhmSaveWriter().Write(
+                await new FhmSaveSqliteReader().ReadAsync(database, cancellationToken),
+                destination);
+            AssertFoldersEqual(source, destination);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task WriteAsync_StoresPlayerTacticalRolesAsInGameRoleEnums()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
