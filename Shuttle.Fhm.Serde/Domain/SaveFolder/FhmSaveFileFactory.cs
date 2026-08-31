@@ -54,4 +54,8 @@ internal static class FhmSaveFileFactory
 
     /// <summary>Normalizes and validates a relative save-file path.</summary>
     public static string NormalizeRelativePath(string relativePath) => FhmSavePath.NormalizeRelativePath(relativePath);
+
+    /// <summary>Normalizes and resolves a save-file path beneath a save-folder root.</summary>
+    public static string ResolvePath(string root, string relativePath) =>
+        FhmSavePath.Resolve(root, FhmSavePath.NormalizeRelativePath(relativePath));
 }

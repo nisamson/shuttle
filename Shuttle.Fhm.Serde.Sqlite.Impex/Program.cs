@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Shuttle.Fhm.Serde.Domain.SaveFolder;
@@ -98,7 +97,7 @@ var exportOutputOption = new Option<DirectoryInfo>("--output", "-o")
 
 var exportTimingsOption = new Option<bool>("--timings")
 {
-    Description = "Print elapsed time for database reconstruction and save-folder writing.",
+    Description = "Print elapsed time for direct SQLite export phases.",
 };
 
 var exportCommand = new Command("export", "Create an FHM 10 save folder from a SQLite adapter database.")
@@ -122,19 +121,17 @@ exportCommand.SetAction(async (parseResult, cancellationToken) =>
 
     try
     {
-        var elapsed = Stopwatch.StartNew();
-        var save = await new FhmSaveSqliteReader().ReadAsync(source.FullName, cancellationToken);
-        if (timings)
-        {
-            Console.WriteLine($"Database reconstruction: {elapsed.Elapsed}");
-            elapsed.Restart();
-        }
-
-        new FhmSaveWriter().Write(save, output.FullName);
-        if (timings)
-        {
-            Console.WriteLine($"Save-folder write: {elapsed.Elapsed}");
-        }
+        await new FhmSaveSqliteReader().ExportAsync(
+            source.FullName,
+            output.FullName,
+            new FhmSaveSqliteExportOptions
+            {
+                Progress = timings
+                    ? new Progress<FhmSaveSqliteExportProgress>(progress =>
+                        Console.WriteLine($"{progress.Phase}: {progress.Elapsed}"))
+                    : null,
+            },
+            cancellationToken);
 
         Console.WriteLine($"Created FHM save folder: {output.FullName}");
         return 0;

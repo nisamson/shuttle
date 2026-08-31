@@ -173,6 +173,99 @@ public sealed class FhmSaveSqliteTests
     }
 
     [Fact]
+    public async Task ExportAsync_StreamsBaselineAndAppliesDocumentedEntities()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var root = CreateTestRoot();
+        try
+        {
+            var database = Path.Combine(root, "save.sqlite");
+            var materializedDestination = Path.Combine(root, "materialized");
+            var streamedDestination = Path.Combine(root, "streamed");
+            await new FhmSaveSqliteWriter().WriteAsync(CreateSave(), database, cancellationToken);
+            await using (var context = new FhmSaveSqliteContext(FhmSaveSqliteContext.CreateOptions(database)))
+            {
+                await context.Database.ExecuteSqlRawAsync(
+                    "UPDATE Names SET Text = 'Streamed Name'; UPDATE Players SET ExternalId = 99;",
+                    cancellationToken);
+                context.Files.AddRange(
+                    new SaveFile
+                    {
+                        RelativePath = "opaque-inline.bin",
+                        Kind = SaveFileKind.Opaque,
+                        Content = [1, 2, 3],
+                    },
+                    new SaveFile
+                    {
+                        RelativePath = "nested/opaque-chunked.bin",
+                        Kind = SaveFileKind.Opaque,
+                        Content = [],
+                    },
+                    new SaveFile
+                    {
+                        RelativePath = "graphics/logo.png",
+                        Kind = SaveFileKind.Opaque,
+                        Content = [4],
+                    },
+                    new SaveFile
+                    {
+                        RelativePath = "import_export/bundle.zip",
+                        Kind = SaveFileKind.Opaque,
+                        Content = [5],
+                    },
+                    new SaveFile
+                    {
+                        RelativePath = "rs_one/restore.dat",
+                        Kind = SaveFileKind.Opaque,
+                        Content = [6],
+                    });
+                context.FileChunks.AddRange(
+                    new SaveFileChunk
+                    {
+                        RelativePath = "nested/opaque-chunked.bin",
+                        Ordinal = 0,
+                        Content = [7, 8],
+                    },
+                    new SaveFileChunk
+                    {
+                        RelativePath = "nested/opaque-chunked.bin",
+                        Ordinal = 1,
+                        Content = [9, 10],
+                    });
+                await context.SaveChangesAsync(cancellationToken);
+                await context.Database.ExecuteSqlRawAsync(
+                    "UPDATE SaveManifest SET SourceFileCount = SourceFileCount + 5;",
+                    cancellationToken);
+            }
+
+            var reader = new FhmSaveSqliteReader();
+            new FhmSaveWriter().Write(
+                await reader.ReadAsync(database, cancellationToken),
+                materializedDestination);
+
+            await reader.ExportAsync(database, streamedDestination, cancellationToken);
+
+            AssertFoldersEqual(materializedDestination, streamedDestination);
+            var reloaded = new FhmSaveReader().Read(streamedDestination);
+            Assert.Equal("Streamed Name", Assert.IsType<FhmNamesFile>(reloaded.Files["names.dat"]).MasterNames[0].Text);
+            Assert.Equal(99, Assert.Single(Assert.IsType<FhmPlayersFile>(reloaded.Files["players.dat"]).Players).ExportedPlayerId);
+            Assert.Equal(
+                [1, 2, 3],
+                Assert.Single(reloaded.OpaqueFiles, file => file.RelativePath == "opaque-inline.bin").Content);
+            Assert.Equal(
+                [7, 8, 9, 10],
+                Assert.Single(reloaded.OpaqueFiles, file => file.RelativePath == "nested/opaque-chunked.bin").Content);
+            Assert.False(File.Exists(Path.Combine(streamedDestination, "graphics", "logo.png")));
+            Assert.False(File.Exists(Path.Combine(streamedDestination, "import_export", "bundle.zip")));
+            Assert.False(File.Exists(Path.Combine(streamedDestination, "rs_one", "restore.dat")));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task WriteFromDirectoryAsync_StreamsPlayersInBoundedBatches()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

@@ -18,8 +18,9 @@ await new FhmSaveSqliteWriter().WriteFromDirectoryAsync(
     @"C:\work\example.sqlite");
 
 // Edit the projection tables through FhmSaveSqliteContext or SQLite tooling.
-var exported = await new FhmSaveSqliteReader().ReadAsync(@"C:\work\example.sqlite");
-new FhmSaveWriter().Write(exported, @"C:\saves\Example-copy.lg");
+await new FhmSaveSqliteReader().ExportAsync(
+    @"C:\work\example.sqlite",
+    @"C:\saves\Example-copy.lg");
 ```
 
 The writer refuses to replace a database by default. To explicitly replace
@@ -30,10 +31,12 @@ returning a context; the reader and writer do the same.
 Every source file is retained in `SaveFiles` as an exact baseline blob. Large
 files use ordered `SaveFileChunks`; `WriteFromDirectoryAsync` streams each
 chunk directly into SQLite, so unsupported large files are not retained as
-`FhmOpaqueFile` byte arrays during import. An
-unedited import/export returns raw documented content as well as opaque files,
-so a folder round trip is byte-equivalent. Export materializes a documented
-file only when an editable projection changed.
+`FhmOpaqueFile` byte arrays during import. `ExportAsync` streams opaque
+content from SQLite directly to the destination and reconstructs documented
+files one at a time. An unedited import/export returns raw documented content
+as well as opaque files, so a folder round trip is byte-equivalent.
+`ReadAsync` remains available for callers that require an in-memory
+`FhmSave`.
 
 Editable projections cover `names.dat`, player profiles/rating vectors,
 team top-level fields and embedded tactical settings, fixed-order game

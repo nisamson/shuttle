@@ -31,8 +31,10 @@ dotnet run --project Shuttle.Fhm.Serde.Sqlite.Impex -- `
 ```
 
 The export command will not replace files in a non-empty destination folder.
-Pass `--timings` to print the elapsed database reconstruction and save-folder
-write phases.
+It streams retained baseline content directly from SQLite to the destination
+and reconstructs only one documented file at a time for editable projections.
+Pass `--timings` to print the elapsed SQLite validation, baseline streaming,
+and documented-file reconstruction/write phases.
 
 Write a human-readable JSON report for a team:
 
