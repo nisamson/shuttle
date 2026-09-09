@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Buffers.Binary;
 using Shuttle.Fhm.Serde.Domain.Binary;
 
@@ -85,11 +86,15 @@ public enum FhmLoyaltyTendency : ushort
     VeryLoyal = 4,
 }
 
+/// <summary>The fixed header that precedes records in a <c>personal.dat</c> file.</summary>
+public readonly record struct FhmPersonnelFileHeader(int Version, int RecordCount);
+
 /// <summary>A lossless <c>personal.dat</c> model with editable verified fields.</summary>
 public sealed class FhmPersonnelFile : IFhmSaveFile
 {
-    private const int HeaderLength = 8;
-    private const int MinimumRecordLength = 0x135;
+    internal const int HeaderLength = 8;
+    internal const int CurrentVersion = 35;
+    internal const int MaximumRecordCount = FhmPlayerWireMapper.MaximumCollectionCount;
     private readonly byte[] sourceContent;
     private readonly HashSet<int> sourcePersonnelIds;
 
@@ -102,7 +107,10 @@ public sealed class FhmPersonnelFile : IFhmSaveFile
 
     public string RelativePath => "personal.dat";
     public int Version => ReadInt32(sourceContent, 0);
-    public int NextPersonnelId => ReadInt32(sourceContent, 4);
+    /// <summary>Gets the serialized personnel-record count.</summary>
+    public int RecordCount => ReadInt32(sourceContent, 4);
+    /// <summary>Gets the serialized personnel-record count.</summary>
+    public int NextPersonnelId => RecordCount;
     public IList<FhmPersonnelRecord> Records { get; }
 
     public static FhmPersonnelFile Read(Stream stream)
@@ -111,46 +119,68 @@ public sealed class FhmPersonnelFile : IFhmSaveFile
         using var buffer = new MemoryStream();
         stream.CopyTo(buffer);
         var content = buffer.ToArray();
+        var header = ReadAndValidateHeader(content);
+
+        var boundaryReader = new PersonnelRecordBoundaryReader(content, HeaderLength);
+        var records = new List<FhmPersonnelRecord>(header.RecordCount);
+        for (var recordOrdinal = 0; recordOrdinal < header.RecordCount; recordOrdinal++)
+        {
+            var start = checked((int)boundaryReader.Offset);
+            boundaryReader.AdvanceRecord(header.Version, recordOrdinal);
+            records.Add(CreateRecord(content, start, checked((int)boundaryReader.Offset - start)));
+        }
+
+        if (boundaryReader.Offset != content.Length)
+        {
+            throw new FhmFormatException(
+                $"personal.dat contains {content.Length - boundaryReader.Offset} unread bytes after {header.RecordCount} records at offset 0x{boundaryReader.Offset:X}.");
+        }
+
+        return new FhmPersonnelFile(content, records);
+    }
+
+    internal static FhmPersonnelFileHeader ReadAndValidateHeader(Stream stream)
+    {
+        var header = new byte[HeaderLength];
+        var bytesRead = 0;
+        while (bytesRead < header.Length)
+        {
+            var count = stream.Read(header, bytesRead, header.Length - bytesRead);
+            if (count == 0)
+            {
+                throw new FhmFormatException("personal.dat is shorter than its 8-byte header.");
+            }
+
+            bytesRead += count;
+        }
+
+        return ReadAndValidateHeader(header);
+    }
+
+    private static FhmPersonnelFileHeader ReadAndValidateHeader(byte[] content)
+    {
         if (content.Length < HeaderLength)
         {
             throw new FhmFormatException("personal.dat is shorter than its 8-byte header.");
         }
 
-        var nextPersonnelId = ReadInt32(content, 4);
-        if (nextPersonnelId < 0 || nextPersonnelId > FhmPlayerWireMapper.MaximumCollectionCount)
+        var version = ReadInt32(content, 0);
+        if (version < 0 || version > CurrentVersion)
         {
-            throw new FhmFormatException($"Invalid personal.dat next personnel ID {nextPersonnelId}.");
+            throw new FhmFormatException(
+                $"Unsupported personal.dat version {version}. Supported versions are 0 through {CurrentVersion}.");
         }
 
-        var startsById = new Dictionary<int, int>();
-        for (var offset = HeaderLength; offset <= content.Length - MinimumRecordLength; offset++)
+        var recordCount = ReadInt32(content, sizeof(int));
+        if (recordCount < 0 || recordCount > MaximumRecordCount)
         {
-            if (!IsRecordCandidate(content, offset, nextPersonnelId))
-            {
-                continue;
-            }
-
-            var personnelId = ReadInt32(content, offset + FhmPersonnelRecord.PersonnelIdOffset);
-            startsById.TryAdd(personnelId, offset);
+            throw new FhmFormatException($"Invalid personal.dat record count {recordCount}.");
         }
 
-        if (startsById.Count == 0 && nextPersonnelId != 0)
-        {
-            throw new FhmFormatException("personal.dat does not expose any personnel records.");
-        }
-
-        var starts = startsById.Values.Order().ToArray();
-        var records = starts
-            .Select((start, index) => CreateRecord(
-                content,
-                start,
-                (index + 1 < starts.Length ? starts[index + 1] : content.Length) - start))
-            .OrderBy(record => record.PersonnelId)
-            .ToList();
-        return new FhmPersonnelFile(content, records);
+        return new(version, recordCount);
     }
 
-    private static FhmPersonnelRecord CreateRecord(byte[] content, int start, int length)
+    internal static FhmPersonnelRecord CreateRecord(byte[] content, int start, int length)
     {
         try
         {
@@ -180,20 +210,514 @@ public sealed class FhmPersonnelFile : IFhmSaveFile
         stream.Write(output);
     }
 
-    private static bool IsRecordCandidate(byte[] content, int offset, int nextPersonnelId)
+    internal sealed class PersonnelRecordBoundaryReader : IDisposable
     {
-        var birthYear = ReadInt32(content, offset + FhmPersonnelRecord.BirthDateOffset);
-        var personnelId = ReadInt32(content, offset + FhmPersonnelRecord.PersonnelIdOffset);
-        var teamRecordIndex = ReadInt32(content, offset + FhmPersonnelRecord.TeamRecordIndexOffset);
-        var job = content[offset + FhmPersonnelRecord.JobOffset];
-        var retired = content[offset + FhmPersonnelRecord.RetiredOffset];
-        return ReadInt32(content, offset + 0x20) == -1
-            && birthYear is >= 1800 and <= 2200
-            && personnelId >= 0
-            && personnelId < nextPersonnelId
-            && teamRecordIndex >= -1
-            && Enum.IsDefined((FhmPersonnelJob)job)
-            && retired is 0 or 1 or byte.MaxValue;
+        private readonly byte[]? content;
+        private readonly Stream? source;
+        private readonly MemoryStream? recordContent;
+        private int recordOrdinal;
+
+        public PersonnelRecordBoundaryReader(byte[] content, int offset)
+        {
+            this.content = content;
+            Offset = offset;
+        }
+
+        public PersonnelRecordBoundaryReader(Stream source, long offset)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            this.source = source;
+            recordContent = new MemoryStream();
+            Offset = offset;
+        }
+
+        public long Offset { get; private set; }
+
+        public byte[] GetRecordBytes() =>
+            recordContent?.ToArray() ??
+            throw new InvalidOperationException("Record bytes are available only when reading from a stream.");
+
+        public void Dispose() => recordContent?.Dispose();
+
+        public void AdvanceRecord(int version, int ordinal)
+        {
+            recordOrdinal = ordinal;
+            recordContent?.SetLength(0);
+
+            ReadInt32("first name ID");
+            ReadInt32("surname ID");
+            ReadInt32("nickname ID");
+            ReadInt32("birth year");
+            ReadInt32("birth month");
+            ReadInt32("birth day");
+            ReadUInt16("nationality");
+            ReadUInt16("unknown field at native +0x6A");
+            ReadInt32("birth city ID");
+            ReadInt32("native +0x74");
+            ReadInt32("team record index");
+            ReadInt32("native +0x80");
+            ReadInt32("personnel ID");
+            ReadInt32("native +0x5C");
+            ReadQString("native +0x260");
+            ReadInt32("native +0x268");
+            ReadBoolean("native +0x26C");
+            ReadUInt16("native +0x26E");
+            ReadInt32("native +0x88");
+            ReadBoolean("native +0x270");
+            ReadBoolean("native +0x271");
+            ReadPersonnelReferenceList("native +0x118");
+
+            ReadBoolean("native +0x1F4");
+            ReadUInt16("native +0x1F6");
+            ReadUInt16("native +0x1FA");
+            ReadUInt16("native +0x23C");
+            if (version < 4)
+            {
+                ReadUInt16("legacy version < 4 field after native +0x23C");
+            }
+
+            ReadUInt16("native +0x1FC");
+            ReadUInt16("native +0x23E");
+            ReadUInt16("native +0x202");
+            ReadUInt16("native +0x204");
+            ReadUInt16("native +0x206");
+            ReadUInt16("native +0x208");
+            if (version < 4)
+            {
+                ReadUInt16("legacy version < 4 field after native +0x208");
+            }
+
+            ReadUInt16("native +0x218");
+            ReadUInt16("native +0x21A");
+            if (version < 4)
+            {
+                ReadUInt16("legacy version < 4 field 1 after native +0x21A");
+                ReadUInt16("legacy version < 4 field 2 after native +0x21A");
+                ReadUInt16("legacy version < 4 field 3 after native +0x21A");
+            }
+
+            ReadUInt16("native +0xCA");
+            ReadQDate("native +0xD0");
+            ReadUInt16("native +0x15A");
+            ReadUInt16("native +0x226");
+            ReadInt32("native +0x274");
+            ReadInt32("native +0x278");
+            ReadSub38List();
+
+            ReadBoolean("native +0x289");
+            ReadBoolean("native +0x122");
+            ReadBoolean("native +0x123");
+            ReadBoolean("native +0x124");
+            ReadBoolean("native +0x126");
+            ReadBoolean("native +0x128");
+            ReadBoolean("native +0x127");
+            if (version > 34)
+            {
+                ReadBoolean("native +0x125");
+            }
+
+            ReadInt32("native +0x12C first value");
+            ReadInt32("native +0x130");
+            ReadBooleans(8, "native +0x140 through +0x147");
+            if (version > 22)
+            {
+                ReadBoolean("native +0x148");
+            }
+
+            if (version > 27)
+            {
+                ReadBoolean("native +0x14A");
+            }
+
+            if (version > 24)
+            {
+                ReadBoolean("native +0x149");
+            }
+
+            if (version > 31)
+            {
+                ReadBoolean("native +0x14B");
+            }
+
+            ReadUInt16("native +0x15E");
+            ReadUInt16("native +0x168");
+            ReadInt32("native +0x178");
+            ReadUInt16("native +0x17C");
+            ReadUInt16("native +0x17E");
+            ReadUInt16("native +0x188");
+            ReadInt32("native +0x184");
+            ReadBoolean("native +0x180");
+            ReadUInt16("native +0x18A");
+            ReadFixedList("native +0x190 integer list", sizeof(int));
+            ReadInt32("native +0x198");
+            ReadInt32("native +0x19C");
+            if (version > 23)
+            {
+                ReadInt32("native +0x1A0");
+            }
+
+            ReadUInt16("native +0xC8");
+            ReadFixedList("native +0xC0 double list", sizeof(double));
+            ReadPersonnelReferenceList("native +0xD8");
+            ReadBoolean("native +0x1A4");
+            ReadUInt16("native +0x1F8");
+            ReadInt32("native +0x1A8");
+            ReadSub21List(version);
+            ReadBoolean("native +0x1BE");
+            ReadQString(version < 30 ? "native +0x1C0 account" : "native +0x1C0 encoded account");
+            ReadUInt16("native +0x20A");
+            ReadUInt16("native +0x20C");
+            ReadUInt16("native +0x20E");
+            ReadByte("native +0x3C");
+            ReadByte("native +0x48");
+            ReadBoolean("native +0x4C");
+            ReadByte("native +0x8C");
+            ReadUInt16("native +0x1C8");
+            ReadUInt16("native +0x1CA");
+            ReadPersonnelReferenceList("native +0xE0");
+            ReadFixedList("native +0x1D0 ushort list", sizeof(ushort));
+            ReadUInt16("native +0x1BC");
+            ReadQDate("native +0x150");
+            ReadFixedList("native +0x1D8 integer list", sizeof(int));
+            ReadUInt16("native +0x1E0");
+            ReadInt32("native +0x1E4");
+            ReadIdAndBooleanList("native +0xA0", version);
+
+            ReadUInt16("native +0x210");
+            if (version > 0)
+            {
+                ReadBooleans(4, "native +0x14C through +0x14F");
+            }
+
+            if (version == 2)
+            {
+                ReadBoolean("version 2 obsolete field");
+            }
+            else if (version > 1)
+            {
+                ReadInt32("native +0x1F0");
+            }
+
+            if (version > 3)
+            {
+                ReadUInt16s(6, "version > 3 fields");
+            }
+
+            if (version > 4)
+            {
+                ReadInt32("native +0x228");
+            }
+
+            if (version > 6)
+            {
+                ReadIdAndBooleanList("native +0xA8", version);
+            }
+
+            if (version > 7)
+            {
+                ReadStringPersonnelReferenceList("native +0x98");
+            }
+
+            if (version > 8)
+            {
+                ReadBoolean("native +0x22C");
+                ReadUInt16s(5, "native +0x22E through +0x236");
+            }
+
+            if (version > 9)
+            {
+                ReadCurrentIdAndBooleanList("native +0xB0");
+            }
+
+            if (version > 10)
+            {
+                ReadBoolean("native +0x238");
+            }
+
+            if (version > 11)
+            {
+                ReadUInt16("native +0x23A");
+            }
+
+            if (version > 12)
+            {
+                ReadBoolean("native +0x129");
+                ReadInt32("native +0x12C replacement value");
+            }
+
+            if (version > 13)
+            {
+                ReadInt32("native +0x134");
+            }
+
+            ReadInt32("native +0x1B4");
+            ReadInt32("native +0x1B8");
+            ReadInt16("native +0x90");
+            ReadInt16("native +0x92");
+            ReadInt16("native +0x94");
+            ReadFixedList("native +0x28 byte-pair list", 2);
+            ReadInt32("native +0x30 first value");
+            ReadInt32("native +0x30 second value");
+            ReadPersonnelReferenceList("native +0x1E8 mixed reference list");
+            ReadInt16s(5, "personality tendencies");
+
+            if (version > 16)
+            {
+                ReadDouble("native +0x138");
+            }
+
+            if (version > 17)
+            {
+                ReadInt32("native +0x244");
+                ReadInt32("native +0x248");
+                ReadUInt16s(6, "native +0x24C through +0x15C");
+            }
+
+            if (version == 19)
+            {
+                ReadUInt16s(10, "version 19 obsolete fields");
+            }
+
+            if (version > 20)
+            {
+                ReadInt32("native +0x16C");
+                ReadUInt16("native +0x170");
+            }
+
+            if (version > 21)
+            {
+                ReadBoolean("native +0x256");
+            }
+
+            if (version > 28)
+            {
+                ReadInt32("native +0x174");
+            }
+
+            if (version > 30)
+            {
+                ReadBoolean("native +0x257");
+            }
+
+            if (version > 32)
+            {
+                ReadByte("native +0x4D");
+                ReadBoolean("native +0x258");
+            }
+
+            if (version > 33)
+            {
+                ReadInt32("native +0xE8");
+            }
+        }
+
+        private void ReadSub38List()
+        {
+            var count = ReadCount("native +0x280 record list");
+            for (var index = 0; index < count; index++)
+            {
+                ReadInt32($"native +0x280 item {index} field 1");
+                ReadInt32($"native +0x280 item {index} field 2");
+                ReadQString($"native +0x280 item {index} text");
+                ReadUInt16s(14, $"native +0x280 item {index} ushort fields");
+                ReadInt32($"native +0x280 item {index} final field");
+            }
+        }
+
+        private void ReadSub21List(int version)
+        {
+            var count = ReadCount("native +0x110 record list");
+            for (var index = 0; index < count; index++)
+            {
+                ReadUInt16s(5, $"native +0x110 item {index} initial ushort fields");
+                ReadInt32($"native +0x110 item {index} integer field");
+                ReadBooleans(3, $"native +0x110 item {index} boolean fields");
+                ReadUInt16($"native +0x110 item {index} ushort field");
+                if (version < 5)
+                {
+                    ReadUInt16($"native +0x110 item {index} legacy version < 5 field");
+                }
+
+                ReadUInt16s(7, $"native +0x110 item {index} final ushort fields");
+            }
+        }
+
+        private void ReadIdAndBooleanList(string field, int version)
+        {
+            var count = ReadCount($"{field} record list");
+            for (var index = 0; index < count; index++)
+            {
+                if (version < 10)
+                {
+                    ReadInt32($"{field} item {index} legacy field 1");
+                    ReadInt32($"{field} item {index} legacy field 2");
+                }
+                else
+                {
+                    ReadIdAndEightBooleans($"{field} item {index}");
+                }
+            }
+        }
+
+        private void ReadCurrentIdAndBooleanList(string field)
+        {
+            var count = ReadCount($"{field} record list");
+            for (var index = 0; index < count; index++)
+            {
+                ReadIdAndEightBooleans($"{field} item {index}");
+            }
+        }
+
+        private void ReadIdAndEightBooleans(string field)
+        {
+            ReadInt32($"{field} ID");
+            ReadBooleans(8, $"{field} boolean fields");
+        }
+
+        private void ReadStringPersonnelReferenceList(string field)
+        {
+            var count = ReadCount($"{field} record list");
+            for (var index = 0; index < count; index++)
+            {
+                ReadQString($"{field} item {index} text");
+                ReadPersonnelReferenceList($"{field} item {index} personnel references");
+            }
+        }
+
+        private void ReadPersonnelReferenceList(string field) =>
+            ReadFixedList(field, sizeof(int));
+
+        private void ReadFixedList(string field, int itemLength)
+        {
+            var count = ReadCount(field);
+            Skip((long)count * itemLength, $"{field} items");
+        }
+
+        private int ReadCount(string field)
+        {
+            var fieldOffset = Offset;
+            var count = ReadInt32(field);
+            if (count < 0 || count > MaximumRecordCount)
+            {
+                throw new FhmFormatException(
+                    $"Invalid {field} count {count} in personal.dat record {recordOrdinal + 1} at offset 0x{fieldOffset:X}.");
+            }
+
+            return count;
+        }
+
+        private void ReadQString(string field)
+        {
+            var byteLength = ReadUInt32($"{field} byte length");
+            if (byteLength != uint.MaxValue)
+            {
+                Skip(byteLength, $"{field} payload");
+            }
+        }
+
+        private void ReadQDate(string field) => Skip(sizeof(long), field);
+        private void ReadDouble(string field) => Skip(sizeof(double), field);
+        private void ReadInt16(string field) => Skip(sizeof(short), field);
+        private void ReadUInt16(string field) => Skip(sizeof(ushort), field);
+        private void ReadByte(string field) => Skip(sizeof(byte), field);
+        private void ReadBoolean(string field) => Skip(sizeof(byte), field);
+        private void ReadUInt16s(int count, string field) => Skip((long)count * sizeof(ushort), field);
+        private void ReadInt16s(int count, string field) => Skip((long)count * sizeof(short), field);
+        private void ReadBooleans(int count, string field) => Skip((long)count * sizeof(byte), field);
+
+        private int ReadInt32(string field)
+        {
+            Span<byte> bytes = stackalloc byte[sizeof(int)];
+            ReadBytes(bytes, field);
+            var value = BinaryPrimitives.ReadInt32BigEndian(bytes);
+            return value;
+        }
+
+        private uint ReadUInt32(string field)
+        {
+            Span<byte> bytes = stackalloc byte[sizeof(uint)];
+            ReadBytes(bytes, field);
+            var value = BinaryPrimitives.ReadUInt32BigEndian(bytes);
+            return value;
+        }
+
+        private void Skip(long length, string field)
+        {
+            if (length > int.MaxValue)
+            {
+                throw new FhmFormatException(
+                    $"{field} in personal.dat record {recordOrdinal + 1} at offset 0x{Offset:X} is too large ({length} bytes).");
+            }
+
+            if (length == 0)
+            {
+                return;
+            }
+
+            if (content is not null)
+            {
+                EnsureAvailable((int)length, field);
+                Offset += (int)length;
+                return;
+            }
+
+            var buffer = ArrayPool<byte>.Shared.Rent(Math.Min((int)length, 64 * 1024));
+            try
+            {
+                var remaining = (int)length;
+                var bytesRead = 0;
+                while (remaining > 0)
+                {
+                    var chunkLength = Math.Min(remaining, buffer.Length);
+                    ReadBytes(buffer.AsSpan(0, chunkLength), field, (int)length, bytesRead);
+                    remaining -= chunkLength;
+                    bytesRead += chunkLength;
+                }
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
+        }
+
+        private void EnsureAvailable(int length, string field)
+        {
+            if (content is not null && content.Length - Offset < length)
+            {
+                throw new FhmFormatException(
+                    $"Truncated personal.dat record {recordOrdinal + 1} at offset 0x{Offset:X} while reading {field}: requires {length} bytes but only {content.Length - Offset} remain.");
+            }
+        }
+
+        private void ReadBytes(Span<byte> destination, string field) =>
+            ReadBytes(destination, field, destination.Length, 0);
+
+        private void ReadBytes(Span<byte> destination, string field, int fieldLength, int bytesPreviouslyRead)
+        {
+            if (content is not null)
+            {
+                EnsureAvailable(destination.Length, field);
+                content.AsSpan(checked((int)Offset), destination.Length).CopyTo(destination);
+                Offset += destination.Length;
+                return;
+            }
+
+            var totalRead = 0;
+            while (totalRead < destination.Length)
+            {
+                var count = source!.Read(destination[totalRead..]);
+                if (count == 0)
+                {
+                    throw new FhmFormatException(
+                        $"Truncated personal.dat record {recordOrdinal + 1} at offset 0x{Offset:X} while reading {field}: requires {fieldLength} bytes but only {bytesPreviouslyRead + totalRead} remain.");
+                }
+
+                recordContent!.Write(destination.Slice(totalRead, count));
+                totalRead += count;
+            }
+
+            Offset += destination.Length;
+        }
     }
 
     internal static int ReadInt32(byte[] content, int offset) =>
@@ -207,6 +731,92 @@ public sealed class FhmPersonnelFile : IFhmSaveFile
 
     internal static void WriteUInt16(byte[] content, int offset, ushort value) =>
         BinaryPrimitives.WriteUInt16BigEndian(content.AsSpan(offset, sizeof(ushort)), value);
+}
+
+/// <summary>Streams validated <c>personal.dat</c> records in serialized order.</summary>
+/// <remarks>
+/// The caller owns the source stream and must keep it open for the entire enumeration. Disposing this reader does
+/// not dispose the source stream. A reader may be enumerated exactly once.
+/// </remarks>
+public sealed class FhmPersonnelFileReader : IEnumerable<FhmPersonnelRecord>, IDisposable
+{
+    private readonly Stream source;
+    private readonly FhmPersonnelFile.PersonnelRecordBoundaryReader boundaryReader;
+    private bool enumerationStarted;
+    private bool disposed;
+
+    /// <summary>Initializes a reader over a caller-owned <c>personal.dat</c> stream.</summary>
+    public FhmPersonnelFileReader(Stream source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (!source.CanRead)
+        {
+            throw new ArgumentException("The source stream must be readable.", nameof(source));
+        }
+
+        this.source = source;
+        Header = FhmPersonnelFile.ReadAndValidateHeader(source);
+        boundaryReader = new(source, FhmPersonnelFile.HeaderLength);
+    }
+
+    /// <summary>Gets the validated file header.</summary>
+    public FhmPersonnelFileHeader Header { get; }
+
+    /// <summary>Gets the validated personnel format version.</summary>
+    public int Version => Header.Version;
+
+    /// <summary>Gets the validated number of records available from this reader.</summary>
+    public int RecordCount => Header.RecordCount;
+
+    /// <inheritdoc />
+    public IEnumerator<FhmPersonnelRecord> GetEnumerator()
+    {
+        ThrowIfDisposed();
+        if (enumerationStarted)
+        {
+            throw new InvalidOperationException("A FhmPersonnelFileReader can be enumerated only once.");
+        }
+
+        enumerationStarted = true;
+        return EnumerateRecords().GetEnumerator();
+    }
+
+    /// <inheritdoc />
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (!disposed)
+        {
+            disposed = true;
+            boundaryReader.Dispose();
+        }
+    }
+
+    private IEnumerable<FhmPersonnelRecord> EnumerateRecords()
+    {
+        for (var ordinal = 0; ordinal < RecordCount; ordinal++)
+        {
+            boundaryReader.AdvanceRecord(Version, ordinal);
+            var content = boundaryReader.GetRecordBytes();
+            yield return FhmPersonnelFile.CreateRecord(content, 0, content.Length);
+        }
+
+        long unreadByteCount = 0;
+        while (source.ReadByte() != -1)
+        {
+            unreadByteCount++;
+        }
+
+        if (unreadByteCount > 0)
+        {
+            throw new FhmFormatException(
+                $"personal.dat contains {unreadByteCount} unread bytes after {RecordCount} records at offset 0x{boundaryReader.Offset:X}.");
+        }
+    }
+
+    private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(disposed, this);
 }
 
 /// <summary>One editable personnel record retained inside its original opaque framing.</summary>

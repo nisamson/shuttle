@@ -1,5 +1,23 @@
 namespace Shuttle.Fhm.Serde.Domain.SaveFolder;
 
+/// <summary>Identifies FHM save-folder paths that are not part of the save-data editing boundary.</summary>
+public static class FhmSaveAuxiliaryPaths
+{
+    /// <summary>Gets whether a normalized relative path belongs to an ignored auxiliary directory.</summary>
+    public static bool IsIgnored(string normalizedRelativePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(normalizedRelativePath);
+        var separatorIndex = normalizedRelativePath.IndexOf('/');
+        var topLevelDirectory = separatorIndex < 0
+            ? normalizedRelativePath
+            : normalizedRelativePath[..separatorIndex];
+
+        return topLevelDirectory.Equals("graphics", StringComparison.OrdinalIgnoreCase) ||
+            topLevelDirectory.Equals("import_export", StringComparison.OrdinalIgnoreCase) ||
+            topLevelDirectory.StartsWith("rs", StringComparison.OrdinalIgnoreCase);
+    }
+}
+
 internal static class FhmSavePath
 {
     internal static string NormalizeRelativePath(string relativePath)

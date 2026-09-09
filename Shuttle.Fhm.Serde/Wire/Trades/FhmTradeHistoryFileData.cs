@@ -107,6 +107,10 @@ public static class FhmTradeHistoryFileSerializer
     public static FhmTradeHistoryFileData Deserialize(Stream stream) =>
         QSerializerFactory.Deserialize<FhmTradeHistoryFileData>(stream, "trade_history.dat");
 
+    /// <summary>Deserializes declared trade-history data, leaving an opaque suffix unread.</summary>
+    public static FhmTradeHistoryFileData DeserializeWithTrailingContent(Stream stream) =>
+        QSerializerFactory.DeserializeOne<FhmTradeHistoryFileData>(stream);
+
     /// <summary>Serializes a <c>trade_history.dat</c> stream.</summary>
     public static void Serialize(Stream stream, FhmTradeHistoryFileData value) =>
         QSerializerFactory.Serialize(stream, value);

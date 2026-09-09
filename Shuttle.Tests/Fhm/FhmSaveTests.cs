@@ -5,6 +5,7 @@ using Shuttle.Fhm.Serde.Domain.Files;
 using Shuttle.Fhm.Serde.Domain.Model;
 using Shuttle.Fhm.Serde.Domain.SaveFolder;
 using Shuttle.Fhm.Serde.Wire.Leagues;
+using Shuttle.Fhm.Serde.Wire.Players;
 using Shuttle.Fhm.Serde.Wire.PlayerRoles;
 using Shuttle.Fhm.Serde.Wire.StoredLines;
 using Shuttle.Fhm.Serde.Wire.Tactics;
@@ -89,6 +90,79 @@ public sealed class FhmSaveTests
     }
 
     [Fact]
+    public async Task FolderReaderAsync_ReadsTheSameFilesAsTheSynchronousReader()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var root = CreateTestRoot();
+        var source = Path.Combine(root, "source");
+        var synchronousDestination = Path.Combine(root, "synchronous");
+        var asynchronousDestination = Path.Combine(root, "asynchronous");
+        try
+        {
+            new FhmSaveWriter().Write(CreateSave(), source);
+            Directory.CreateDirectory(Path.Combine(source, "assets"));
+            File.WriteAllBytes(Path.Combine(source, "assets", "unmodeled.bin"), [9, 8, 7, 6]);
+
+            var reader = new FhmSaveReader();
+            new FhmSaveWriter().Write(reader.Read(source), synchronousDestination);
+            new FhmSaveWriter().Write(
+                await reader.ReadAsync(
+                    source,
+                    new FhmSaveReadOptions { MaxDegreeOfParallelism = 2 },
+                    cancellationToken),
+                asynchronousDestination);
+
+            AssertFoldersEqual(synchronousDestination, asynchronousDestination);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task FolderReaderWriter_ExcludeImportExportAndRestorePointDirectories()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var root = CreateTestRoot();
+        var source = Path.Combine(root, "source");
+        var destination = Path.Combine(root, "destination");
+        try
+        {
+            new FhmSaveWriter().Write(CreateSave(), source);
+            Directory.CreateDirectory(Path.Combine(source, "graphics"));
+            Directory.CreateDirectory(Path.Combine(source, "import_export"));
+            Directory.CreateDirectory(Path.Combine(source, "rs_one"));
+            Directory.CreateDirectory(Path.Combine(source, "assets"));
+            File.WriteAllBytes(Path.Combine(source, "graphics", "logo.png"), [0]);
+            File.WriteAllBytes(Path.Combine(source, "import_export", "bundle.zip"), [1]);
+            File.WriteAllBytes(Path.Combine(source, "rs_one", "restore.dat"), [2]);
+            File.WriteAllBytes(Path.Combine(source, "assets", "unmodeled.bin"), [3]);
+
+            var reader = new FhmSaveReader();
+            var synchronousSave = reader.Read(source);
+            var asynchronousSave = await reader.ReadAsync(source, cancellationToken);
+
+            Assert.Equal(["assets/unmodeled.bin"], synchronousSave.OpaqueFiles.Select(file => file.RelativePath));
+            Assert.Equal(
+                synchronousSave.OpaqueFiles.Select(file => file.RelativePath),
+                asynchronousSave.OpaqueFiles.Select(file => file.RelativePath));
+
+            synchronousSave.OpaqueFiles.Add(new FhmOpaqueFile("rs_manual/excluded.bin", [4]));
+            new FhmSaveWriter().Write(synchronousSave, destination);
+            Assert.True(File.Exists(Path.Combine(destination, "assets", "unmodeled.bin")));
+            Assert.False(Directory.Exists(Path.Combine(destination, "graphics")));
+            Assert.False(Directory.Exists(Path.Combine(destination, "import_export")));
+            Assert.False(Directory.Exists(Path.Combine(destination, "rs_one")));
+            Assert.False(Directory.Exists(Path.Combine(destination, "rs_manual")));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void FolderReader_RejectsUnsupportedPlayersVersion()
     {
         var root = CreateTestRoot();
@@ -118,6 +192,26 @@ public sealed class FhmSaveTests
                 CreateVersionedCountHeader(FhmPlayersFile.CurrentVersion, -1));
 
             Assert.Throws<FhmFormatException>(() => new FhmSaveReader().Read(root));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void FolderReader_RejectsExcessivePlayersCount()
+    {
+        var root = CreateTestRoot();
+        try
+        {
+            File.WriteAllBytes(
+                Path.Combine(root, "players.dat"),
+                CreateVersionedCountHeader(FhmPlayersFile.CurrentVersion, 10_000_001));
+
+            var exception = Assert.Throws<FhmFormatException>(() => new FhmSaveReader().Read(root));
+
+            Assert.Equal("Invalid players count 10000001.", exception.Message);
         }
         finally
         {
@@ -188,6 +282,57 @@ public sealed class FhmSaveTests
         {
             Directory.Delete(root, recursive: true);
         }
+    }
+
+    [Fact]
+    public void PlayersFileReader_StreamsRecordsWithHeaderAndByteParity()
+    {
+        var expected = CreateStructuredPlayersFile();
+        using var encoded = new MemoryStream();
+        expected.WriteTo(encoded);
+        var bytes = encoded.ToArray();
+
+        using var source = new MemoryStream(bytes, writable: false);
+        List<FhmPlayerRecord> streamed;
+        using (var reader = new FhmPlayersFileReader(source))
+        {
+            Assert.Equal(new FhmPlayersFileHeader(FhmPlayersFile.CurrentVersion, 2), reader.Header);
+            Assert.Equal(FhmPlayersFile.CurrentVersion, reader.FormatVersion);
+            Assert.Equal(2, reader.PlayerCount);
+
+            streamed = [.. reader];
+            Assert.Throws<InvalidOperationException>(() => reader.ToArray());
+        }
+
+        Assert.True(source.CanRead);
+        var materialized = FhmPlayersFile.Read(new MemoryStream(bytes, writable: false));
+        Assert.Equal(
+            materialized.Players.Select(player => player.ToBytes()),
+            streamed.Select(player => player.ToBytes()));
+
+        var streamedFile = new FhmPlayersFile();
+        foreach (var player in streamed)
+        {
+            streamedFile.Players.Add(player);
+        }
+
+        using var roundTripped = new MemoryStream();
+        streamedFile.WriteTo(roundTripped);
+        Assert.Equal(bytes, roundTripped.ToArray());
+    }
+
+    [Fact]
+    public void PlayersFileReader_RejectsTrailingBytes()
+    {
+        using var encoded = new MemoryStream();
+        CreateStructuredPlayersFile().WriteTo(encoded);
+        var bytes = encoded.ToArray().Append((byte)0xFF).ToArray();
+        using var source = new MemoryStream(bytes, writable: false);
+        using var reader = new FhmPlayersFileReader(source);
+
+        var exception = Assert.Throws<FhmFormatException>(() => reader.ToArray());
+
+        Assert.Contains("players.dat contains unread bytes at offset", exception.Message);
     }
 
     [Fact]
@@ -268,14 +413,14 @@ public sealed class FhmSaveTests
         var bytes = CreatePersonnelFileBytes(
             (0, 1, null, FhmPersonnelJob.GeneralManager),
             (2, 2, null, FhmPersonnelJob.Scout));
-        BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(4, sizeof(int)), 4);
 
         using var input = new MemoryStream(bytes, writable: false);
         var file = FhmPersonnelFile.Read(input);
         using var output = new MemoryStream();
         file.WriteTo(output);
 
-        Assert.Equal(4, file.NextPersonnelId);
+        Assert.Equal(2, file.RecordCount);
+        Assert.Equal(2, file.NextPersonnelId);
         Assert.Equal([0, 2], file.Records.Select(value => value.PersonnelId));
         Assert.Equal(bytes, output.ToArray());
     }
@@ -295,7 +440,7 @@ public sealed class FhmSaveTests
     }
 
     [Fact]
-    public void PlayerRecord_ByteApi_RoundTripsTheBinarySerializerWireContract()
+    public void PlayerRecord_ByteApi_RoundTripsTheDirectWireContract()
     {
         var source = CreateStructuredPlayersFile().Players[0];
 
@@ -306,6 +451,122 @@ public sealed class FhmSaveTests
         Assert.Equal(source.UnknownString01, result.UnknownString01);
         Assert.Equal(source.UnknownRecordList01[0].Data.Value, result.UnknownRecordList01[0].Data.Value);
         Assert.Equal(source.TacticalRole!.TendencyValue, result.TacticalRole!.TendencyValue);
+    }
+
+    [Fact]
+    public void PlayerRecordSerializer_ReadsSequentialSelfDelimitingRecords()
+    {
+        var source = CreateStructuredPlayersFile();
+        using var stream = new MemoryStream();
+        foreach (var player in source.Players)
+        {
+            FhmPlayersFileSerializer.SerializeRecord(stream, FhmPlayerWireMapper.ToWire(player));
+        }
+
+        stream.Position = 0;
+        var first = FhmPlayersFileSerializer.DeserializeRecord(stream);
+        var second = FhmPlayersFileSerializer.DeserializeRecord(stream);
+
+        Assert.Equal(source.Players[0].ExportedPlayerId, first.ExportedPlayerId);
+        Assert.Equal(source.Players[1].ExportedPlayerId, second.ExportedPlayerId);
+        Assert.Equal(stream.Length, stream.Position);
+    }
+
+    [Fact]
+    public void PlayerWireMapper_PreservesQtCollectionsAndRawVectorAliases()
+    {
+        var source = CreateStructuredPlayersFile().Players[0];
+        source.PrimaryContractRole = new FhmEnumValue<FhmPlayingRole>(456);
+        source.SupplementaryContractRole = new FhmEnumValue<FhmSquadStatus>(789);
+        source.SecondaryTacticalRole = new FhmPlayerRoleInstance
+        {
+            RoleId = 23,
+            BackcheckingUseOverride = 1,
+            BackcheckingTendencyValue = 24,
+        };
+
+        var wire = FhmPlayerWireMapper.ToWire(source);
+        var result = FhmPlayerWireMapper.FromWire(wire);
+
+        Assert.Equal(1, wire.UnknownRecordList01.Length);
+        Assert.Equal(1, wire.Contracts.Length);
+        Assert.Equal(FhmPlayerContract.MaximumYears * 2, wire.Contracts.Items[0].Salaries.Length);
+        Assert.Equal([1], wire.Contracts.Items[0].UnknownU1List01.Items);
+        Assert.Equal([2], wire.Contracts.Items[0].UnknownU1List02.Items);
+        Assert.Equal([3], wire.UnknownU2List01.Items);
+        Assert.Equal([4], wire.UnknownS4List04.Items);
+        Assert.Equal([9], wire.SpecialAbilities.Items);
+        Assert.Equal(-8, wire.UnknownU1S4PairList.Items[0].UnknownS4);
+        Assert.Equal(12, wire.PositionRatings.RawValues.Length);
+        Assert.Equal(source.TeamId, result.TeamId);
+        Assert.Equal(source.FranchiseId, result.FranchiseId);
+        Assert.Equal(source.PrimaryContractRole, result.PrimaryContractRole);
+        Assert.Equal(source.SupplementaryContractRole, result.SupplementaryContractRole);
+        Assert.Equal(source.PositionRatings.RawValues, result.PositionRatings.RawValues);
+        Assert.Equal(
+            source.Contracts[0].Salaries.Select(value => (value.MajorLeagueSalary, value.MinorLeagueSalary)),
+            result.Contracts[0].Salaries.Select(value => (value.MajorLeagueSalary, value.MinorLeagueSalary)));
+        Assert.Equal(source.AggregateSkaterStats01[0].CountersU201, result.AggregateSkaterStats01[0].CountersU201);
+        Assert.Equal(source.DetailedSkaterGameStats[0].CountersU202, result.DetailedSkaterGameStats[0].CountersU202);
+        Assert.Equal(source.UnknownRecordList03[0].Data.Value, result.UnknownRecordList03[0].Data.Value);
+        Assert.Equal(source.SecondaryTacticalRole!.TendencyValue, result.SecondaryTacticalRole!.TendencyValue);
+    }
+
+    [Fact]
+    public void PlayerWireMapper_RejectsInconsistentQtCollectionCount()
+    {
+        var wire = FhmPlayerWireMapper.ToWire(CreateStructuredPlayersFile().Players[0]);
+        wire.UnknownS4List01.Length = 2;
+
+        var exception = Assert.Throws<FhmFormatException>(() => FhmPlayerWireMapper.FromWire(wire));
+
+        Assert.Equal("Invalid UnknownS4List01 count 2.", exception.Message);
+    }
+
+    [Fact]
+    public void PlayerWireMapper_RejectsInvalidFixedCollectionCount()
+    {
+        var wire = FhmPlayerWireMapper.ToWire(CreateStructuredPlayersFile().Players[0]);
+        wire.UnknownU2Values01 = [];
+
+        var exception = Assert.Throws<FhmFormatException>(() => FhmPlayerWireMapper.FromWire(wire));
+
+        Assert.Equal("Invalid UnknownU2Values01 count 3.", exception.Message);
+    }
+
+    [Fact]
+    public void PlayerWireMapper_RejectsInvalidOpaqueRecordLength()
+    {
+        var player = CreateStructuredPlayersFile().Players[0];
+        player.UnknownRecordList01[0].Data = new FhmOpaqueBytes([1]);
+
+        var exception = Assert.Throws<FhmFormatException>(() => FhmPlayerWireMapper.ToWire(player));
+
+        Assert.Equal("Data must contain exactly 24 bytes.", exception.Message);
+    }
+
+    [Fact]
+    public void PlayerWireMapper_RejectsInvalidPackedSalaryCardinality()
+    {
+        var wire = FhmPlayerWireMapper.ToWire(CreateStructuredPlayersFile().Players[0]);
+        wire.Contracts.Items[0].Salaries = new QList<int> { Length = 3, Items = [1, 2, 3] };
+
+        var exception = Assert.Throws<FhmFormatException>(() => FhmPlayerWireMapper.FromWire(wire));
+
+        Assert.Equal(
+            $"Player contract contains 3 salary values; expected {FhmPlayerContract.MaximumYears * 2}.",
+            exception.Message);
+    }
+
+    [Fact]
+    public void PlayerWireMapper_RejectsInvalidPackedSalaryValue()
+    {
+        var wire = FhmPlayerWireMapper.ToWire(CreateStructuredPlayersFile().Players[0]);
+        wire.Contracts.Items[0].Salaries.Items[0] = -2;
+
+        var exception = Assert.Throws<FhmFormatException>(() => FhmPlayerWireMapper.FromWire(wire));
+
+        Assert.Equal("Player contract contains invalid salary value -2.", exception.Message);
     }
 
     [Fact]
@@ -404,6 +665,7 @@ public sealed class FhmSaveTests
             completed.DraftPickLists[0].Add(new(30, -31, 32, -33, 34, 35));
             completed.DraftPickLists[1].Add(new(36, -37, 38, -39, 40, 41));
             history.Records.Add(completed);
+            history.TrailingOpaqueBytes = [42, 43, 44];
 
             var save = new FhmSave();
             Add(save, trade);
@@ -417,9 +679,11 @@ public sealed class FhmSaveTests
             var loadedProposal = Assert.Single(Assert.IsType<FhmTradeFile>(loaded.Files["trade.dat"]).Records);
             Assert.Equal(proposal.AssetLists.SelectMany(list => list), loadedProposal.AssetLists.SelectMany(list => list));
             Assert.Equal(proposal.PairLists.SelectMany(list => list), loadedProposal.PairLists.SelectMany(list => list));
-            var loadedCompleted = Assert.Single(Assert.IsType<FhmTradeHistoryFile>(loaded.Files["trade_history.dat"]).Records);
+            var loadedHistory = Assert.IsType<FhmTradeHistoryFile>(loaded.Files["trade_history.dat"]);
+            var loadedCompleted = Assert.Single(loadedHistory.Records);
             Assert.Equal(completed.AssetLists.SelectMany(list => list), loadedCompleted.AssetLists.SelectMany(list => list));
             Assert.Equal(completed.DraftPickLists.SelectMany(list => list), loadedCompleted.DraftPickLists.SelectMany(list => list));
+            Assert.Equal(history.TrailingOpaqueBytes, loadedHistory.TrailingOpaqueBytes);
         }
         finally
         {
@@ -1019,6 +1283,8 @@ public sealed class FhmSaveTests
             BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(start + 0x6E, sizeof(int)), 400_000);
             bytes[start + 0x99] = 8;
             bytes[start + 0xE5] = 0;
+            // Eight zero-valued entries yield the reference 0x1B6-byte v35 stream record.
+            BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(start + 0xAB, sizeof(int)), 8);
             WritePersonnelUInt16(bytes, start, 0xF5, 12);
             WritePersonnelUInt16(bytes, start, 0xF7, 10);
             WritePersonnelUInt16(bytes, start, 0xF9, 122);
@@ -1084,7 +1350,6 @@ public sealed class FhmSaveTests
                 PairList1 = ToWireList(record.PairLists[1].Select(pair => new FhmIntUInt16PairData { Id = pair.Id, Value = pair.Value })),
             }).ToList(),
         });
-
         return stream.ToArray();
     }
 
@@ -1118,6 +1383,7 @@ public sealed class FhmSaveTests
                 Flag = record.Flag,
             }).ToList(),
         });
+        stream.Write(history.TrailingOpaqueBytes);
 
         return stream.ToArray();
     }

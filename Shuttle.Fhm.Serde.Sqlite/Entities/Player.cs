@@ -41,7 +41,7 @@ public sealed class Player
     /// <summary>Gets or sets the player's birth date.</summary>
     public DateOnly BirthDate { get; set; }
     /// <summary>Gets or sets the team reference.</summary>
-    public int? TeamId { get; set; }
+    public int? TeamRecordOrdinal { get; set; }
     /// <summary>Gets or sets the player's current team.</summary>
     public Team? Team { get; set; }
     /// <summary>Gets or sets the franchise reference.</summary>
@@ -281,7 +281,7 @@ public sealed class PlayerConfiguration : IEntityTypeConfiguration<Player>
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(value => value.Team)
             .WithMany(value => value.Players)
-            .HasForeignKey(value => value.TeamId)
+            .HasForeignKey(value => value.TeamRecordOrdinal)
             .OnDelete(DeleteBehavior.SetNull);
         builder.Navigation(value => value.FirstName).AutoInclude();
         builder.Navigation(value => value.Surname).AutoInclude();

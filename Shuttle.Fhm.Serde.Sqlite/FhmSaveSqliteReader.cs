@@ -6,6 +6,16 @@ using Shuttle.Fhm.Serde.Domain.SaveFolder;
 
 namespace Shuttle.Fhm.Serde.Sqlite;
 
+/// <summary>Options governing direct SQLite-to-save-folder exports.</summary>
+public sealed class FhmSaveSqliteExportOptions
+{
+    /// <summary>Gets or sets an optional recipient of completed export-phase timings.</summary>
+    public IProgress<FhmSaveSqliteExportProgress>? Progress { get; init; }
+}
+
+/// <summary>Reports elapsed time for a completed direct SQLite export phase.</summary>
+public sealed record FhmSaveSqliteExportProgress(string Phase, TimeSpan Elapsed);
+
 /// <summary>Validates and exports an FHM save from the SQLite adapter format.</summary>
 public sealed class FhmSaveSqliteReader
 {
@@ -20,6 +30,8 @@ public sealed class FhmSaveSqliteReader
         }
 
         await using var context = await FhmSaveSqliteContext.OpenAsync(fullPath, cancellationToken);
+        await context.Database.OpenConnectionAsync(cancellationToken);
+        await FhmSaveSqliteContext.ConfigureReadConnectionAsync(context, cancellationToken);
         var manifest = await context.Manifests.AsNoTracking().SingleOrDefaultAsync(cancellationToken)
             ?? throw new InvalidDataException("SQLite save database does not contain a manifest.");
         if (manifest.Id != 1 || manifest.SchemaVersion != FhmSaveSqliteWriter.SchemaVersion ||
@@ -30,6 +42,11 @@ public sealed class FhmSaveSqliteReader
         }
 
         var files = await context.Files.AsNoTracking().ToListAsync(cancellationToken);
+        var fileChunks = await context.FileChunks.AsNoTracking()
+            .OrderBy(value => value.RelativePath)
+            .ThenBy(value => value.Ordinal)
+            .ToListAsync(cancellationToken);
+        files = RehydrateFileContents(files, fileChunks);
         ValidateBaselineFiles(files, manifest);
 
         var names = await context.Names.AsNoTracking().ToListAsync(cancellationToken);
@@ -63,7 +80,7 @@ public sealed class FhmSaveSqliteReader
         var output = CreateRawSave(files);
         var nameIds = new HashSet<int>();
         var playerIds = new HashSet<int>();
-        var playerRoleIds = new HashSet<int>();
+        var playerRoleIds = new HashSet<InGameRole>();
 
         var namesFile = GetDocumented<FhmNamesFile>(baseline, "names.dat");
         if (namesFile is not null)
@@ -135,7 +152,7 @@ public sealed class FhmSaveSqliteReader
         var personnelFile = GetDocumented<FhmPersonnelFile>(baseline, "personal.dat");
         if (personnelFile is not null)
         {
-            if (ApplyPersonnel(personnelFile, personnel, teams, nameIds))
+            if (ApplyPersonnel(personnelFile, personnel, teams))
             {
                 SetDocumented(output, personnelFile);
             }
@@ -148,7 +165,7 @@ public sealed class FhmSaveSqliteReader
         var teamsFile = GetDocumented<FhmTeamsFile>(baseline, "teams.dat");
         if (teamsFile is not null)
         {
-            if (ApplyTeams(teamsFile, teams, teamTactics, teamActiveLineSlots, personnelFile, playerIds))
+            if (ApplyTeams(teamsFile, teams, teamTactics, teamActiveLineSlots, playerIds))
             {
                 SetDocumented(output, teamsFile);
             }
@@ -300,6 +317,660 @@ public sealed class FhmSaveSqliteReader
         return output;
     }
 
+    /// <summary>
+    /// Exports a SQLite adapter database directly to a new or empty FHM save folder without
+    /// materializing a complete <see cref="FhmSave"/>.
+    /// </summary>
+    public Task ExportAsync(
+        string databasePath,
+        string destinationDirectory,
+        CancellationToken cancellationToken = default) =>
+        ExportAsync(
+            databasePath,
+            destinationDirectory,
+            new FhmSaveSqliteExportOptions(),
+            cancellationToken);
+
+    /// <summary>
+    /// Exports a SQLite adapter database directly to a new or empty FHM save folder using
+    /// explicit progress options, without materializing a complete <see cref="FhmSave"/>.
+    /// </summary>
+    public async Task ExportAsync(
+        string databasePath,
+        string destinationDirectory,
+        FhmSaveSqliteExportOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(destinationDirectory);
+        ArgumentNullException.ThrowIfNull(options);
+
+        var fullDatabasePath = Path.GetFullPath(databasePath);
+        if (!File.Exists(fullDatabasePath))
+        {
+            throw new FileNotFoundException(
+                $"SQLite save database '{fullDatabasePath}' does not exist.",
+                fullDatabasePath);
+        }
+
+        var fullDestinationDirectory = Path.GetFullPath(destinationDirectory);
+        if (Directory.Exists(fullDestinationDirectory) &&
+            Directory.EnumerateFileSystemEntries(fullDestinationDirectory).Any())
+        {
+            throw new IOException($"FHM save destination '{fullDestinationDirectory}' must be empty.");
+        }
+
+        var elapsed = System.Diagnostics.Stopwatch.StartNew();
+        await using var context = await FhmSaveSqliteContext.OpenAsync(fullDatabasePath, cancellationToken);
+        await context.Database.OpenConnectionAsync(cancellationToken);
+        await FhmSaveSqliteContext.ConfigureReadConnectionAsync(context, cancellationToken);
+        var manifest = await context.Manifests.AsNoTracking().SingleOrDefaultAsync(cancellationToken)
+            ?? throw new InvalidDataException("SQLite save database does not contain a manifest.");
+        ValidateManifest(manifest);
+        var baselineFiles = await ReadAndValidateBaselineFilesAsync(context, manifest, cancellationToken)
+            .ConfigureAwait(false);
+        var baselineByPath = baselineFiles.ToDictionary(
+            file => file.RelativePath,
+            StringComparer.OrdinalIgnoreCase);
+        ReportExportElapsed(options, "SQLite validation", elapsed);
+
+        Directory.CreateDirectory(fullDestinationDirectory);
+        await WriteBaselineFilesAsync(context, baselineFiles, fullDestinationDirectory, cancellationToken)
+            .ConfigureAwait(false);
+        ReportExportElapsed(options, "Baseline streaming to save folder", elapsed);
+
+        await ReconstructDocumentedFilesAsync(
+            context,
+            baselineByPath,
+            fullDestinationDirectory,
+            cancellationToken).ConfigureAwait(false);
+        ReportExportElapsed(options, "Documented-file reconstruction and writing", elapsed);
+    }
+
+    private static void ValidateManifest(SaveManifest manifest)
+    {
+        if (manifest.Id != 1 || manifest.SchemaVersion != FhmSaveSqliteWriter.SchemaVersion ||
+            manifest.SourceFormatVersion != "FHM 10 save folder")
+        {
+            throw new InvalidDataException(
+                $"SQLite save database has unsupported manifest schema {manifest.SchemaVersion} or source format '{manifest.SourceFormatVersion}'.");
+        }
+    }
+
+    private static async Task<List<BaselineFile>> ReadAndValidateBaselineFilesAsync(
+        FhmSaveSqliteContext context,
+        SaveManifest manifest,
+        CancellationToken cancellationToken)
+    {
+        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var files = new List<BaselineFile>();
+        await foreach (var file in context.Files
+            .AsNoTracking()
+            .Select(value => new BaselineFileProjection(
+                value.RelativePath,
+                value.Kind,
+                value.Content == null ? -1 : value.Content.Length))
+            .AsAsyncEnumerable()
+            .WithCancellation(cancellationToken))
+        {
+            var normalized = FhmSaveFileFactory.NormalizeRelativePath(file.RelativePath);
+            if (!string.Equals(normalized, file.RelativePath, StringComparison.Ordinal) ||
+                !paths.Add(normalized) ||
+                file.ContentLength < 0)
+            {
+                throw new InvalidDataException($"Invalid or duplicate baseline save-file path '{file.RelativePath}'.");
+            }
+
+            if (file.Kind is not SaveFileKind.Documented and not SaveFileKind.Opaque)
+            {
+                throw new InvalidDataException($"Unknown source-file kind '{file.Kind}'.");
+            }
+
+            files.Add(new BaselineFile(file.RelativePath, file.Kind, file.ContentLength));
+        }
+
+        if (manifest.SourceFileCount != files.Count)
+        {
+            throw new InvalidDataException(
+                $"Manifest declares {manifest.SourceFileCount} source files but the database contains {files.Count}.");
+        }
+
+        var filesByPath = files.ToDictionary(file => file.RelativePath, StringComparer.OrdinalIgnoreCase);
+        string? chunkPath = null;
+        var expectedOrdinal = 0;
+        await foreach (var chunk in context.FileChunks
+            .AsNoTracking()
+            .OrderBy(value => value.RelativePath)
+            .ThenBy(value => value.Ordinal)
+            .Select(value => new SaveFileChunkProjection(
+                value.RelativePath,
+                value.Ordinal,
+                value.Content == null ? -1 : value.Content.Length))
+            .AsAsyncEnumerable()
+            .WithCancellation(cancellationToken))
+        {
+            if (!filesByPath.TryGetValue(chunk.RelativePath, out var file))
+            {
+                throw new InvalidDataException("Baseline content chunks reference missing source files.");
+            }
+
+            if (!string.Equals(chunkPath, chunk.RelativePath, StringComparison.OrdinalIgnoreCase))
+            {
+                chunkPath = chunk.RelativePath;
+                expectedOrdinal = 0;
+            }
+
+            if (file.ContentLength != 0)
+            {
+                throw new InvalidDataException($"Chunked baseline save file '{file.RelativePath}' also has inline content.");
+            }
+
+            if (chunk.ContentLength < 0 || chunk.Ordinal != expectedOrdinal)
+            {
+                throw new InvalidDataException($"Chunked baseline save file '{file.RelativePath}' has non-contiguous chunk ordinals.");
+            }
+
+            expectedOrdinal++;
+            file.ChunkCount++;
+        }
+
+        return files;
+    }
+
+    private static async Task WriteBaselineFilesAsync(
+        FhmSaveSqliteContext context,
+        IEnumerable<BaselineFile> files,
+        string destinationDirectory,
+        CancellationToken cancellationToken)
+    {
+        foreach (var file in files.Where(value => value.Kind == SaveFileKind.Documented))
+        {
+            await WriteBaselineFileAsync(context, file, destinationDirectory, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        foreach (var file in files.Where(value => value.Kind == SaveFileKind.Opaque))
+        {
+            await WriteBaselineFileAsync(context, file, destinationDirectory, cancellationToken)
+                .ConfigureAwait(false);
+        }
+    }
+
+    private static async Task WriteBaselineFileAsync(
+        FhmSaveSqliteContext context,
+        BaselineFile file,
+        string destinationDirectory,
+        CancellationToken cancellationToken)
+    {
+        if (FhmSaveAuxiliaryPaths.IsIgnored(file.RelativePath))
+        {
+            return;
+        }
+
+        var destinationPath = FhmSaveFileFactory.ResolvePath(destinationDirectory, file.RelativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+        await using var output = new FileStream(
+            destinationPath,
+            FileMode.Create,
+            FileAccess.Write,
+            FileShare.None,
+            bufferSize: 1024 * 1024,
+            FileOptions.Asynchronous | FileOptions.SequentialScan);
+
+        if (file.ChunkCount == 0)
+        {
+            var content = await context.Files
+                .AsNoTracking()
+                .Where(value => value.RelativePath == file.RelativePath)
+                .Select(value => value.Content)
+                .SingleAsync(cancellationToken)
+                .ConfigureAwait(false);
+            if (content.Length != file.ContentLength)
+            {
+                throw new InvalidDataException($"Baseline save file '{file.RelativePath}' changed during export.");
+            }
+
+            await output.WriteAsync(content, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var expectedOrdinal = 0;
+        await foreach (var chunk in context.FileChunks
+            .AsNoTracking()
+            .Where(value => value.RelativePath == file.RelativePath)
+            .OrderBy(value => value.Ordinal)
+            .Select(value => new SaveFileChunkContent(value.Ordinal, value.Content))
+            .AsAsyncEnumerable()
+            .WithCancellation(cancellationToken))
+        {
+            if (chunk.Ordinal != expectedOrdinal++)
+            {
+                throw new InvalidDataException($"Chunked baseline save file '{file.RelativePath}' changed during export.");
+            }
+
+            await output.WriteAsync(chunk.Content, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (expectedOrdinal != file.ChunkCount)
+        {
+            throw new InvalidDataException($"Chunked baseline save file '{file.RelativePath}' changed during export.");
+        }
+    }
+
+    private static async Task ReconstructDocumentedFilesAsync(
+        FhmSaveSqliteContext context,
+        IReadOnlyDictionary<string, BaselineFile> baseline,
+        string destinationDirectory,
+        CancellationToken cancellationToken)
+    {
+        var nameIds = await ReconstructNamesAsync(context, baseline, destinationDirectory, cancellationToken)
+            .ConfigureAwait(false);
+        var playerRoleIds = await ReconstructPlayerRolesAsync(context, baseline, destinationDirectory, cancellationToken)
+            .ConfigureAwait(false);
+        var playerIds = await ReconstructPlayersAsync(
+            context,
+            baseline,
+            destinationDirectory,
+            playerRoleIds,
+            nameIds,
+            cancellationToken).ConfigureAwait(false);
+        await ReconstructPersonnelAndTeamsAsync(
+            context,
+            baseline,
+            destinationDirectory,
+            nameIds,
+            playerIds,
+            cancellationToken).ConfigureAwait(false);
+        await ReconstructGameSettingsAsync(context, baseline, destinationDirectory, cancellationToken)
+            .ConfigureAwait(false);
+        await ReconstructStoredLinesAsync(context, baseline, destinationDirectory, playerIds, cancellationToken)
+            .ConfigureAwait(false);
+        await ReconstructTacticFilesAsync(context, baseline, destinationDirectory, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static async Task<HashSet<int>> ReconstructNamesAsync(
+        FhmSaveSqliteContext context,
+        IReadOnlyDictionary<string, BaselineFile> baseline,
+        string destinationDirectory,
+        CancellationToken cancellationToken)
+    {
+        var names = await context.Names.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var listEntries = await context.NameListEntries.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var scalars = await context.NameScalars.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var nameIds = new HashSet<int>();
+        var file = GetExportedDocumented<FhmNamesFile>(baseline, destinationDirectory, "names.dat");
+        if (file is not null)
+        {
+            WriteIfChanged(
+                destinationDirectory,
+                file,
+                ApplyNames(file, names, listEntries, scalars, nameIds));
+        }
+        else
+        {
+            RequireEmpty(names, nameof(Name));
+            RequireEmpty(listEntries, nameof(NameListEntry));
+            RequireEmpty(scalars, nameof(NameScalar));
+        }
+
+        return nameIds;
+    }
+
+    private static async Task<HashSet<InGameRole>> ReconstructPlayerRolesAsync(
+        FhmSaveSqliteContext context,
+        IReadOnlyDictionary<string, BaselineFile> baseline,
+        string destinationDirectory,
+        CancellationToken cancellationToken)
+    {
+        var catalogues = await context.TacticalRoleCatalogues.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var roles = await context.TacticalRoles.AsNoTracking().IgnoreAutoIncludes().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var weights = await context.TacticalRoleWeights.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var indexEntries = await context.TacticalRoleIndexEntries.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var roleIds = new HashSet<InGameRole>();
+        var file = GetExportedDocumented<FhmPlayerRolesFile>(baseline, destinationDirectory, "player_roles.dat");
+        if (file is not null)
+        {
+            WriteIfChanged(
+                destinationDirectory,
+                file,
+                ApplyPlayerRoles(file, catalogues, roles, weights, indexEntries, roleIds));
+        }
+        else
+        {
+            RequireEmpty(catalogues, nameof(PlayerRoleCatalogue));
+            RequireEmpty(roles, nameof(PlayerRoleDefinition));
+            RequireEmpty(weights, nameof(PlayerRoleWeight));
+            RequireEmpty(indexEntries, nameof(PlayerRoleIndexEntry));
+        }
+
+        return roleIds;
+    }
+
+    private static async Task<HashSet<int>> ReconstructPlayersAsync(
+        FhmSaveSqliteContext context,
+        IReadOnlyDictionary<string, BaselineFile> baseline,
+        string destinationDirectory,
+        ISet<InGameRole> playerRoleIds,
+        ISet<int> nameIds,
+        CancellationToken cancellationToken)
+    {
+        var players = await context.Players.AsNoTracking().IgnoreAutoIncludes().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var attributes = await context.PlayerAttributes.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var contracts = await context.PlayerContracts.AsNoTracking().IgnoreAutoIncludes().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var contractYears = await context.PlayerContractYears.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var assignments = await context.PlayerTacticalRoleAssignments.AsNoTracking().IgnoreAutoIncludes().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var tendencies = await context.PlayerTacticalRoleTendencyValues.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var teams = await context.Teams.AsNoTracking().IgnoreAutoIncludes().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var playerIds = new HashSet<int>();
+        var file = GetExportedDocumented<FhmPlayersFile>(baseline, destinationDirectory, "players.dat");
+        if (file is not null)
+        {
+            WriteIfChanged(
+                destinationDirectory,
+                file,
+                ApplyPlayers(
+                    file,
+                    players,
+                    attributes,
+                    contracts,
+                    contractYears,
+                    assignments,
+                    tendencies,
+                    teams,
+                    playerRoleIds,
+                    playerIds));
+        }
+        else
+        {
+            RequireEmpty(players, nameof(Player));
+            RequireEmpty(attributes, nameof(PlayerAttributes));
+            RequireEmpty(contracts, nameof(PlayerContract));
+            RequireEmpty(contractYears, nameof(PlayerContractYear));
+            RequireEmpty(assignments, nameof(PlayerRoleAssignment));
+            RequireEmpty(tendencies, nameof(PlayerRoleTendencyValue));
+        }
+
+        ValidatePlayerReferences(file, nameIds);
+        return playerIds;
+    }
+
+    private static async Task ReconstructPersonnelAndTeamsAsync(
+        FhmSaveSqliteContext context,
+        IReadOnlyDictionary<string, BaselineFile> baseline,
+        string destinationDirectory,
+        ISet<int> nameIds,
+        ISet<int> playerIds,
+        CancellationToken cancellationToken)
+    {
+        var personnel = await context.Personnel.AsNoTracking().IgnoreAutoIncludes().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var teams = await context.Teams.AsNoTracking().IgnoreAutoIncludes().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var personnelFile = GetExportedDocumented<FhmPersonnelFile>(baseline, destinationDirectory, "personal.dat");
+        if (personnelFile is not null)
+        {
+            WriteIfChanged(destinationDirectory, personnelFile, ApplyPersonnel(personnelFile, personnel, teams));
+        }
+        else
+        {
+            RequireEmpty(personnel, nameof(Personnel));
+        }
+
+        var teamTactics = await context.TeamTactics.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var activeLineSlots = await context.TeamActiveLineSlots.AsNoTracking().IgnoreAutoIncludes().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var teamsFile = GetExportedDocumented<FhmTeamsFile>(baseline, destinationDirectory, "teams.dat");
+        if (teamsFile is not null)
+        {
+            WriteIfChanged(
+                destinationDirectory,
+                teamsFile,
+                ApplyTeams(teamsFile, teams, teamTactics, activeLineSlots, playerIds));
+        }
+        else
+        {
+            RequireEmpty(teams, nameof(Team));
+            RequireEmpty(teamTactics, nameof(TeamTactic));
+            RequireEmpty(activeLineSlots, nameof(TeamActiveLineSlot));
+        }
+    }
+
+    private static async Task ReconstructGameSettingsAsync(
+        FhmSaveSqliteContext context,
+        IReadOnlyDictionary<string, BaselineFile> baseline,
+        string destinationDirectory,
+        CancellationToken cancellationToken)
+    {
+        var settings = await context.GameSettings.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var file = GetExportedDocumented<FhmGameSettingsFile>(baseline, destinationDirectory, "game_settings.dat");
+        if (file is not null)
+        {
+            WriteIfChanged(destinationDirectory, file, ApplyGameSettings(file, settings));
+        }
+        else
+        {
+            RequireEmpty(settings, nameof(GameSetting));
+        }
+    }
+
+    private static async Task ReconstructStoredLinesAsync(
+        FhmSaveSqliteContext context,
+        IReadOnlyDictionary<string, BaselineFile> baseline,
+        string destinationDirectory,
+        ISet<int> playerIds,
+        CancellationToken cancellationToken)
+    {
+        var lines = await context.StoredLines.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var slots = await context.StoredLineSlots.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var file = GetExportedDocumented<FhmStoredLinesFile>(baseline, destinationDirectory, "stored_lines.dat");
+        if (file is not null)
+        {
+            WriteIfChanged(destinationDirectory, file, ApplyStoredLines(file, lines, slots, playerIds));
+        }
+        else
+        {
+            RequireEmpty(lines, nameof(StoredLine));
+            RequireEmpty(slots, nameof(StoredLineSlot));
+        }
+    }
+
+    private static async Task ReconstructTacticFilesAsync(
+        FhmSaveSqliteContext context,
+        IReadOnlyDictionary<string, BaselineFile> baseline,
+        string destinationDirectory,
+        CancellationToken cancellationToken)
+    {
+        var systems = await context.TacticSystems.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var templates = await context.TacticTemplates.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var setPlays = await context.SetPlays.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var modifiers = await context.ModifierCatalogues.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var tactics = await context.Tactics.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var tacticFiles = await context.TacticFiles.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+
+        var expectedFiles = new Dictionary<string, TacticFileExpectation>(StringComparer.OrdinalIgnoreCase);
+        var systemsFile = GetExportedDocumented<FhmTeamTacticsFile>(baseline, destinationDirectory, "team_tactics.dat");
+        if (systemsFile is not null)
+        {
+            expectedFiles.Add(systemsFile.RelativePath, new(TacticFileKind.TacticSystems, systemsFile.VersionTag, systemsFile.Records.Count));
+            WriteIfChanged(destinationDirectory, systemsFile, ApplyTacticSystems(systemsFile, systems));
+        }
+        else
+        {
+            RequireEmpty(systems, nameof(TacticSystem));
+        }
+
+        var templatesFile = GetExportedDocumented<FhmTacticTemplatesFile>(baseline, destinationDirectory, "tactic_templates.dat");
+        if (templatesFile is not null)
+        {
+            expectedFiles.Add(templatesFile.RelativePath, new(TacticFileKind.TacticTemplates, templatesFile.Version, templatesFile.Templates.Count));
+            WriteIfChanged(destinationDirectory, templatesFile, ApplyTacticTemplates(templatesFile, templates));
+        }
+        else
+        {
+            RequireEmpty(templates, nameof(TacticTemplate));
+        }
+
+        var setPlayFiles = GetExportedDocuments<FhmSetPlayFile>(
+            baseline,
+            destinationDirectory,
+            static path => path.StartsWith("set_play_", StringComparison.OrdinalIgnoreCase) &&
+                path.EndsWith(".dat", StringComparison.OrdinalIgnoreCase)).ToList();
+        foreach (var file in setPlayFiles)
+        {
+            expectedFiles.Add(file.RelativePath, new(TacticFileKind.SetPlay, file.Version, file.Formations.Count));
+            WriteIfChanged(destinationDirectory, file, ApplySetPlay(file, setPlays));
+        }
+
+        var modifierFiles = GetExportedDocuments<FhmLengthPrefixedCatalogueFile>(
+            baseline,
+            destinationDirectory,
+            static path => path.Equals("shot_type_mod.dat", StringComparison.OrdinalIgnoreCase) ||
+                path.Equals("tactical_settings_mod.dat", StringComparison.OrdinalIgnoreCase)).ToList();
+        foreach (var file in modifierFiles)
+        {
+            expectedFiles.Add(file.RelativePath, new(TacticFileKind.ModifierCatalogue, file.Version, file.Blocks.Count));
+            WriteIfChanged(destinationDirectory, file, ApplyModifierCatalogue(file, modifiers));
+        }
+
+        var zoneEventsFile = GetExportedDocumented<FhmZoneEventModifiersFile>(baseline, destinationDirectory, "zone_event_mod.dat");
+        if (zoneEventsFile is not null)
+        {
+            expectedFiles.Add(zoneEventsFile.RelativePath, new(TacticFileKind.ZoneEventModifiers, zoneEventsFile.Version, zoneEventsFile.ZoneCount));
+            WriteIfChanged(destinationDirectory, zoneEventsFile, ApplyZoneEventModifiers(zoneEventsFile, modifiers));
+        }
+
+        var tacticsFile = GetExportedDocumented<FhmTacticsFile>(baseline, destinationDirectory, "tactics.dat");
+        if (tacticsFile is not null)
+        {
+            WriteIfChanged(destinationDirectory, tacticsFile, ApplyTactics(tacticsFile, tactics));
+        }
+        else
+        {
+            RequireEmpty(tactics, nameof(Tactics));
+        }
+
+        var headerChangedPaths = ValidateAndApplyTacticHeaders(
+            expectedFiles,
+            tacticFiles,
+            systemsFile,
+            templatesFile,
+            setPlayFiles,
+            modifierFiles,
+            zoneEventsFile);
+        ValidateNoUnexpectedSetPlays(setPlays, expectedFiles);
+        ValidateNoUnexpectedModifiers(modifiers, expectedFiles);
+        foreach (var changedPath in headerChangedPaths)
+        {
+            if (systemsFile is not null &&
+                string.Equals(changedPath, systemsFile.RelativePath, StringComparison.OrdinalIgnoreCase))
+            {
+                WriteDocumentedFile(destinationDirectory, systemsFile);
+            }
+            else if (templatesFile is not null &&
+                string.Equals(changedPath, templatesFile.RelativePath, StringComparison.OrdinalIgnoreCase))
+            {
+                WriteDocumentedFile(destinationDirectory, templatesFile);
+            }
+            else if (setPlayFiles.SingleOrDefault(file => string.Equals(changedPath, file.RelativePath, StringComparison.OrdinalIgnoreCase)) is { } setPlay)
+            {
+                WriteDocumentedFile(destinationDirectory, setPlay);
+            }
+            else if (modifierFiles.SingleOrDefault(file => string.Equals(changedPath, file.RelativePath, StringComparison.OrdinalIgnoreCase)) is { } modifier)
+            {
+                WriteDocumentedFile(destinationDirectory, modifier);
+            }
+            else if (zoneEventsFile is not null &&
+                string.Equals(changedPath, zoneEventsFile.RelativePath, StringComparison.OrdinalIgnoreCase))
+            {
+                WriteDocumentedFile(destinationDirectory, zoneEventsFile);
+            }
+        }
+    }
+
+    private static T? GetExportedDocumented<T>(
+        IReadOnlyDictionary<string, BaselineFile> files,
+        string destinationDirectory,
+        string path)
+        where T : class, IFhmSaveFile
+    {
+        if (!files.TryGetValue(path, out var baseline))
+        {
+            return null;
+        }
+
+        if (baseline.Kind != SaveFileKind.Documented)
+        {
+            throw new InvalidDataException($"Projected file '{path}' is incorrectly classified as opaque.");
+        }
+
+        return ReadExportedDocument(baseline, destinationDirectory) as T
+            ?? throw new InvalidDataException($"Projected file '{path}' cannot be parsed by its documented codec.");
+    }
+
+    private static IEnumerable<T> GetExportedDocuments<T>(
+        IReadOnlyDictionary<string, BaselineFile> files,
+        string destinationDirectory,
+        Func<string, bool> isCandidate)
+        where T : class, IFhmSaveFile
+    {
+        foreach (var file in files.Values)
+        {
+            if (file.Kind != SaveFileKind.Documented ||
+                FhmSaveAuxiliaryPaths.IsIgnored(file.RelativePath) ||
+                !isCandidate(file.RelativePath))
+            {
+                continue;
+            }
+
+            if (ReadExportedDocument(file, destinationDirectory) is T document)
+            {
+                yield return document;
+            }
+        }
+    }
+
+    private static IFhmSaveFile? ReadExportedDocument(BaselineFile file, string destinationDirectory)
+    {
+        var path = FhmSaveFileFactory.ResolvePath(destinationDirectory, file.RelativePath);
+        using var input = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: 1024 * 1024,
+            FileOptions.SequentialScan);
+        return FhmSaveFileFactory.TryRead(file.RelativePath, input);
+    }
+
+    private static void WriteIfChanged(string destinationDirectory, IFhmSaveFile file, bool changed)
+    {
+        if (changed)
+        {
+            WriteDocumentedFile(destinationDirectory, file);
+        }
+    }
+
+    private static void WriteDocumentedFile(string destinationDirectory, IFhmSaveFile file)
+    {
+        var path = FhmSaveFileFactory.ResolvePath(destinationDirectory, file.RelativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        using var output = new FileStream(
+            path,
+            FileMode.Create,
+            FileAccess.Write,
+            FileShare.None,
+            bufferSize: 1024 * 1024,
+            FileOptions.SequentialScan);
+        file.WriteTo(output);
+    }
+
+    private static void ReportExportElapsed(
+        FhmSaveSqliteExportOptions options,
+        string phase,
+        System.Diagnostics.Stopwatch elapsed)
+    {
+        options.Progress?.Report(new FhmSaveSqliteExportProgress(phase, elapsed.Elapsed));
+        elapsed.Restart();
+    }
+
     private static void ValidateBaselineFiles(IReadOnlyCollection<SaveFile> files, SaveManifest manifest)
     {
         if (manifest.SourceFileCount != files.Count)
@@ -319,6 +990,61 @@ public sealed class FhmSaveSqliteReader
                 throw new InvalidDataException($"Invalid or duplicate baseline save-file path '{file.RelativePath}'.");
             }
         }
+    }
+
+    private static List<SaveFile> RehydrateFileContents(
+        IReadOnlyCollection<SaveFile> files,
+        IReadOnlyCollection<SaveFileChunk> chunks)
+    {
+        var chunksByPath = chunks.GroupBy(value => value.RelativePath, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, StringComparer.OrdinalIgnoreCase);
+        var result = new List<SaveFile>(files.Count);
+
+        foreach (var file in files)
+        {
+            if (!chunksByPath.Remove(file.RelativePath, out var fileChunks))
+            {
+                result.Add(file);
+                continue;
+            }
+
+            if (file.Content.Length != 0)
+            {
+                throw new InvalidDataException($"Chunked baseline save file '{file.RelativePath}' also has inline content.");
+            }
+
+            var orderedChunks = fileChunks.OrderBy(value => value.Ordinal).ToArray();
+            if (!orderedChunks.Select(value => value.Ordinal).SequenceEqual(Enumerable.Range(0, orderedChunks.Length)))
+            {
+                throw new InvalidDataException($"Chunked baseline save file '{file.RelativePath}' has non-contiguous chunk ordinals.");
+            }
+
+            var length = orderedChunks.Aggregate(
+                0L,
+                (total, chunk) => checked(total + chunk.Content.Length));
+            if (length > int.MaxValue)
+            {
+                throw new InvalidDataException($"Chunked baseline save file '{file.RelativePath}' exceeds the supported size.");
+            }
+
+            var content = new byte[(int)length];
+            var offset = 0;
+            foreach (var chunk in orderedChunks)
+            {
+                Buffer.BlockCopy(chunk.Content, 0, content, offset, chunk.Content.Length);
+                offset += chunk.Content.Length;
+            }
+
+            file.Content = content;
+            result.Add(file);
+        }
+
+        if (chunksByPath.Count > 0)
+        {
+            throw new InvalidDataException("Baseline content chunks reference missing source files.");
+        }
+
+        return result;
     }
 
     private static FhmSave CreateRawSave(IEnumerable<SaveFile> files)
@@ -493,7 +1219,7 @@ public sealed class FhmSaveSqliteReader
         IReadOnlyCollection<PlayerRoleAssignment> roleAssignments,
         IReadOnlyCollection<PlayerRoleTendencyValue> roleTendencies,
         IReadOnlyCollection<Team> teams,
-        ISet<int> roleIds,
+        ISet<InGameRole> roleIds,
         ISet<int> playerIds)
     {
         RequireExactKeys(entities, Enumerable.Range(0, file.Players.Count).ToHashSet(), value => value.RecordOrdinal, nameof(Player));
@@ -514,7 +1240,7 @@ public sealed class FhmSaveSqliteReader
         var tendencies = roleTendencies
             .GroupBy(value => (value.PlayerInternalId, value.Slot))
             .ToDictionary(group => group.Key, group => group.ToArray());
-        var teamRecordIndicesById = teams.ToDictionary(value => value.TeamId, value => value.RecordIndex);
+        var teamRecordIndicesByOrdinal = teams.ToDictionary(value => value.RecordOrdinal, value => value.RecordIndex);
         var expectedPlayerIds = file.Players.Select(value => value.InternalIdentity).ToHashSet();
         if (roleAssignments.Any(value => !expectedPlayerIds.Contains(value.PlayerInternalId)))
         {
@@ -538,7 +1264,10 @@ public sealed class FhmSaveSqliteReader
             }
 
             ValidatePlayer(row, ordinal);
-            var teamRecordIndex = ResolveTeamRecordIndex(row.TeamId, teamRecordIndicesById, $"player {row.InternalId}");
+            var teamRecordIndex = ResolveTeamRecordIndex(
+                row.TeamRecordOrdinal,
+                teamRecordIndicesByOrdinal,
+                $"player {row.InternalId}");
             changed |= ApplyPlayer(player, row, teamRecordIndex);
             changed |= ApplyAttributes(player.RatingAttributes, ratingRow, ordinal);
             changed |= ApplyContracts(
@@ -571,7 +1300,7 @@ public sealed class FhmSaveSqliteReader
         IReadOnlyCollection<PlayerRoleDefinition> definitions,
         IReadOnlyCollection<PlayerRoleWeight> weights,
         IReadOnlyCollection<PlayerRoleIndexEntry> indexEntries,
-        ISet<int> roleIds)
+        ISet<InGameRole> roleIds)
     {
         RequireExactKeys(catalogues, new HashSet<int> { 1 }, value => value.Id, nameof(PlayerRoleCatalogue));
         var catalogue = catalogues.Single();
@@ -607,7 +1336,7 @@ public sealed class FhmSaveSqliteReader
             ValidatePlayerRoleDefinition(row);
             var role = new FhmPlayerRoleDefinition
             {
-                RoleId = row.RoleId,
+                RoleId = (int)row.RoleId,
                 Name = row.Name,
                 AppliesToForwards = checked((byte)row.AppliesToForwards),
                 AppliesToDefencemen = checked((byte)row.AppliesToDefencemen),
@@ -620,15 +1349,15 @@ public sealed class FhmSaveSqliteReader
                 Description = row.Description,
                 TuningValueC = checked((ushort)row.TuningValueC),
             };
-            ApplyPlayerRoleWeights(role.RoleId, role.WeightGroupA, PlayerRoleWeightGroup.A, 8, weightsByRoleAndGroup);
-            ApplyPlayerRoleWeights(role.RoleId, role.WeightGroupB, PlayerRoleWeightGroup.B, 13, weightsByRoleAndGroup);
-            ApplyPlayerRoleWeights(role.RoleId, role.WeightGroupC, PlayerRoleWeightGroup.C, 17, weightsByRoleAndGroup);
-            ApplyPlayerRoleWeights(role.RoleId, role.WeightGroupD, PlayerRoleWeightGroup.D, 4, weightsByRoleAndGroup);
-            ApplyPlayerRoleWeights(role.RoleId, role.WeightGroupE, PlayerRoleWeightGroup.E, 19, weightsByRoleAndGroup);
-            ApplyPlayerRoleWeights(role.RoleId, role.WeightGroupF, PlayerRoleWeightGroup.F, 9, weightsByRoleAndGroup);
+            ApplyPlayerRoleWeights((InGameRole)role.RoleId, role.WeightGroupA, PlayerRoleWeightGroup.A, 8, weightsByRoleAndGroup);
+            ApplyPlayerRoleWeights((InGameRole)role.RoleId, role.WeightGroupB, PlayerRoleWeightGroup.B, 13, weightsByRoleAndGroup);
+            ApplyPlayerRoleWeights((InGameRole)role.RoleId, role.WeightGroupC, PlayerRoleWeightGroup.C, 17, weightsByRoleAndGroup);
+            ApplyPlayerRoleWeights((InGameRole)role.RoleId, role.WeightGroupD, PlayerRoleWeightGroup.D, 4, weightsByRoleAndGroup);
+            ApplyPlayerRoleWeights((InGameRole)role.RoleId, role.WeightGroupE, PlayerRoleWeightGroup.E, 19, weightsByRoleAndGroup);
+            ApplyPlayerRoleWeights((InGameRole)role.RoleId, role.WeightGroupF, PlayerRoleWeightGroup.F, 9, weightsByRoleAndGroup);
             foreach (var list in Enum.GetValues<PlayerRoleIndexList>())
             {
-                var rows = indicesByRoleAndList.GetValueOrDefault((role.RoleId, list)) ?? [];
+                var rows = indicesByRoleAndList.GetValueOrDefault(((InGameRole)role.RoleId, list)) ?? [];
                 RequireExactKeys(
                     rows,
                     Enumerable.Range(0, rows.Length).ToHashSet(),
@@ -672,11 +1401,11 @@ public sealed class FhmSaveSqliteReader
     }
 
     private static void ApplyPlayerRoleWeights(
-        int roleId,
+        InGameRole roleId,
         IList<int> destination,
         PlayerRoleWeightGroup group,
         int expectedCount,
-        IReadOnlyDictionary<(int RoleId, PlayerRoleWeightGroup Group), PlayerRoleWeight[]> weights)
+        IReadOnlyDictionary<(InGameRole RoleId, PlayerRoleWeightGroup Group), PlayerRoleWeight[]> weights)
     {
         var rows = weights.GetValueOrDefault((roleId, group)) ?? [];
         RequireExactKeys(
@@ -695,7 +1424,7 @@ public sealed class FhmSaveSqliteReader
         PlayerRoleSlot slot,
         PlayerRoleAssignment? assignment,
         IReadOnlyDictionary<(int PlayerInternalId, PlayerRoleSlot Slot), PlayerRoleTendencyValue[]> tendencies,
-        ISet<int> roleIds,
+        ISet<InGameRole> roleIds,
         int playerOrdinal)
     {
         var destination = slot == PlayerRoleSlot.Tactical ? player.TacticalRole : player.SecondaryTacticalRole;
@@ -714,7 +1443,7 @@ public sealed class FhmSaveSqliteReader
                 Enum.GetValues<PlayerRoleTendency>().ToHashSet(),
                 value => value.Tendency,
                 $"player record {playerOrdinal} {slot} role tendencies");
-            replacement = new FhmPlayerRoleInstance { RoleId = assignment.RoleId };
+            replacement = new FhmPlayerRoleInstance { RoleId = (int)assignment.RoleId };
             foreach (var row in rows)
             {
                 if (row.UseOverride is < byte.MinValue or > byte.MaxValue
@@ -928,18 +1657,18 @@ public sealed class FhmSaveSqliteReader
     private static int ToWireReference(int? reference) => reference ?? FhmNullConstants.Null;
 
     private static int ResolveTeamRecordIndex(
-        int? teamId,
-        IReadOnlyDictionary<int, int> teamRecordIndicesById,
+        int? teamRecordOrdinal,
+        IReadOnlyDictionary<int, int> teamRecordIndicesByOrdinal,
         string owner)
     {
-        if (teamId is null)
+        if (teamRecordOrdinal is null)
         {
             return FhmNullConstants.Null;
         }
 
-        if (!teamRecordIndicesById.TryGetValue(teamId.Value, out var recordIndex))
+        if (!teamRecordIndicesByOrdinal.TryGetValue(teamRecordOrdinal.Value, out var recordIndex))
         {
-            throw new InvalidDataException($"{owner} references missing stable team ID {teamId.Value}.");
+            throw new InvalidDataException($"{owner} references missing team record ordinal {teamRecordOrdinal.Value}.");
         }
 
         return recordIndex;
@@ -950,45 +1679,40 @@ public sealed class FhmSaveSqliteReader
         IReadOnlyCollection<Team> entities,
         IReadOnlyCollection<TeamTactic> tactics,
         IReadOnlyCollection<TeamActiveLineSlot> activeLineSlots,
-        FhmPersonnelFile? personnelFile,
         ISet<int> playerIds)
     {
         RequireExactKeys(entities, Enumerable.Range(0, file.Teams.Count).ToHashSet(), value => value.RecordOrdinal, nameof(Team));
         RequireExactKeys(
             tactics,
-            file.Teams.Select(value => value.TeamId).ToHashSet(),
-            value => value.TeamId,
+            Enumerable.Range(0, file.Teams.Count).ToHashSet(),
+            value => value.TeamRecordOrdinal,
             nameof(TeamTactic));
         var rows = entities.ToDictionary(value => value.RecordOrdinal);
-        var tacticRows = tactics.ToDictionary(value => value.TeamId);
+        var tacticRows = tactics.ToDictionary(value => value.TeamRecordOrdinal);
         var expectedActiveLineSlotKeys = GetTeamActiveLineSlotKeys(file);
         RequireExactKeys(
             activeLineSlots,
             expectedActiveLineSlotKeys,
-            value => (value.TeamId, value.Group, value.SlotOrdinal),
+            value => (value.TeamRecordOrdinal, value.Group, value.SlotOrdinal),
             nameof(TeamActiveLineSlot));
         var activeLineSlotRows = activeLineSlots.ToDictionary(
-            value => (value.TeamId, value.Group, value.SlotOrdinal));
-        var teamIds = new HashSet<int>();
+            value => (value.TeamRecordOrdinal, value.Group, value.SlotOrdinal));
+        var teamRecordIndicesByOrdinal = entities.ToDictionary(value => value.RecordOrdinal, value => value.RecordIndex);
         var changed = false;
 
         foreach (var (team, ordinal) in file.Teams.Select((value, index) => (value, index)).ToArray())
         {
             var row = rows[ordinal];
-            if (row.RecordIndex != team.RecordIndex || row.TeamId != team.TeamId || !teamIds.Add(row.TeamId))
+            if (row.RecordIndex != team.RecordIndex || row.TeamId != team.TeamId)
             {
-                throw new InvalidDataException($"Teams entity record {ordinal} changes an immutable identity or duplicates TeamId {row.TeamId}.");
+                throw new InvalidDataException($"Teams entity record {ordinal} changes an immutable identity.");
             }
 
             ValidateTeam(row, ordinal);
-            changed |= ApplyTeam(team, row);
-            if (personnelFile is not null)
-            {
-                changed |= ApplyTeamPersonnel(team, personnelFile.Records);
-            }
-            changed |= ApplyTeamActiveLines(team, activeLineSlotRows, playerIds);
+            changed |= ApplyTeam(team, row, teamRecordIndicesByOrdinal);
+            changed |= ApplyTeamActiveLines(team, ordinal, activeLineSlotRows, playerIds);
 
-            var tacticRow = tacticRows[team.TeamId];
+            var tacticRow = tacticRows[ordinal];
             var sourceSettings = FhmSaveSqliteWriter.SerializeTeamTactics(team.Tail.Tactics);
             if (tacticRow.SerializedSettings.Length != sourceSettings.Length)
             {
@@ -1014,13 +1738,13 @@ public sealed class FhmSaveSqliteReader
     private static HashSet<(int, FhmLineGroup, int)> GetTeamActiveLineSlotKeys(FhmTeamsFile file)
     {
         var result = new HashSet<(int, FhmLineGroup, int)>();
-        foreach (var team in file.Teams)
+        foreach (var (team, teamRecordOrdinal) in file.Teams.Select((value, index) => (value, index)))
         {
             foreach (var line in team.ActiveLines.Lists)
             {
                 for (var slotOrdinal = 0; slotOrdinal < line.PlayerReferences.Count; slotOrdinal++)
                 {
-                    result.Add((team.TeamId, line.Group, slotOrdinal));
+                    result.Add((teamRecordOrdinal, line.Group, slotOrdinal));
                 }
             }
         }
@@ -1030,6 +1754,7 @@ public sealed class FhmSaveSqliteReader
 
     private static bool ApplyTeamActiveLines(
         FhmTeamRecord team,
+        int teamRecordOrdinal,
         IReadOnlyDictionary<(int, FhmLineGroup, int), TeamActiveLineSlot> rows,
         ISet<int> playerIds)
     {
@@ -1038,7 +1763,7 @@ public sealed class FhmSaveSqliteReader
         {
             for (var slotOrdinal = 0; slotOrdinal < line.PlayerReferences.Count; slotOrdinal++)
             {
-                var row = rows[(team.TeamId, line.Group, slotOrdinal)];
+                var row = rows[(teamRecordOrdinal, line.Group, slotOrdinal)];
                 if (row.PlayerInternalId is { } playerId)
                 {
                     ValidateReference(
@@ -1062,8 +1787,7 @@ public sealed class FhmSaveSqliteReader
     private static bool ApplyPersonnel(
         FhmPersonnelFile file,
         IReadOnlyCollection<Personnel> entities,
-        IReadOnlyCollection<Team> teams,
-        ISet<int> nameIds)
+        IReadOnlyCollection<Team> teams)
     {
         RequireExactKeys(
             entities,
@@ -1071,7 +1795,7 @@ public sealed class FhmSaveSqliteReader
             value => value.PersonnelId,
             nameof(Personnel));
         var rows = entities.ToDictionary(value => value.PersonnelId);
-        var teamsById = teams.ToDictionary(value => value.TeamId);
+        var teamsByRecordOrdinal = teams.ToDictionary(value => value.RecordOrdinal);
         var changed = false;
 
         foreach (var record in file.Records)
@@ -1083,34 +1807,26 @@ public sealed class FhmSaveSqliteReader
                     $"Personnel entity {record.PersonnelId} changes its immutable serialized backing.");
             }
 
-            if (!nameIds.Contains(row.FirstNameNameId))
-            {
-                throw new InvalidDataException(
-                    $"Personnel entity {record.PersonnelId} references missing first-name ID {row.FirstNameNameId}.");
-            }
-
-            if (!nameIds.Contains(row.SurnameNameId))
-            {
-                throw new InvalidDataException(
-                    $"Personnel entity {record.PersonnelId} references missing surname name ID {row.SurnameNameId}.");
-            }
-
-            if (row.NicknameNameId is int nicknameNameId && !nameIds.Contains(nicknameNameId))
-            {
-                throw new InvalidDataException(
-                    $"Personnel entity {record.PersonnelId} references missing nickname ID {nicknameNameId}.");
-            }
-
             int? teamRecordIndex = null;
-            if (row.TeamId is int teamId)
+            if (row.TeamRecordOrdinal is int teamRecordOrdinal)
             {
-                if (!teamsById.TryGetValue(teamId, out var team))
+                if (row.UnresolvedTeamRecordIndex is not null)
                 {
                     throw new InvalidDataException(
-                        $"Personnel entity {record.PersonnelId} references missing team ID {teamId}.");
+                        $"Personnel entity {record.PersonnelId} has both a resolved and unresolved team reference.");
+                }
+
+                if (!teamsByRecordOrdinal.TryGetValue(teamRecordOrdinal, out var team))
+                {
+                    throw new InvalidDataException(
+                        $"Personnel entity {record.PersonnelId} references missing team record ordinal {teamRecordOrdinal}.");
                 }
 
                 teamRecordIndex = team.RecordIndex;
+            }
+            else
+            {
+                teamRecordIndex = row.UnresolvedTeamRecordIndex;
             }
 
             ValidatePersonnel(row);
@@ -1126,7 +1842,7 @@ public sealed class FhmSaveSqliteReader
             destination.FirstNameNameId != source.FirstNameNameId
             || destination.SurnameNameId != source.SurnameNameId
             || destination.NicknameNameId != source.NicknameNameId
-            || destination.BirthDate != new FhmDate(source.BirthDate.Year, source.BirthDate.Month, source.BirthDate.Day)
+            || destination.BirthDate != new FhmDate(source.BirthYear, source.BirthMonth, source.BirthDay)
             || destination.NationalityId != source.NationalityId
             || destination.BirthCityId != source.BirthCityId
             || destination.TeamRecordIndex != teamRecordIndex
@@ -1164,7 +1880,7 @@ public sealed class FhmSaveSqliteReader
         destination.FirstNameNameId = source.FirstNameNameId;
         destination.SurnameNameId = source.SurnameNameId;
         destination.NicknameNameId = source.NicknameNameId;
-        destination.BirthDate = new(source.BirthDate.Year, source.BirthDate.Month, source.BirthDate.Day);
+        destination.BirthDate = new(source.BirthYear, source.BirthMonth, source.BirthDay);
         destination.NationalityId = checked((ushort)source.NationalityId);
         destination.BirthCityId = source.BirthCityId;
         destination.TeamRecordIndex = teamRecordIndex;
@@ -1203,23 +1919,13 @@ public sealed class FhmSaveSqliteReader
 
     private static void ValidatePersonnel(Personnel row)
     {
-        if (!Enum.IsDefined(row.Job)
-            || !Enum.IsDefined(row.OffensivePreference)
-            || !Enum.IsDefined(row.PhysicalPreference)
-            || !Enum.IsDefined(row.LineMatchingTendency)
-            || !Enum.IsDefined(row.GoalieHandlingTendency)
-            || !Enum.IsDefined(row.VeteranPreference)
-            || !Enum.IsDefined(row.InnovationTendency)
-            || !Enum.IsDefined(row.LoyaltyTendency)
-            || row.ContractLength is < 1 or > byte.MaxValue
+        if (row.ContractLength is < 1 or > byte.MaxValue
             || row.NationalityId is < 0 or > ushort.MaxValue
-            || row.Reputation is < 0 or > 100
+            || row.Reputation is < 0 or > ushort.MaxValue
             || row.BasedInLocationId is < 0 or > ushort.MaxValue)
         {
-            throw new InvalidDataException($"Personnel entity {row.PersonnelId} contains an invalid enum, range, or contract length.");
+            throw new InvalidDataException($"Personnel entity {row.PersonnelId} contains an invalid range or contract length.");
         }
-
-        _ = row.BirthDate;
 
         int?[] ratings =
         [
@@ -1247,42 +1953,6 @@ public sealed class FhmSaveSqliteReader
         }
     }
 
-    private static bool ApplyTeamPersonnel(FhmTeamRecord team, IEnumerable<FhmPersonnelRecord> personnel)
-    {
-        var staff = personnel.Where(value => value.TeamRecordIndex == team.RecordIndex).ToArray();
-        var generalManagerId = GetSingleStaffId(
-            staff,
-            value => value.Job is FhmPersonnelJob.GeneralManager or FhmPersonnelJob.GmHeadCoach,
-            team,
-            "general manager");
-        var headCoachId = GetSingleStaffId(
-            staff,
-            value => value.Job is FhmPersonnelJob.HeadCoach or FhmPersonnelJob.GmHeadCoach,
-            team,
-            "head coach");
-        var changed = team.Tail.GeneralManagerPersonnelId != generalManagerId
-            || team.Tail.HeadCoachPersonnelId != headCoachId;
-        team.Tail.GeneralManagerPersonnelId = generalManagerId;
-        team.Tail.HeadCoachPersonnelId = headCoachId;
-        return changed;
-    }
-
-    private static int GetSingleStaffId(
-        IEnumerable<FhmPersonnelRecord> staff,
-        Func<FhmPersonnelRecord, bool> predicate,
-        FhmTeamRecord team,
-        string role)
-    {
-        var matches = staff.Where(predicate).Select(value => value.PersonnelId).ToArray();
-        return matches.Length switch
-        {
-            0 => -1,
-            1 => matches[0],
-            _ => throw new InvalidDataException(
-                $"Team {team.TeamId} has multiple personnel records assigned as {role}: {string.Join(", ", matches)}."),
-        };
-    }
-
     private static void ValidateTeam(Team row, int ordinal)
     {
         if (row.Flag1 is < byte.MinValue or > byte.MaxValue ||
@@ -1294,8 +1964,19 @@ public sealed class FhmSaveSqliteReader
         }
     }
 
-    private static bool ApplyTeam(FhmTeamRecord destination, Team source)
+    private static bool ApplyTeam(
+        FhmTeamRecord destination,
+        Team source,
+        IReadOnlyDictionary<int, int> teamRecordIndicesByOrdinal)
     {
+        var affiliateParentRecordIndex = ResolveTeamRecordIndex(
+            source.AffiliateParentRecordOrdinal,
+            teamRecordIndicesByOrdinal,
+            "team affiliate parent");
+        var secondaryAffiliateParentRecordIndex = ResolveTeamRecordIndex(
+            source.SecondaryAffiliateParentRecordOrdinal,
+            teamRecordIndicesByOrdinal,
+            "team secondary affiliate parent");
         var changed =
             destination.InternalCode != source.InternalCode ||
             destination.InternalCode2 != source.InternalCode2 ||
@@ -1303,8 +1984,8 @@ public sealed class FhmSaveSqliteReader
             destination.City != source.City ||
             destination.Nickname != source.Nickname ||
             destination.NicknamePlacement != source.NicknamePlacement ||
-            destination.AffiliateParentId != ToWireReference(source.AffiliateParentId) ||
-            destination.AffiliateParentId2 != ToWireReference(source.AffiliateParentId2) ||
+            destination.AffiliateParentId != affiliateParentRecordIndex ||
+            destination.AffiliateParentId2 != secondaryAffiliateParentRecordIndex ||
             destination.LeagueId != source.LeagueId ||
             destination.ConferenceId != source.ConferenceId ||
             destination.DivisionId != source.DivisionId ||
@@ -1322,8 +2003,8 @@ public sealed class FhmSaveSqliteReader
         destination.City = source.City;
         destination.Nickname = source.Nickname;
         destination.NicknamePlacement = checked((byte)source.NicknamePlacement);
-        destination.AffiliateParentId = ToWireReference(source.AffiliateParentId);
-        destination.AffiliateParentId2 = ToWireReference(source.AffiliateParentId2);
+        destination.AffiliateParentId = affiliateParentRecordIndex;
+        destination.AffiliateParentId2 = secondaryAffiliateParentRecordIndex;
         destination.LeagueId = source.LeagueId;
         destination.ConferenceId = source.ConferenceId;
         destination.DivisionId = source.DivisionId;
@@ -1768,6 +2449,26 @@ public sealed class FhmSaveSqliteReader
             throw new InvalidDataException($"{description} contains inserted, deleted, or reordered source rows.");
         }
     }
+
+    private sealed class BaselineFile(string relativePath, SaveFileKind kind, int contentLength)
+    {
+        public string RelativePath { get; } = relativePath;
+        public SaveFileKind Kind { get; } = kind;
+        public int ContentLength { get; } = contentLength;
+        public int ChunkCount { get; set; }
+    }
+
+    private sealed record BaselineFileProjection(
+        string RelativePath,
+        SaveFileKind Kind,
+        int ContentLength);
+
+    private sealed record SaveFileChunkProjection(
+        string RelativePath,
+        int Ordinal,
+        int ContentLength);
+
+    private sealed record SaveFileChunkContent(int Ordinal, byte[] Content);
 
     private sealed record TacticFileExpectation(TacticFileKind Kind, int Version, int RecordCount);
 }

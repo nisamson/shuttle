@@ -1,114 +1,147 @@
 using Shuttle.Fhm.Serde.Domain.Binary;
+using System.Buffers.Binary;
 
 namespace Shuttle.Fhm.Serde.Domain.Files;
 
 internal static class FhmFileCodecs
 {
-    internal static IFhmSaveFile? TryRead(string relativePath, byte[] content)
+    internal static bool IsDocumentedPath(string relativePath)
+    {
+        var normalized = relativePath.Replace('\\', '/');
+        return normalized.Equals("info.dat", StringComparison.OrdinalIgnoreCase) ||
+            normalized is "shot_type_mod.dat" or "tactical_settings_mod.dat" ||
+            normalized.Equals("tactic_templates.dat", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("team_tactics.dat", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("leagues.dat", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("tactics.dat", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("zone_event_mod.dat", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("game_settings.dat", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("names.dat", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("player_roles.dat", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("players.dat", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("personal.dat", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("teams.dat", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("stored_lines.dat", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("trade.dat", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("trade_history.dat", StringComparison.OrdinalIgnoreCase) ||
+            (normalized.StartsWith("set_play_", StringComparison.OrdinalIgnoreCase) &&
+             normalized.EndsWith(".dat", StringComparison.OrdinalIgnoreCase));
+    }
+
+    internal static IFhmSaveFile? TryRead(string relativePath, Stream content)
     {
         ArgumentNullException.ThrowIfNull(content);
         var normalized = relativePath.Replace('\\', '/');
         if (string.Equals(normalized, "info.dat", StringComparison.OrdinalIgnoreCase))
         {
-            using var infoStream = new MemoryStream(content, writable: false);
-            return FhmInfoFile.Read(infoStream);
+            return FhmInfoFile.Read(content);
         }
 
         if (normalized is "shot_type_mod.dat" or "tactical_settings_mod.dat")
         {
-            using var catalogueStream = new MemoryStream(content, writable: false);
-            return FhmLengthPrefixedCatalogueFile.Read(normalized, hasCount: false, catalogueStream);
+            return FhmLengthPrefixedCatalogueFile.Read(normalized, hasCount: false, content);
         }
 
         if (string.Equals(normalized, "tactic_templates.dat", StringComparison.OrdinalIgnoreCase))
         {
-            using var templatesStream = new MemoryStream(content, writable: false);
-            return FhmTacticTemplatesFile.Read(templatesStream);
+            return FhmTacticTemplatesFile.Read(content);
         }
 
         if (string.Equals(normalized, "team_tactics.dat", StringComparison.OrdinalIgnoreCase))
         {
-            using var teamTacticsStream = new MemoryStream(content, writable: false);
-            return FhmTeamTacticsFile.Read(teamTacticsStream);
+            return FhmTeamTacticsFile.Read(content);
         }
 
         if (string.Equals(normalized, "leagues.dat", StringComparison.OrdinalIgnoreCase))
         {
-            using var leaguesStream = new MemoryStream(content, writable: false);
-            return FhmLeaguesFile.Read(leaguesStream);
+            using var leaguesStream = new MemoryStream();
+            content.CopyTo(leaguesStream);
+            var leaguesContent = leaguesStream.ToArray();
+            if (FhmLeaguesFile.HasMultipleRecords(leaguesContent))
+            {
+                return new FhmOpaqueDocumentedFile(
+                    normalized,
+                    BinaryPrimitives.ReadInt32BigEndian(leaguesContent),
+                    leaguesContent[sizeof(int)..]);
+            }
+
+            using var bufferedLeaguesStream = new MemoryStream(leaguesContent, writable: false);
+            return FhmLeaguesFile.Read(bufferedLeaguesStream);
         }
 
         if (string.Equals(normalized, "tactics.dat", StringComparison.OrdinalIgnoreCase))
         {
-            using var tacticsStream = new MemoryStream(content, writable: false);
-            return FhmTacticsFile.Read(tacticsStream);
+            return FhmTacticsFile.Read(content);
         }
 
         if (string.Equals(normalized, "zone_event_mod.dat", StringComparison.OrdinalIgnoreCase))
         {
-            using var zoneEventModifiersStream = new MemoryStream(content, writable: false);
-            return FhmZoneEventModifiersFile.Read(zoneEventModifiersStream);
+            return FhmZoneEventModifiersFile.Read(content);
         }
 
         if (string.Equals(normalized, "game_settings.dat", StringComparison.OrdinalIgnoreCase))
         {
-            using var gameSettingsStream = new MemoryStream(content, writable: false);
-            return FhmGameSettingsFile.Read(gameSettingsStream);
+            return FhmGameSettingsFile.Read(content);
         }
 
         if (string.Equals(normalized, "names.dat", StringComparison.OrdinalIgnoreCase))
         {
-            using var namesStream = new MemoryStream(content, writable: false);
-            return FhmNamesFile.Read(namesStream);
+            return FhmNamesFile.Read(content);
         }
 
         if (string.Equals(normalized, "player_roles.dat", StringComparison.OrdinalIgnoreCase))
         {
-            using var playerRolesStream = new MemoryStream(content, writable: false);
-            return FhmPlayerRolesFile.Read(playerRolesStream);
+            return FhmPlayerRolesFile.Read(content);
         }
 
         if (string.Equals(normalized, "players.dat", StringComparison.OrdinalIgnoreCase))
         {
-            using var playersStream = new MemoryStream(content, writable: false);
-            return FhmPlayersFile.Read(playersStream);
+            return FhmPlayersFile.Read(content);
         }
 
         if (string.Equals(normalized, "personal.dat", StringComparison.OrdinalIgnoreCase))
         {
-            using var personnelStream = new MemoryStream(content, writable: false);
-            return FhmPersonnelFile.Read(personnelStream);
+            return FhmPersonnelFile.Read(content);
         }
 
         if (string.Equals(normalized, "teams.dat", StringComparison.OrdinalIgnoreCase))
         {
-            using var teamsStream = new MemoryStream(content, writable: false);
-            return FhmTeamsFile.Read(teamsStream);
+            return FhmTeamsFile.Read(content);
         }
 
         if (string.Equals(normalized, "stored_lines.dat", StringComparison.OrdinalIgnoreCase))
         {
-            using var storedLinesStream = new MemoryStream(content, writable: false);
-            return FhmStoredLinesFile.Read(storedLinesStream);
+            return FhmStoredLinesFile.Read(content);
         }
 
         if (string.Equals(normalized, "trade.dat", StringComparison.OrdinalIgnoreCase))
         {
-            using var tradeStream = new MemoryStream(content, writable: false);
-            return FhmTradeFile.Read(tradeStream);
+            return FhmTradeFile.Read(content);
         }
 
         if (string.Equals(normalized, "trade_history.dat", StringComparison.OrdinalIgnoreCase))
         {
-            using var tradeHistoryStream = new MemoryStream(content, writable: false);
-            return FhmTradeHistoryFile.Read(tradeHistoryStream);
+            using var tradeHistoryStream = new MemoryStream();
+            content.CopyTo(tradeHistoryStream);
+            var tradeHistoryContent = tradeHistoryStream.ToArray();
+            using var bufferedTradeHistoryStream = new MemoryStream(tradeHistoryContent, writable: false);
+            try
+            {
+                return FhmTradeHistoryFile.Read(bufferedTradeHistoryStream);
+            }
+            catch (FhmUnsupportedFormatException)
+            {
+                return new FhmOpaqueDocumentedFile(
+                    normalized,
+                    BinaryPrimitives.ReadInt32BigEndian(tradeHistoryContent),
+                    tradeHistoryContent[sizeof(int)..]);
+            }
         }
 
         if (normalized.StartsWith("set_play_", StringComparison.OrdinalIgnoreCase) &&
             normalized.EndsWith(".dat", StringComparison.OrdinalIgnoreCase))
         {
-            using var setPlayStream = new MemoryStream(content, writable: false);
-            return FhmSetPlayFile.Read(normalized, setPlayStream);
+            return FhmSetPlayFile.Read(normalized, content);
         }
 
         return null;

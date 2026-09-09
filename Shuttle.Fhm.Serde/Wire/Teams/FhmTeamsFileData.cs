@@ -1,6 +1,6 @@
-using System.Buffers.Binary;
 using BinarySerialization;
 using Shuttle.BinarySerde.Common.QFormat;
+using Shuttle.BinarySerde.Dsl;
 
 namespace Shuttle.Fhm.Serde.Wire.Teams;
 
@@ -93,29 +93,9 @@ public sealed class FhmLeadershipReserveData
 }
 
 /// <summary>The count-delimited participation blocks before the roster delimiter.</summary>
-public sealed class FhmSeasonParticipationChainData : IBinarySerializable
+public sealed class FhmSeasonParticipationChainData
 {
     public List<FhmSeasonParticipationBlockData> Blocks { get; set; } = [];
-
-    public void Deserialize(Stream stream, Endianness endianness, BinarySerializationContext context)
-    {
-        FhmTeamsWirePrimitives.RequireBigEndian(endianness);
-        Blocks = [];
-        do
-        {
-            Blocks.Add(QSerializerFactory.DeserializeOne<FhmSeasonParticipationBlockData>(stream));
-        }
-        while (FhmTeamsWirePrimitives.PeekInt32(stream) != 0);
-    }
-
-    public void Serialize(Stream stream, Endianness endianness, BinarySerializationContext context)
-    {
-        FhmTeamsWirePrimitives.RequireBigEndian(endianness);
-        foreach (var block in Blocks)
-        {
-            QSerializerFactory.Serialize(stream, block);
-        }
-    }
 }
 
 public sealed class FhmSeasonParticipationBlockData
@@ -132,30 +112,9 @@ public sealed class FhmSeasonParticipationRecordData
 }
 
 /// <summary>The self-delimiting roster lists preceding the post-head marker.</summary>
-public sealed class FhmRosterChainData : IBinarySerializable
+public sealed class FhmRosterChainData
 {
-    private static ReadOnlySpan<byte> PostHeadSignature => [0, 100, 1];
-
     public List<QList<int>> Lists { get; set; } = [];
-
-    public void Deserialize(Stream stream, Endianness endianness, BinarySerializationContext context)
-    {
-        FhmTeamsWirePrimitives.RequireBigEndian(endianness);
-        Lists = [];
-        while (!FhmTeamsWirePrimitives.PeekBytes(stream, 3, 4).SequenceEqual(PostHeadSignature))
-        {
-            Lists.Add(QSerializerFactory.DeserializeOne<QList<int>>(stream));
-        }
-    }
-
-    public void Serialize(Stream stream, Endianness endianness, BinarySerializationContext context)
-    {
-        FhmTeamsWirePrimitives.RequireBigEndian(endianness);
-        foreach (var list in Lists)
-        {
-            QSerializerFactory.Serialize(stream, list);
-        }
-    }
 }
 
 public sealed class FhmTeamPostHeadData
@@ -246,7 +205,7 @@ public sealed class FhmRetiredNumberData
 }
 
 /// <summary>The 1,303-byte team-owned tactics region.</summary>
-public sealed class FhmTeamTacticsSettingsData : IBinarySerializable
+public sealed class FhmTeamTacticsSettingsData
 {
     [Ignore] public ushort TeamValue1 { get; set; }
     [Ignore] public byte TeamFlag { get; set; }
@@ -260,62 +219,6 @@ public sealed class FhmTeamTacticsSettingsData : IBinarySerializable
     [Ignore] public List<byte> FinalUseOwnSettingsFlags { get; set; } = [];
     [Ignore] public List<FhmTendencyBlockData> Tendencies { get; set; } = [];
 
-    public void Deserialize(Stream stream, Endianness endianness, BinarySerializationContext context)
-    {
-        FhmTeamsWirePrimitives.RequireBigEndian(endianness);
-        var header = QSerializerFactory.DeserializeOne<FhmTeamTacticsHeaderData>(stream);
-        TeamValue1 = header.TeamValue1;
-        TeamFlag = header.TeamFlag;
-        TeamRating = header.TeamRating;
-        TeamValues2To4 = header.TeamValues2To4;
-        TacticsObjectVersion = header.TacticsObjectVersion;
-        BaseSettings = header.BaseSettings;
-
-        Selectors = [];
-        for (var index = 0; index < 22; index++)
-        {
-            Selectors.Add(FhmZoneSelectorBlockData.Deserialize(stream, index));
-        }
-
-        var footer = QSerializerFactory.DeserializeOne<FhmTeamTacticsFooterData>(stream);
-        FinalOffensiveOrientation = footer.FinalOffensiveOrientation;
-        FinalPhysicalOrientation = footer.FinalPhysicalOrientation;
-        FinalUseOwnSettingsFlags = footer.FinalUseOwnSettingsFlags;
-        Tendencies = [];
-        for (var index = 0; index < 22; index++)
-        {
-            Tendencies.Add(QSerializerFactory.DeserializeOne<FhmTendencyBlockData>(stream));
-        }
-    }
-
-    public void Serialize(Stream stream, Endianness endianness, BinarySerializationContext context)
-    {
-        FhmTeamsWirePrimitives.RequireBigEndian(endianness);
-        QSerializerFactory.Serialize(stream, new FhmTeamTacticsHeaderData
-        {
-            TeamValue1 = TeamValue1,
-            TeamFlag = TeamFlag,
-            TeamRating = TeamRating,
-            TeamValues2To4 = TeamValues2To4,
-            TacticsObjectVersion = TacticsObjectVersion,
-            BaseSettings = BaseSettings,
-        });
-        foreach (var selector in Selectors)
-        {
-            selector.Serialize(stream);
-        }
-
-        QSerializerFactory.Serialize(stream, new FhmTeamTacticsFooterData
-        {
-            FinalOffensiveOrientation = FinalOffensiveOrientation,
-            FinalPhysicalOrientation = FinalPhysicalOrientation,
-            FinalUseOwnSettingsFlags = FinalUseOwnSettingsFlags,
-        });
-        foreach (var tendency in Tendencies)
-        {
-            QSerializerFactory.Serialize(stream, tendency);
-        }
-    }
 }
 
 public sealed class FhmTeamTacticsHeaderData
@@ -336,43 +239,6 @@ public sealed class FhmZoneSelectorBlockData
     public ushort PhysicalOrientation { get; set; }
     public List<byte> DelayedUseOwnSettingsFlags { get; set; } = [];
 
-    internal static FhmZoneSelectorBlockData Deserialize(Stream stream, int blockIndex)
-    {
-        var result = QSerializerFactory.DeserializeOne<FhmZoneSelectorSystemsData>(stream);
-        var selector = new FhmZoneSelectorBlockData { BlockIndex = blockIndex, SystemIds = result.SystemIds };
-        if (blockIndex != 21)
-        {
-            var orientation = QSerializerFactory.DeserializeOne<FhmZoneSelectorOrientationData>(stream);
-            selector.OffensiveOrientation = orientation.OffensiveOrientation;
-            selector.PhysicalOrientation = orientation.PhysicalOrientation;
-        }
-
-        selector.DelayedUseOwnSettingsFlags = FhmTeamsWirePrimitives.ReadBytes(stream, GetDelayedFlagCount(blockIndex)).ToList();
-        return selector;
-    }
-
-    internal void Serialize(Stream stream)
-    {
-        QSerializerFactory.Serialize(stream, new FhmZoneSelectorSystemsData { SystemIds = SystemIds });
-        if (BlockIndex != 21)
-        {
-            QSerializerFactory.Serialize(stream, new FhmZoneSelectorOrientationData
-            {
-                OffensiveOrientation = OffensiveOrientation,
-                PhysicalOrientation = PhysicalOrientation,
-            });
-        }
-
-        FhmTeamsWirePrimitives.WriteBytes(stream, DelayedUseOwnSettingsFlags);
-    }
-
-    internal static int GetDelayedFlagCount(int blockIndex) => blockIndex switch
-    {
-        4 => 4,
-        13 => 3,
-        6 or 8 or 10 or 15 or 17 or 19 => 2,
-        _ => 0,
-    };
 }
 
 public sealed class FhmZoneSelectorSystemsData
@@ -496,77 +362,42 @@ public sealed class FhmTaggedPlayerIdData
 public static class FhmTeamsFileSerializer
 {
     /// <summary>Deserializes only the fixed-size tactics region within a team record.</summary>
-    public static FhmTeamTacticsSettingsData DeserializeSettings(Stream stream) =>
-        QSerializerFactory.Deserialize<FhmTeamTacticsSettingsData>(stream, "team tactics settings");
+    public static FhmTeamTacticsSettingsData DeserializeSettings(Stream stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        using var reader = new BigEndianBinaryReader(stream);
+        var result = FhmTeamsFileCodec.ReadTacticsSettings(reader);
+        reader.EnsureEndOfStream("team tactics settings");
+        return result;
+    }
 
     /// <summary>Deserializes a complete <c>teams.dat</c> stream.</summary>
-    public static FhmTeamsFileData Deserialize(Stream stream) =>
-        QSerializerFactory.Deserialize<FhmTeamsFileData>(stream, "teams.dat");
+    public static FhmTeamsFileData Deserialize(Stream stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        using var reader = new BigEndianBinaryReader(stream);
+        var result = FhmTeamsFileCodec.Read(reader);
+        reader.EnsureEndOfStream("teams.dat");
+        return result;
+    }
 
     /// <summary>Serializes a <c>teams.dat</c> stream.</summary>
-    public static void Serialize(Stream stream, FhmTeamsFileData value) =>
-        QSerializerFactory.Serialize(stream, value);
+    public static void Serialize(Stream stream, FhmTeamsFileData value)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        ArgumentNullException.ThrowIfNull(value);
+        using var writer = new BigEndianBinaryWriter(stream);
+        FhmTeamsFileCodec.Write(writer, value);
+        writer.Flush();
+    }
 
     /// <summary>Serializes only the fixed-size tactics region within a team record.</summary>
-    public static void SerializeSettings(Stream stream, FhmTeamTacticsSettingsData value) =>
-        QSerializerFactory.Serialize(stream, value);
-}
-
-internal static class FhmTeamsWirePrimitives
-{
-    internal static void RequireBigEndian(Endianness endianness)
+    public static void SerializeSettings(Stream stream, FhmTeamTacticsSettingsData value)
     {
-        if (endianness != Endianness.Big)
-        {
-            throw new NotSupportedException("FHM teams data requires big-endian serialization.");
-        }
-    }
-
-    internal static int PeekInt32(Stream stream)
-    {
-        Span<byte> bytes = stackalloc byte[sizeof(int)];
-        ReadAt(stream, stream.Position, bytes);
-        return BinaryPrimitives.ReadInt32BigEndian(bytes);
-    }
-
-    internal static byte[] PeekBytes(Stream stream, int length, int relativeOffset)
-    {
-        var bytes = new byte[length];
-        ReadAt(stream, checked(stream.Position + relativeOffset), bytes);
-        return bytes;
-    }
-
-    internal static byte[] ReadBytes(Stream stream, int length)
-    {
-        var bytes = new byte[length];
-        stream.ReadExactly(bytes);
-        return bytes;
-    }
-
-    internal static void WriteBytes(Stream stream, IEnumerable<byte> values)
-    {
-        foreach (var value in values)
-        {
-            stream.WriteByte(value);
-        }
-    }
-
-    private static void ReadAt(Stream stream, long position, Span<byte> destination)
-    {
-        if (!stream.CanSeek)
-        {
-            throw new NotSupportedException("FHM teams data requires a seekable stream.");
-        }
-
-        var originalPosition = stream.Position;
-        try
-        {
-            stream.Position = position;
-            stream.ReadExactly(destination);
-        }
-        finally
-        {
-            stream.Position = originalPosition;
-        }
+        ArgumentNullException.ThrowIfNull(stream);
+        ArgumentNullException.ThrowIfNull(value);
+        using var writer = new BigEndianBinaryWriter(stream);
+        FhmTeamsFileCodec.WriteTacticsSettings(writer, value);
+        writer.Flush();
     }
 }

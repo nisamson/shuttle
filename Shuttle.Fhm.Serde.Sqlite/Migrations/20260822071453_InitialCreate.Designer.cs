@@ -619,7 +619,7 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
                     b.Property<int>("Slot")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("RoleId")
+                    b.Property<Shuttle.Fhm.Serde.Sqlite.Entities.InGameRole>("RoleId")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("PlayerInternalId", "Slot");
@@ -644,7 +644,7 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
 
             modelBuilder.Entity("Shuttle.Fhm.Serde.Sqlite.Entities.PlayerRoleDefinition", b =>
                 {
-                    b.Property<int>("RoleId")
+                    b.Property<Shuttle.Fhm.Serde.Sqlite.Entities.InGameRole>("RoleId")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("AppliesToDefencemen")
@@ -710,7 +710,7 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
 
             modelBuilder.Entity("Shuttle.Fhm.Serde.Sqlite.Entities.PlayerRoleIndexEntry", b =>
                 {
-                    b.Property<int>("RoleId")
+                    b.Property<Shuttle.Fhm.Serde.Sqlite.Entities.InGameRole>("RoleId")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("List")
@@ -759,7 +759,7 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
 
             modelBuilder.Entity("Shuttle.Fhm.Serde.Sqlite.Entities.PlayerRoleWeight", b =>
                 {
-                    b.Property<int>("RoleId")
+                    b.Property<Shuttle.Fhm.Serde.Sqlite.Entities.InGameRole>("RoleId")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Group")

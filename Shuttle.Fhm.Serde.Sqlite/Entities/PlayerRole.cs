@@ -3,6 +3,43 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Shuttle.Fhm.Serde.Sqlite.Entities;
 
+/// <summary>FHM 10's built-in player tactical roles from <c>player_roles.dat</c>.</summary>
+public enum InGameRole
+{
+    Screener,
+    PowerForward,
+    Grinder,
+    Agitator,
+    PerimeterShooter,
+    Sniper,
+    Playmaker,
+    AggressiveForechecker,
+    BackcheckingForward,
+    Goon,
+    Enforcer,
+    GarbageCollector,
+    Dangler,
+    CounterattackingForward,
+    Shadow,
+    TwoWayForward,
+    UpAndDownWinger,
+    PlaymakingDefenceman,
+    RushingDefenceman,
+    StayAtHomeDefenceman,
+    CreaseClearingDefenceman,
+    Quarterback,
+    PunishingDefenceman,
+    ShutdownDefenceman,
+    TwoWayDefenceman,
+    PointShooter,
+    SetupMan,
+    PunishingForward,
+    MobileDefenceman,
+    GretzkysOffice,
+    OldSchoolDefenceman,
+    SpeedyForward,
+}
+
 public enum PlayerRoleSlot
 {
     Tactical,
@@ -48,7 +85,7 @@ public sealed class PlayerRoleCatalogue
 
 public sealed class PlayerRoleDefinition
 {
-    public int RoleId { get; set; }
+    public InGameRole RoleId { get; set; }
     public int RecordOrdinal { get; set; }
     public string? Name { get; set; }
     public int AppliesToForwards { get; set; }
@@ -68,7 +105,7 @@ public sealed class PlayerRoleDefinition
 
 public sealed class PlayerRoleWeight
 {
-    public int RoleId { get; set; }
+    public InGameRole RoleId { get; set; }
     public PlayerRoleWeightGroup Group { get; set; }
     public int Ordinal { get; set; }
     public int Value { get; set; }
@@ -77,7 +114,7 @@ public sealed class PlayerRoleWeight
 
 public sealed class PlayerRoleIndexEntry
 {
-    public int RoleId { get; set; }
+    public InGameRole RoleId { get; set; }
     public PlayerRoleIndexList List { get; set; }
     public int Ordinal { get; set; }
     public int Value { get; set; }
@@ -88,7 +125,7 @@ public sealed class PlayerRoleAssignment
 {
     public int PlayerInternalId { get; set; }
     public PlayerRoleSlot Slot { get; set; }
-    public int RoleId { get; set; }
+    public InGameRole RoleId { get; set; }
     public Player Player { get; set; } = null!;
     public PlayerRoleDefinition Role { get; set; } = null!;
     public ICollection<PlayerRoleTendencyValue> Tendencies { get; } = [];

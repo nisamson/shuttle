@@ -8,7 +8,7 @@ using Shuttle.Fhm.Serde.Wire.Teams;
 
 namespace Shuttle.Fhm.Serde.Domain.Files;
 
-/// <summary>Maps the stable team object model to the BinarySerializer wire contract.</summary>
+/// <summary>Maps the stable team object model to its wire contract.</summary>
 internal static class FhmTeamWireMapper
 {
     internal const int MaximumCollectionCount = 10_000_000;

@@ -12,11 +12,13 @@ dependency.
 
 ## Contract
 
-Import stores one `SaveFiles` baseline row per normalized source path. The row
-contains its exact bytes and whether the source was a documented or opaque
-file. Unedited export returns documented baseline files as raw byte containers
-and restores opaque files directly; therefore a save-folder → SQLite →
-save-folder conversion is byte-equivalent.
+Import stores one `SaveFiles` baseline row per normalized source path, except
+for the top-level `graphics/`, `import_export/`, and `rs*/` auxiliary trees.
+The row contains its exact bytes and whether the source was a documented or
+opaque file. Unedited export returns documented baseline files as raw byte
+containers and restores opaque files directly; therefore a save-folder →
+SQLite → save-folder conversion is byte-equivalent for the included save-data
+boundary.
 
 Entity edits are update-only. Export compares source key and ordinal sets
 with the parsed baseline and rejects inserts, deletes, reorders, identity
@@ -32,18 +34,20 @@ stored lines; tactic systems/templates; set plays; tactics; and the supported
 modifier catalogues. Unknown fields, opaque files, and serialized-record
 backing remain baseline-preserved.
 
-`Personnel.TeamId` resolves the `personal.dat` team record index to the stable
-`Teams.TeamId` key. `Team.Staff`, `Team.GeneralManager`, and `Team.HeadCoach`
+`Personnel.TeamRecordOrdinal` resolves the `personal.dat` team record index to
+the `Teams.RecordOrdinal` primary key. `Team.Staff`, `Team.GeneralManager`, and `Team.HeadCoach`
 expose employment relationships; export synchronizes the explicit GM and head
 coach personnel slots in `teams.dat`.
 
 `TeamActiveLineSlots` normalizes the thirteen `teams.dat` active-line groups by
-stable team ID, `FhmLineGroup`, and slot ordinal. Each populated slot references
+team record ordinal, `FhmLineGroup`, and slot ordinal. Each populated slot references
 `Players.InternalId`; an empty slot is stored as null. These are the team's
 current game lines and are distinct from user-named `stored_lines.dat` records.
 
 The player team reference is also normalized: `players.dat` stores the team's
-record index, while `Players.TeamId` stores the stable `Teams.TeamId`. Import
+record index, while `Players.TeamRecordOrdinal` stores the corresponding
+`Teams.RecordOrdinal`. The decoded wire `Teams.TeamId` is retained as a
+non-unique data field. Import
 and export translate between those two identity spaces.
 
 Player roles are represented as three distinct systems:
@@ -159,7 +163,7 @@ classDiagram
     }
     class Personnel {
         +PersonnelId int
-        +TeamId int?
+        +TeamRecordOrdinal int?
         +Job FhmPersonnelJob
         +Salary int
         +ContractLength int?
@@ -169,7 +173,7 @@ classDiagram
     }
     class Team {
         +RecordOrdinal int
-        +TeamId int
+        +TeamId int (non-unique wire data)
         +City string
         +Nickname string
     }

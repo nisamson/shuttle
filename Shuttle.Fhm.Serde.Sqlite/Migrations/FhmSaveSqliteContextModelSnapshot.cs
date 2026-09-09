@@ -152,8 +152,14 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
                     b.Property<int>("BirthCityId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateOnly>("BirthDate")
-                        .HasColumnType("TEXT");
+                    b.Property<int>("BirthDay")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("BirthMonth")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("BirthYear")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("CoachingDefense")
                         .HasColumnType("INTEGER");
@@ -180,6 +186,9 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int?>("EvaluatePotential")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("FirstNameLookupNameId")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("FirstNameNameId")
@@ -210,6 +219,9 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int?>("Negotiating")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("NicknameLookupNameId")
                         .HasColumnType("INTEGER");
 
                     b.Property<int?>("NicknameNameId")
@@ -246,16 +258,22 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
                         .IsRequired()
                         .HasColumnType("BLOB");
 
+                    b.Property<int?>("SurnameLookupNameId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("SurnameNameId")
                         .HasColumnType("INTEGER");
 
                     b.Property<int?>("Tactics")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("TeamId")
+                    b.Property<int?>("TeamRecordOrdinal")
                         .HasColumnType("INTEGER");
 
                     b.Property<int?>("TrainerSkill")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("UnresolvedTeamRecordIndex")
                         .HasColumnType("INTEGER");
 
                     b.Property<ushort>("VeteranPreference")
@@ -263,13 +281,13 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
 
                     b.HasKey("PersonnelId");
 
-                    b.HasIndex("FirstNameNameId");
+                    b.HasIndex("FirstNameLookupNameId");
 
-                    b.HasIndex("NicknameNameId");
+                    b.HasIndex("NicknameLookupNameId");
 
-                    b.HasIndex("SurnameNameId");
+                    b.HasIndex("SurnameLookupNameId");
 
-                    b.HasIndex("TeamId");
+                    b.HasIndex("TeamRecordOrdinal");
 
                     b.ToTable("Personnel", null, t =>
                         {
@@ -293,15 +311,7 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
 
                             t.HasCheckConstraint("CK_Personnel_EvaluatePotential", "EvaluatePotential BETWEEN 0 AND 20");
 
-                            t.HasCheckConstraint("CK_Personnel_GoalieHandlingTendency", "GoalieHandlingTendency BETWEEN 0 AND 4");
-
                             t.HasCheckConstraint("CK_Personnel_IngameTactics", "IngameTactics BETWEEN 0 AND 20");
-
-                            t.HasCheckConstraint("CK_Personnel_InnovationTendency", "InnovationTendency BETWEEN 0 AND 4");
-
-                            t.HasCheckConstraint("CK_Personnel_LineMatchingTendency", "LineMatchingTendency BETWEEN 0 AND 4");
-
-                            t.HasCheckConstraint("CK_Personnel_LoyaltyTendency", "LoyaltyTendency BETWEEN 0 AND 4");
 
                             t.HasCheckConstraint("CK_Personnel_Motivation", "Motivation BETWEEN 0 AND 20");
 
@@ -315,15 +325,13 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
 
                             t.HasCheckConstraint("CK_Personnel_PlayerManagement", "PlayerManagement BETWEEN 0 AND 20");
 
-                            t.HasCheckConstraint("CK_Personnel_Reputation", "Reputation BETWEEN 0 AND 100");
+                            t.HasCheckConstraint("CK_Personnel_Reputation", "Reputation BETWEEN 0 AND 65535");
 
                             t.HasCheckConstraint("CK_Personnel_SelfPreservation", "SelfPreservation BETWEEN 0 AND 20");
 
                             t.HasCheckConstraint("CK_Personnel_Tactics", "Tactics BETWEEN 0 AND 20");
 
                             t.HasCheckConstraint("CK_Personnel_TrainerSkill", "TrainerSkill BETWEEN 0 AND 20");
-
-                            t.HasCheckConstraint("CK_Personnel_VeteranPreference", "VeteranPreference BETWEEN 0 AND 4");
                         });
                 });
 
@@ -363,7 +371,7 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
                     b.Property<int?>("SurnameId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("TeamId")
+                    b.Property<int?>("TeamRecordOrdinal")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("InternalId");
@@ -377,7 +385,7 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
 
                     b.HasIndex("SurnameId");
 
-                    b.HasIndex("TeamId");
+                    b.HasIndex("TeamRecordOrdinal");
 
                     b.ToTable("Players", (string)null);
                 });
@@ -794,6 +802,24 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
                     b.ToTable("SaveFiles", (string)null);
                 });
 
+            modelBuilder.Entity("Shuttle.Fhm.Serde.Sqlite.Entities.SaveFileChunk", b =>
+                {
+                    b.Property<string>("RelativePath")
+                        .HasColumnType("TEXT")
+                        .UseCollation("NOCASE");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
+                    b.HasKey("RelativePath", "Ordinal");
+
+                    b.ToTable("SaveFileChunks", (string)null);
+                });
+
             modelBuilder.Entity("Shuttle.Fhm.Serde.Sqlite.Entities.SaveManifest", b =>
                 {
                     b.Property<int>("Id")
@@ -843,12 +869,12 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
                     b.Property<string>("Name")
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("TeamId")
+                    b.Property<int?>("TeamRecordOrdinal")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("LineOrdinal");
 
-                    b.HasIndex("TeamId");
+                    b.HasIndex("TeamRecordOrdinal");
 
                     b.ToTable("StoredLines", (string)null);
                 });
@@ -968,13 +994,10 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
 
             modelBuilder.Entity("Shuttle.Fhm.Serde.Sqlite.Entities.Team", b =>
                 {
-                    b.Property<int>("TeamId")
+                    b.Property<int>("RecordOrdinal")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("AffiliateParentId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("AffiliateParentId2")
+                    b.Property<int?>("AffiliateParentRecordOrdinal")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("City")
@@ -1028,24 +1051,24 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
                     b.Property<int>("RecordIndex")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("RecordOrdinal")
+                    b.Property<int?>("SecondaryAffiliateParentRecordOrdinal")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("TeamId");
+                    b.Property<int>("TeamId")
+                        .HasColumnType("INTEGER");
 
-                    b.HasIndex("AffiliateParentId");
+                    b.HasKey("RecordOrdinal");
 
-                    b.HasIndex("AffiliateParentId2");
+                    b.HasIndex("AffiliateParentRecordOrdinal");
 
-                    b.HasIndex("RecordOrdinal")
-                        .IsUnique();
+                    b.HasIndex("SecondaryAffiliateParentRecordOrdinal");
 
                     b.ToTable("Teams", (string)null);
                 });
 
             modelBuilder.Entity("Shuttle.Fhm.Serde.Sqlite.Entities.TeamActiveLineSlot", b =>
                 {
-                    b.Property<int>("TeamId")
+                    b.Property<int>("TeamRecordOrdinal")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Group")
@@ -1057,7 +1080,7 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
                     b.Property<int?>("PlayerInternalId")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("TeamId", "Group", "SlotOrdinal");
+                    b.HasKey("TeamRecordOrdinal", "Group", "SlotOrdinal");
 
                     b.HasIndex("PlayerInternalId");
 
@@ -1071,14 +1094,14 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
 
             modelBuilder.Entity("Shuttle.Fhm.Serde.Sqlite.Entities.TeamTactic", b =>
                 {
-                    b.Property<int>("TeamId")
+                    b.Property<int>("TeamRecordOrdinal")
                         .HasColumnType("INTEGER");
 
                     b.Property<byte[]>("SerializedSettings")
                         .IsRequired()
                         .HasColumnType("BLOB");
 
-                    b.HasKey("TeamId");
+                    b.HasKey("TeamRecordOrdinal");
 
                     b.ToTable("TeamTactics", (string)null);
                 });
@@ -1152,24 +1175,22 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
                 {
                     b.HasOne("Shuttle.Fhm.Serde.Sqlite.Entities.Name", "FirstName")
                         .WithMany()
-                        .HasForeignKey("FirstNameNameId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .HasForeignKey("FirstNameLookupNameId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Shuttle.Fhm.Serde.Sqlite.Entities.Name", "Nickname")
                         .WithMany()
-                        .HasForeignKey("NicknameNameId")
+                        .HasForeignKey("NicknameLookupNameId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Shuttle.Fhm.Serde.Sqlite.Entities.Name", "Surname")
                         .WithMany()
-                        .HasForeignKey("SurnameNameId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .HasForeignKey("SurnameLookupNameId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Shuttle.Fhm.Serde.Sqlite.Entities.Team", "Team")
                         .WithMany("Staff")
-                        .HasForeignKey("TeamId")
+                        .HasForeignKey("TeamRecordOrdinal")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("FirstName");
@@ -1200,7 +1221,7 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
 
                     b.HasOne("Shuttle.Fhm.Serde.Sqlite.Entities.Team", "Team")
                         .WithMany("Players")
-                        .HasForeignKey("TeamId")
+                        .HasForeignKey("TeamRecordOrdinal")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.OwnsOne("Shuttle.Fhm.Serde.Sqlite.Entities.PlayerPositionAffinity", "PositionAffinity", b1 =>
@@ -1337,11 +1358,20 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
                     b.Navigation("Role");
                 });
 
+            modelBuilder.Entity("Shuttle.Fhm.Serde.Sqlite.Entities.SaveFileChunk", b =>
+                {
+                    b.HasOne("Shuttle.Fhm.Serde.Sqlite.Entities.SaveFile", null)
+                        .WithMany()
+                        .HasForeignKey("RelativePath")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Shuttle.Fhm.Serde.Sqlite.Entities.StoredLine", b =>
                 {
                     b.HasOne("Shuttle.Fhm.Serde.Sqlite.Entities.Team", "Team")
                         .WithMany("StoredLines")
-                        .HasForeignKey("TeamId")
+                        .HasForeignKey("TeamRecordOrdinal")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Team");
@@ -1369,12 +1399,12 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
                 {
                     b.HasOne("Shuttle.Fhm.Serde.Sqlite.Entities.Team", "AffiliateParent")
                         .WithMany()
-                        .HasForeignKey("AffiliateParentId")
+                        .HasForeignKey("AffiliateParentRecordOrdinal")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Shuttle.Fhm.Serde.Sqlite.Entities.Team", "SecondaryAffiliateParent")
                         .WithMany()
-                        .HasForeignKey("AffiliateParentId2")
+                        .HasForeignKey("SecondaryAffiliateParentRecordOrdinal")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("AffiliateParent");
@@ -1391,7 +1421,7 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
 
                     b.HasOne("Shuttle.Fhm.Serde.Sqlite.Entities.Team", "Team")
                         .WithMany("ActiveLineSlots")
-                        .HasForeignKey("TeamId")
+                        .HasForeignKey("TeamRecordOrdinal")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -1404,7 +1434,7 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
                 {
                     b.HasOne("Shuttle.Fhm.Serde.Sqlite.Entities.Team", "Team")
                         .WithOne("Tactics")
-                        .HasForeignKey("Shuttle.Fhm.Serde.Sqlite.Entities.TeamTactic", "TeamId")
+                        .HasForeignKey("Shuttle.Fhm.Serde.Sqlite.Entities.TeamTactic", "TeamRecordOrdinal")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
