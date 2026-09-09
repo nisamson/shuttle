@@ -1,6 +1,7 @@
 using Shuttle.BinarySerde.Common.QFormat;
 using Shuttle.Fhm.Serde.Domain.Files;
 using Shuttle.Fhm.Serde.Wire.Leagues;
+using System.Buffers.Binary;
 
 namespace Shuttle.Tests.Fhm;
 
@@ -26,5 +27,22 @@ public sealed class FhmLeaguesFileTests
 
         Assert.Equal([0xDE, 0xAD, 0xBE, 0xEF], decoded.League.OpaqueLeagueBody);
         Assert.Equal(encoded.ToArray(), rewritten.ToArray());
+    }
+
+    [Fact]
+    public void LeaguesFile_MultiRecordContainerIsPreservedAsOpaqueDocumentedFile()
+    {
+        var content = new byte[12];
+        BinaryPrimitives.WriteInt32BigEndian(content, 35);
+        BinaryPrimitives.WriteInt32BigEndian(content.AsSpan(sizeof(int)), 2);
+        new byte[] { 0xDE, 0xAD, 0xBE, 0xEF }.CopyTo(content, 8);
+
+        using var source = new MemoryStream(content, writable: false);
+        var decoded = Assert.IsType<FhmOpaqueDocumentedFile>(FhmFileCodecs.TryRead("leagues.dat", source));
+        using var rewritten = new MemoryStream();
+        decoded.WriteTo(rewritten);
+
+        Assert.Equal(35, decoded.Version);
+        Assert.Equal(content, rewritten.ToArray());
     }
 }

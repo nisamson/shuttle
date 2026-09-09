@@ -413,14 +413,14 @@ public sealed class FhmSaveTests
         var bytes = CreatePersonnelFileBytes(
             (0, 1, null, FhmPersonnelJob.GeneralManager),
             (2, 2, null, FhmPersonnelJob.Scout));
-        BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(4, sizeof(int)), 4);
 
         using var input = new MemoryStream(bytes, writable: false);
         var file = FhmPersonnelFile.Read(input);
         using var output = new MemoryStream();
         file.WriteTo(output);
 
-        Assert.Equal(4, file.NextPersonnelId);
+        Assert.Equal(2, file.RecordCount);
+        Assert.Equal(2, file.NextPersonnelId);
         Assert.Equal([0, 2], file.Records.Select(value => value.PersonnelId));
         Assert.Equal(bytes, output.ToArray());
     }
@@ -1283,6 +1283,8 @@ public sealed class FhmSaveTests
             BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(start + 0x6E, sizeof(int)), 400_000);
             bytes[start + 0x99] = 8;
             bytes[start + 0xE5] = 0;
+            // Eight zero-valued entries yield the reference 0x1B6-byte v35 stream record.
+            BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(start + 0xAB, sizeof(int)), 8);
             WritePersonnelUInt16(bytes, start, 0xF5, 12);
             WritePersonnelUInt16(bytes, start, 0xF7, 10);
             WritePersonnelUInt16(bytes, start, 0xF9, 122);

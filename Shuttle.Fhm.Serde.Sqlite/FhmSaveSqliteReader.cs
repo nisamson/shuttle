@@ -30,6 +30,8 @@ public sealed class FhmSaveSqliteReader
         }
 
         await using var context = await FhmSaveSqliteContext.OpenAsync(fullPath, cancellationToken);
+        await context.Database.OpenConnectionAsync(cancellationToken);
+        await FhmSaveSqliteContext.ConfigureReadConnectionAsync(context, cancellationToken);
         var manifest = await context.Manifests.AsNoTracking().SingleOrDefaultAsync(cancellationToken)
             ?? throw new InvalidDataException("SQLite save database does not contain a manifest.");
         if (manifest.Id != 1 || manifest.SchemaVersion != FhmSaveSqliteWriter.SchemaVersion ||
@@ -150,7 +152,7 @@ public sealed class FhmSaveSqliteReader
         var personnelFile = GetDocumented<FhmPersonnelFile>(baseline, "personal.dat");
         if (personnelFile is not null)
         {
-            if (ApplyPersonnel(personnelFile, personnel, teams, nameIds))
+            if (ApplyPersonnel(personnelFile, personnel, teams))
             {
                 SetDocumented(output, personnelFile);
             }
@@ -163,7 +165,7 @@ public sealed class FhmSaveSqliteReader
         var teamsFile = GetDocumented<FhmTeamsFile>(baseline, "teams.dat");
         if (teamsFile is not null)
         {
-            if (ApplyTeams(teamsFile, teams, teamTactics, teamActiveLineSlots, personnelFile, playerIds))
+            if (ApplyTeams(teamsFile, teams, teamTactics, teamActiveLineSlots, playerIds))
             {
                 SetDocumented(output, teamsFile);
             }
@@ -360,6 +362,8 @@ public sealed class FhmSaveSqliteReader
 
         var elapsed = System.Diagnostics.Stopwatch.StartNew();
         await using var context = await FhmSaveSqliteContext.OpenAsync(fullDatabasePath, cancellationToken);
+        await context.Database.OpenConnectionAsync(cancellationToken);
+        await FhmSaveSqliteContext.ConfigureReadConnectionAsync(context, cancellationToken);
         var manifest = await context.Manifests.AsNoTracking().SingleOrDefaultAsync(cancellationToken)
             ?? throw new InvalidDataException("SQLite save database does not contain a manifest.");
         ValidateManifest(manifest);
@@ -704,7 +708,7 @@ public sealed class FhmSaveSqliteReader
         var personnelFile = GetExportedDocumented<FhmPersonnelFile>(baseline, destinationDirectory, "personal.dat");
         if (personnelFile is not null)
         {
-            WriteIfChanged(destinationDirectory, personnelFile, ApplyPersonnel(personnelFile, personnel, teams, nameIds));
+            WriteIfChanged(destinationDirectory, personnelFile, ApplyPersonnel(personnelFile, personnel, teams));
         }
         else
         {
@@ -719,7 +723,7 @@ public sealed class FhmSaveSqliteReader
             WriteIfChanged(
                 destinationDirectory,
                 teamsFile,
-                ApplyTeams(teamsFile, teams, teamTactics, activeLineSlots, personnelFile, playerIds));
+                ApplyTeams(teamsFile, teams, teamTactics, activeLineSlots, playerIds));
         }
         else
         {
@@ -1675,7 +1679,6 @@ public sealed class FhmSaveSqliteReader
         IReadOnlyCollection<Team> entities,
         IReadOnlyCollection<TeamTactic> tactics,
         IReadOnlyCollection<TeamActiveLineSlot> activeLineSlots,
-        FhmPersonnelFile? personnelFile,
         ISet<int> playerIds)
     {
         RequireExactKeys(entities, Enumerable.Range(0, file.Teams.Count).ToHashSet(), value => value.RecordOrdinal, nameof(Team));
@@ -1707,10 +1710,6 @@ public sealed class FhmSaveSqliteReader
 
             ValidateTeam(row, ordinal);
             changed |= ApplyTeam(team, row, teamRecordIndicesByOrdinal);
-            if (personnelFile is not null)
-            {
-                changed |= ApplyTeamPersonnel(team, personnelFile.Records);
-            }
             changed |= ApplyTeamActiveLines(team, ordinal, activeLineSlotRows, playerIds);
 
             var tacticRow = tacticRows[ordinal];
@@ -1788,8 +1787,7 @@ public sealed class FhmSaveSqliteReader
     private static bool ApplyPersonnel(
         FhmPersonnelFile file,
         IReadOnlyCollection<Personnel> entities,
-        IReadOnlyCollection<Team> teams,
-        ISet<int> nameIds)
+        IReadOnlyCollection<Team> teams)
     {
         RequireExactKeys(
             entities,
@@ -1809,27 +1807,15 @@ public sealed class FhmSaveSqliteReader
                     $"Personnel entity {record.PersonnelId} changes its immutable serialized backing.");
             }
 
-            if (!nameIds.Contains(row.FirstNameNameId))
-            {
-                throw new InvalidDataException(
-                    $"Personnel entity {record.PersonnelId} references missing first-name ID {row.FirstNameNameId}.");
-            }
-
-            if (!nameIds.Contains(row.SurnameNameId))
-            {
-                throw new InvalidDataException(
-                    $"Personnel entity {record.PersonnelId} references missing surname name ID {row.SurnameNameId}.");
-            }
-
-            if (row.NicknameNameId is int nicknameNameId && !nameIds.Contains(nicknameNameId))
-            {
-                throw new InvalidDataException(
-                    $"Personnel entity {record.PersonnelId} references missing nickname ID {nicknameNameId}.");
-            }
-
             int? teamRecordIndex = null;
             if (row.TeamRecordOrdinal is int teamRecordOrdinal)
             {
+                if (row.UnresolvedTeamRecordIndex is not null)
+                {
+                    throw new InvalidDataException(
+                        $"Personnel entity {record.PersonnelId} has both a resolved and unresolved team reference.");
+                }
+
                 if (!teamsByRecordOrdinal.TryGetValue(teamRecordOrdinal, out var team))
                 {
                     throw new InvalidDataException(
@@ -1837,6 +1823,10 @@ public sealed class FhmSaveSqliteReader
                 }
 
                 teamRecordIndex = team.RecordIndex;
+            }
+            else
+            {
+                teamRecordIndex = row.UnresolvedTeamRecordIndex;
             }
 
             ValidatePersonnel(row);
@@ -1852,7 +1842,7 @@ public sealed class FhmSaveSqliteReader
             destination.FirstNameNameId != source.FirstNameNameId
             || destination.SurnameNameId != source.SurnameNameId
             || destination.NicknameNameId != source.NicknameNameId
-            || destination.BirthDate != new FhmDate(source.BirthDate.Year, source.BirthDate.Month, source.BirthDate.Day)
+            || destination.BirthDate != new FhmDate(source.BirthYear, source.BirthMonth, source.BirthDay)
             || destination.NationalityId != source.NationalityId
             || destination.BirthCityId != source.BirthCityId
             || destination.TeamRecordIndex != teamRecordIndex
@@ -1890,7 +1880,7 @@ public sealed class FhmSaveSqliteReader
         destination.FirstNameNameId = source.FirstNameNameId;
         destination.SurnameNameId = source.SurnameNameId;
         destination.NicknameNameId = source.NicknameNameId;
-        destination.BirthDate = new(source.BirthDate.Year, source.BirthDate.Month, source.BirthDate.Day);
+        destination.BirthDate = new(source.BirthYear, source.BirthMonth, source.BirthDay);
         destination.NationalityId = checked((ushort)source.NationalityId);
         destination.BirthCityId = source.BirthCityId;
         destination.TeamRecordIndex = teamRecordIndex;
@@ -1931,13 +1921,11 @@ public sealed class FhmSaveSqliteReader
     {
         if (row.ContractLength is < 1 or > byte.MaxValue
             || row.NationalityId is < 0 or > ushort.MaxValue
-            || row.Reputation is < 0 or > 100
+            || row.Reputation is < 0 or > ushort.MaxValue
             || row.BasedInLocationId is < 0 or > ushort.MaxValue)
         {
             throw new InvalidDataException($"Personnel entity {row.PersonnelId} contains an invalid range or contract length.");
         }
-
-        _ = row.BirthDate;
 
         int?[] ratings =
         [
@@ -1963,42 +1951,6 @@ public sealed class FhmSaveSqliteReader
         {
             throw new InvalidDataException($"Personnel entity {row.PersonnelId} contains a rating outside 0..20.");
         }
-    }
-
-    private static bool ApplyTeamPersonnel(FhmTeamRecord team, IEnumerable<FhmPersonnelRecord> personnel)
-    {
-        var staff = personnel.Where(value => value.TeamRecordIndex == team.RecordIndex).ToArray();
-        var generalManagerId = GetSingleStaffId(
-            staff,
-            value => value.Job is FhmPersonnelJob.GeneralManager or FhmPersonnelJob.GmHeadCoach,
-            team,
-            "general manager");
-        var headCoachId = GetSingleStaffId(
-            staff,
-            value => value.Job is FhmPersonnelJob.HeadCoach or FhmPersonnelJob.GmHeadCoach,
-            team,
-            "head coach");
-        var changed = team.Tail.GeneralManagerPersonnelId != generalManagerId
-            || team.Tail.HeadCoachPersonnelId != headCoachId;
-        team.Tail.GeneralManagerPersonnelId = generalManagerId;
-        team.Tail.HeadCoachPersonnelId = headCoachId;
-        return changed;
-    }
-
-    private static int GetSingleStaffId(
-        IEnumerable<FhmPersonnelRecord> staff,
-        Func<FhmPersonnelRecord, bool> predicate,
-        FhmTeamRecord team,
-        string role)
-    {
-        var matches = staff.Where(predicate).Select(value => value.PersonnelId).ToArray();
-        return matches.Length switch
-        {
-            0 => -1,
-            1 => matches[0],
-            _ => throw new InvalidDataException(
-                $"Team {team.TeamId} has multiple personnel records assigned as {role}: {string.Join(", ", matches)}."),
-        };
     }
 
     private static void ValidateTeam(Team row, int ordinal)

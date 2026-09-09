@@ -54,7 +54,19 @@ internal static class FhmFileCodecs
 
         if (string.Equals(normalized, "leagues.dat", StringComparison.OrdinalIgnoreCase))
         {
-            return FhmLeaguesFile.Read(content);
+            using var leaguesStream = new MemoryStream();
+            content.CopyTo(leaguesStream);
+            var leaguesContent = leaguesStream.ToArray();
+            if (FhmLeaguesFile.HasMultipleRecords(leaguesContent))
+            {
+                return new FhmOpaqueDocumentedFile(
+                    normalized,
+                    BinaryPrimitives.ReadInt32BigEndian(leaguesContent),
+                    leaguesContent[sizeof(int)..]);
+            }
+
+            using var bufferedLeaguesStream = new MemoryStream(leaguesContent, writable: false);
+            return FhmLeaguesFile.Read(bufferedLeaguesStream);
         }
 
         if (string.Equals(normalized, "tactics.dat", StringComparison.OrdinalIgnoreCase))

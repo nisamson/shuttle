@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Shuttle.Fhm.Serde.Sqlite;
 
@@ -10,9 +11,11 @@ using Shuttle.Fhm.Serde.Sqlite;
 namespace Shuttle.Fhm.Serde.Sqlite.Migrations
 {
     [DbContext(typeof(FhmSaveSqliteContext))]
-    partial class FhmSaveSqliteContextModelSnapshot : ModelSnapshot
+    [Migration("20260901231030_PreserveUnresolvedPersonnelNameReferences")]
+    partial class PreserveUnresolvedPersonnelNameReferences
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
@@ -325,7 +328,7 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
 
                             t.HasCheckConstraint("CK_Personnel_PlayerManagement", "PlayerManagement BETWEEN 0 AND 20");
 
-                            t.HasCheckConstraint("CK_Personnel_Reputation", "Reputation BETWEEN 0 AND 65535");
+                            t.HasCheckConstraint("CK_Personnel_Reputation", "Reputation BETWEEN 0 AND 100");
 
                             t.HasCheckConstraint("CK_Personnel_SelfPreservation", "SelfPreservation BETWEEN 0 AND 20");
 

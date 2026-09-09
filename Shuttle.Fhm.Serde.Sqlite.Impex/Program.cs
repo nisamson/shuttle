@@ -18,7 +18,7 @@ var importOutputOption = new Option<FileInfo>("--output", "-o")
 
 var importOverwriteOption = new Option<bool>("--overwrite")
 {
-    Description = "Replace an existing SQLite adapter database at --output.",
+    Description = "Replace an existing SQLite database with a new import.",
 };
 
 var importTimingsOption = new Option<bool>("--timings")

@@ -96,6 +96,99 @@ public sealed class FhmSaveSqliteTests
     }
 
     [Fact]
+    public async Task WriteAsync_PreservesNonCalendarPersonnelBirthDates()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var root = CreateTestRoot();
+        try
+        {
+            var database = Path.Combine(root, "save.sqlite");
+            var destination = Path.Combine(root, "destination");
+            var save = CreateSave();
+            var record = Assert.IsType<FhmPersonnelFile>(save.Files["personal.dat"]).Records[0];
+            record.BirthDate = new(2000, 0, 0);
+
+            await new FhmSaveSqliteWriter().WriteAsync(save, database, cancellationToken);
+
+            await using (var context = new FhmSaveSqliteContext(FhmSaveSqliteContext.CreateOptions(database)))
+            {
+                var personnel = await context.Personnel.SingleAsync(
+                    value => value.PersonnelId == record.PersonnelId,
+                    cancellationToken);
+                Assert.Equal(2000, personnel.BirthYear);
+                Assert.Equal(0, personnel.BirthMonth);
+                Assert.Equal(0, personnel.BirthDay);
+            }
+
+            await using (var context = new FhmSaveSqliteContext(FhmSaveSqliteContext.CreateOptions(database)))
+            {
+                await context.Database.ExecuteSqlRawAsync(
+                    "UPDATE Personnel SET Salary = Salary + 1 WHERE PersonnelId = {0}",
+                    new object[] { record.PersonnelId },
+                    cancellationToken);
+            }
+
+            await new FhmSaveSqliteReader().ExportAsync(database, destination, cancellationToken);
+            var reloaded = new FhmSaveReader().Read(destination);
+            var personnelFile = Assert.IsType<FhmPersonnelFile>(reloaded.Files["personal.dat"]);
+            Assert.Equal(
+                new FhmDate(2000, 0, 0),
+                personnelFile.Records.Single(value => value.PersonnelId == record.PersonnelId).BirthDate);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task WriteAsync_PreservesUnresolvedPersonnelTeamReference()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var root = CreateTestRoot();
+        try
+        {
+            var database = Path.Combine(root, "save.sqlite");
+            var destination = Path.Combine(root, "destination");
+            var save = CreateSave();
+            var record = Assert.IsType<FhmPersonnelFile>(save.Files["personal.dat"]).Records[0];
+            record.TeamRecordIndex = 65_540;
+            record.FirstNameNameId = 192_242;
+
+            await new FhmSaveSqliteWriter().WriteAsync(save, database, cancellationToken);
+
+            await using (var context = new FhmSaveSqliteContext(FhmSaveSqliteContext.CreateOptions(database)))
+            {
+                var personnel = await context.Personnel.SingleAsync(
+                    value => value.PersonnelId == record.PersonnelId,
+                    cancellationToken);
+                Assert.Null(personnel.TeamRecordOrdinal);
+                Assert.Equal(65_540, personnel.UnresolvedTeamRecordIndex);
+                Assert.Equal(192_242, personnel.FirstNameNameId);
+                Assert.Null(personnel.FirstNameLookupNameId);
+                await context.Database.ExecuteSqlRawAsync(
+                    "UPDATE Personnel SET Salary = Salary + 1 WHERE PersonnelId = {0}",
+                    new object[] { record.PersonnelId },
+                    cancellationToken);
+            }
+
+            await new FhmSaveSqliteReader().ExportAsync(database, destination, cancellationToken);
+            var reloaded = new FhmSaveReader().Read(destination);
+            var personnelFile = Assert.IsType<FhmPersonnelFile>(reloaded.Files["personal.dat"]);
+            Assert.Equal(
+                65_540,
+                personnelFile.Records.Single(value => value.PersonnelId == record.PersonnelId).TeamRecordIndex);
+            Assert.Equal(
+                192_242,
+                personnelFile.Records.Single(value => value.PersonnelId == record.PersonnelId).FirstNameNameId);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task WriteAsync_ExcludesAuxiliarySaveFiles()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -165,6 +258,38 @@ public sealed class FhmSaveSqliteTests
             var exported = await new FhmSaveSqliteReader().ReadAsync(database, cancellationToken);
             new FhmSaveWriter().Write(exported, destination);
             AssertFoldersEqual(source, destination);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task WriteFromDirectoryAsync_PreservesMultiRecordLeaguesAsOpaqueBaseline()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var root = CreateTestRoot();
+        try
+        {
+            var source = Path.Combine(root, "source");
+            var destination = Path.Combine(root, "destination");
+            var database = Path.Combine(root, "save.sqlite");
+            new FhmSaveWriter().Write(CreateSave(), source);
+
+            var leaguesContent = new byte[12];
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(leaguesContent, 35);
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(leaguesContent.AsSpan(sizeof(int)), 2);
+            new byte[] { 0xDE, 0xAD, 0xBE, 0xEF }.CopyTo(leaguesContent, 8);
+            await File.WriteAllBytesAsync(Path.Combine(source, "leagues.dat"), leaguesContent, cancellationToken);
+
+            await new FhmSaveSqliteWriter().WriteFromDirectoryAsync(source, database, cancellationToken);
+            await new FhmSaveSqliteReader().ExportAsync(database, destination, cancellationToken);
+
+            var exportedLeagues = await File.ReadAllBytesAsync(
+                Path.Combine(destination, "leagues.dat"),
+                cancellationToken);
+            Assert.Equal(leaguesContent, exportedLeagues);
         }
         finally
         {
@@ -319,6 +444,48 @@ public sealed class FhmSaveSqliteTests
     }
 
     [Fact]
+    public async Task WriteFromDirectoryAsync_StreamsPersonnelInBoundedBatchesAndPreservesParity()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var root = CreateTestRoot();
+        try
+        {
+            var source = Path.Combine(root, "source");
+            var destination = Path.Combine(root, "destination");
+            var database = Path.Combine(root, "save.sqlite");
+            new FhmSaveWriter().Write(CreateSave(), source);
+            var personnel = Enumerable.Range(0, 251)
+                .Select(personnelId => (personnelId, 1, (int?)0, FhmPersonnelJob.Scout))
+                .ToArray();
+            await File.WriteAllBytesAsync(
+                Path.Combine(source, "personal.dat"),
+                FhmSaveTests.CreatePersonnelFileBytes(personnel),
+                cancellationToken);
+
+            await new FhmSaveSqliteWriter().WriteFromDirectoryAsync(source, database, cancellationToken);
+
+            await using (var context = new FhmSaveSqliteContext(FhmSaveSqliteContext.CreateOptions(database)))
+            {
+                Assert.Equal(251, await context.Personnel.CountAsync(cancellationToken));
+                var firstPersonnel = await context.Personnel.SingleAsync(
+                    value => value.PersonnelId == 0,
+                    cancellationToken);
+                Assert.Equal(1, firstPersonnel.FirstNameLookupNameId);
+                Assert.Equal(1, firstPersonnel.SurnameLookupNameId);
+                Assert.Equal(0, firstPersonnel.TeamRecordOrdinal);
+                Assert.Null(firstPersonnel.UnresolvedTeamRecordIndex);
+            }
+
+            await new FhmSaveSqliteReader().ExportAsync(database, destination, cancellationToken);
+            AssertFoldersEqual(source, destination);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task WriteAsync_StoresPlayerTacticalRolesAsInGameRoleEnums()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -359,15 +526,41 @@ public sealed class FhmSaveSqliteTests
             var sqliteWriter = new FhmSaveSqliteWriter();
             await sqliteWriter.WriteAsync(sourceSave, database, cancellationToken);
             await Assert.ThrowsAsync<IOException>(() => sqliteWriter.WriteAsync(sourceSave, database, cancellationToken));
-            await sqliteWriter.WriteAsync(
-                sourceSave,
-                database,
-                new FhmSaveSqliteWriteOptions { Overwrite = true },
-                cancellationToken);
             var exported = await new FhmSaveSqliteReader().ReadAsync(database, cancellationToken);
             new FhmSaveWriter().Write(exported, destination);
 
             AssertFoldersEqual(source, destination);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ImportExport_PreservesTeamStaffTailWithMultipleMatchingPersonnel()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var root = CreateTestRoot();
+        try
+        {
+            var source = Path.Combine(root, "source");
+            var materializedDestination = Path.Combine(root, "materialized");
+            var streamedDestination = Path.Combine(root, "streamed");
+            var database = Path.Combine(root, "save.sqlite");
+            var save = CreateSave();
+            var personnel = Assert.IsType<FhmPersonnelFile>(save.Files["personal.dat"]);
+            personnel.Records.Single(value => value.PersonnelId == 1).Job = FhmPersonnelJob.GeneralManager;
+            new FhmSaveWriter().Write(save, source);
+
+            await new FhmSaveSqliteWriter().WriteFromDirectoryAsync(source, database, cancellationToken);
+
+            var materialized = await new FhmSaveSqliteReader().ReadAsync(database, cancellationToken);
+            new FhmSaveWriter().Write(materialized, materializedDestination);
+            await new FhmSaveSqliteReader().ExportAsync(database, streamedDestination, cancellationToken);
+
+            AssertFoldersEqual(source, materializedDestination);
+            AssertFoldersEqual(source, streamedDestination);
         }
         finally
         {
@@ -413,7 +606,9 @@ public sealed class FhmSaveSqliteTests
                     """
                     UPDATE Personnel
                     SET NicknameNameId = 1,
-                        BirthDate = '1981-02-03',
+                        BirthYear = 1981,
+                        BirthMonth = 2,
+                        BirthDay = 3,
                         NationalityId = 151,
                         BirthCityId = 71152,
                         Reputation = 75,
@@ -509,7 +704,7 @@ public sealed class FhmSaveSqliteTests
             Assert.Null(Assert.IsType<FhmPersonnelFile>(reloaded.Files["personal.dat"]).Records[1].TeamRecordIndex);
             var reloadedTeam = Assert.Single(Assert.IsType<FhmTeamsFile>(reloaded.Files["teams.dat"]).Teams);
             Assert.Equal(0, reloadedTeam.Tail.GeneralManagerPersonnelId);
-            Assert.Equal(0, reloadedTeam.Tail.HeadCoachPersonnelId);
+            Assert.Equal(1, reloadedTeam.Tail.HeadCoachPersonnelId);
             Assert.Equal(FhmNullConstants.Null, reloadedTeam.ActiveLines.Lists[0].PlayerReferences[0]);
             Assert.Equal("Edited City", Assert.Single(Assert.IsType<FhmTeamsFile>(reloaded.Files["teams.dat"]).Teams).City);
             Assert.Equal((byte)7, Assert.IsType<FhmGameSettingsFile>(reloaded.Files["game_settings.dat"]).Get<byte>(FhmGameSetting.Setting001));
@@ -591,7 +786,7 @@ public sealed class FhmSaveSqliteTests
             Assert.Equal(2, playerTeam.Staff.Count);
             Assert.Equal(0, playerTeam.GeneralManager?.PersonnelId);
             Assert.Equal(1, playerTeam.HeadCoach?.PersonnelId);
-            Assert.Equal("Original", playerTeam.GeneralManager?.Surname.Text);
+            Assert.Equal("Original", playerTeam.GeneralManager?.Surname?.Text);
 
             var storedLine = await context.StoredLines
                 .Include(value => value.Slots)
@@ -606,7 +801,7 @@ public sealed class FhmSaveSqliteTests
     }
 
     [Fact]
-    public async Task Import_RefusesNonAdapterDatabaseWithoutAddingTables()
+    public async Task Import_OverwriteReplacesExistingDatabase()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var root = CreateTestRoot();
@@ -621,20 +816,18 @@ public sealed class FhmSaveSqliteTests
                 await command.ExecuteNonQueryAsync(cancellationToken);
             }
 
-            var exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
-                new FhmSaveSqliteWriter().WriteAsync(
-                    CreateSave(),
-                    database,
-                    new FhmSaveSqliteWriteOptions { Overwrite = true },
-                    cancellationToken));
-            Assert.Contains("not an adapter database", exception.Message);
+            await new FhmSaveSqliteWriter().WriteAsync(
+                CreateSave(),
+                database,
+                new FhmSaveSqliteWriteOptions { Overwrite = true },
+                cancellationToken);
 
             await using (var verification = new SqliteConnection($"Data Source={database};Pooling=False"))
             {
                 await verification.OpenAsync(cancellationToken);
                 await using var verificationCommand = verification.CreateCommand();
-                verificationCommand.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'SaveManifest';";
-                Assert.Equal(0L, Convert.ToInt64(await verificationCommand.ExecuteScalarAsync(cancellationToken)));
+                verificationCommand.CommandText = "SELECT COUNT(*) FROM SaveManifest;";
+                Assert.Equal(1L, Convert.ToInt64(await verificationCommand.ExecuteScalarAsync(cancellationToken)));
             }
         }
         finally
@@ -732,6 +925,7 @@ public sealed class FhmSaveSqliteTests
                     .ToListAsync(cancellationToken);
                 Assert.Equal([1, 1], teamRows.Select(team => team.TeamId));
                 Assert.Equal([0, 1], teamRows.Select(team => team.RecordOrdinal));
+                Assert.Equal(1, teamRows[0].AffiliateParentRecordOrdinal);
                 Assert.Equal([0, 1], await context.Players
                     .OrderBy(player => player.InternalId)
                     .Select(player => player.TeamRecordOrdinal)
@@ -754,6 +948,7 @@ public sealed class FhmSaveSqliteTests
 
             Assert.Equal([1, 1], teams.Select(team => team.TeamId));
             Assert.Equal([0, 1], teams.Select(team => team.RecordIndex));
+            Assert.Equal(1, teams[0].AffiliateParentId);
             Assert.Equal([0, 1], players.OrderBy(player => player.InternalIdentity).Select(player => player.TeamId));
             Assert.Equal([0, 1], teams
                 .Select((team, ordinal) => (team, ordinal))
@@ -939,6 +1134,7 @@ public sealed class FhmSaveSqliteTests
         });
 
         var teams = Assert.IsType<FhmTeamsFile>(save.Files["teams.dat"]);
+        teams.Teams[0].AffiliateParentId = 1;
         var duplicateTeamId = new FhmTeamRecord
         {
             RecordIndex = 1,

@@ -9,16 +9,30 @@ public sealed class Personnel
 {
     public int PersonnelId { get; set; }
     public int FirstNameNameId { get; set; }
-    public Name FirstName { get; set; } = null!;
+    public int? FirstNameLookupNameId { get; set; }
+    public Name? FirstName { get; set; }
     public int SurnameNameId { get; set; }
-    public Name Surname { get; set; } = null!;
+    public int? SurnameLookupNameId { get; set; }
+    public Name? Surname { get; set; }
     public int? NicknameNameId { get; set; }
+    public int? NicknameLookupNameId { get; set; }
     public Name? Nickname { get; set; }
-    public DateOnly BirthDate { get; set; }
+    /// <summary>Gets or sets the raw FHM birth-date year.</summary>
+    public int BirthYear { get; set; }
+
+    /// <summary>Gets or sets the raw FHM birth-date month.</summary>
+    public int BirthMonth { get; set; }
+
+    /// <summary>Gets or sets the raw FHM birth-date day.</summary>
+    public int BirthDay { get; set; }
     public int NationalityId { get; set; }
     public int BirthCityId { get; set; }
     public int? TeamRecordOrdinal { get; set; }
     public Team? Team { get; set; }
+
+    /// <summary>Gets or sets a source team record index with no corresponding team record.</summary>
+    public int? UnresolvedTeamRecordIndex { get; set; }
+
     public FhmPersonnelJob Job { get; set; }
     public int? Negotiating { get; set; }
     public FhmOffensivePreference OffensivePreference { get; set; }
@@ -90,7 +104,7 @@ public sealed class PersonnelConfiguration : IEntityTypeConfiguration<Personnel>
                     "CK_Personnel_ContractLength",
                     "ContractLength IS NULL OR ContractLength BETWEEN 1 AND 255");
                 table.HasCheckConstraint("CK_Personnel_NationalityId", "NationalityId BETWEEN 0 AND 65535");
-                table.HasCheckConstraint("CK_Personnel_Reputation", "Reputation BETWEEN 0 AND 100");
+                table.HasCheckConstraint("CK_Personnel_Reputation", "Reputation BETWEEN 0 AND 65535");
                 table.HasCheckConstraint("CK_Personnel_BasedInLocationId", "BasedInLocationId BETWEEN 0 AND 65535");
             });
         builder.HasKey(value => value.PersonnelId);
@@ -98,15 +112,15 @@ public sealed class PersonnelConfiguration : IEntityTypeConfiguration<Personnel>
         builder.Property(value => value.SerializedRecord).IsRequired();
         builder.HasOne(value => value.FirstName)
             .WithMany()
-            .HasForeignKey(value => value.FirstNameNameId)
+            .HasForeignKey(value => value.FirstNameLookupNameId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(value => value.Surname)
             .WithMany()
-            .HasForeignKey(value => value.SurnameNameId)
+            .HasForeignKey(value => value.SurnameLookupNameId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(value => value.Nickname)
             .WithMany()
-            .HasForeignKey(value => value.NicknameNameId)
+            .HasForeignKey(value => value.NicknameLookupNameId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(value => value.Team)
             .WithMany(value => value.Staff)

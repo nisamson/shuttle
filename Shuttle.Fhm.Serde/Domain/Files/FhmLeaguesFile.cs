@@ -1,6 +1,7 @@
 using Shuttle.BinarySerde.Common.QFormat;
 using Shuttle.Fhm.Serde.Domain.Binary;
 using Shuttle.Fhm.Serde.Wire.Leagues;
+using System.Buffers.Binary;
 
 namespace Shuttle.Fhm.Serde.Domain.Files;
 
@@ -15,6 +16,37 @@ public sealed class FhmLeaguesFile : IFhmSaveFile
 
     /// <summary>Gets or sets the known league record.</summary>
     public FhmLeagueRecord League { get; set; } = new();
+
+    /// <summary>Gets whether a seekable file stream has a multi-record league container.</summary>
+    /// <remarks>
+    /// The multi-record body grammar is not yet verified, so callers must preserve this form
+    /// as opaque data rather than attempting a partial decode.
+    /// </remarks>
+    internal static bool HasMultipleRecords(Stream stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        if (!stream.CanSeek)
+        {
+            throw new NotSupportedException("Determining the leagues.dat record count requires a seekable stream.");
+        }
+
+        var originalPosition = stream.Position;
+        try
+        {
+            Span<byte> header = stackalloc byte[sizeof(int) * 2];
+            stream.ReadExactly(header);
+            return BinaryPrimitives.ReadInt32BigEndian(header[sizeof(int)..]) > 1;
+        }
+        finally
+        {
+            stream.Position = originalPosition;
+        }
+    }
+
+    /// <summary>Gets whether complete league-file bytes contain a multi-record container.</summary>
+    internal static bool HasMultipleRecords(ReadOnlySpan<byte> content) =>
+        content.Length >= sizeof(int) * 2 &&
+        BinaryPrimitives.ReadInt32BigEndian(content[sizeof(int)..]) > 1;
 
     internal static FhmLeaguesFile Read(Stream stream)
     {

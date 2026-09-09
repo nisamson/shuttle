@@ -112,6 +112,26 @@ public sealed class FhmSaveSqliteContext : DbContext
         }
     }
 
+    /// <summary>Configures a fresh, disposable import connection for high-throughput bulk loading.</summary>
+    internal static async Task ConfigureFreshImportConnectionAsync(
+        FhmSaveSqliteContext context,
+        CancellationToken cancellationToken)
+    {
+        await ConfigureReadConnectionAsync(context, cancellationToken);
+        await context.Database.ExecuteSqlRawAsync("PRAGMA journal_mode = WAL;", cancellationToken);
+        await context.Database.ExecuteSqlRawAsync("PRAGMA synchronous = NORMAL;", cancellationToken);
+        await context.Database.ExecuteSqlRawAsync("PRAGMA temp_store = MEMORY;", cancellationToken);
+    }
+
+    /// <summary>Configures a connection for large read-oriented export queries.</summary>
+    internal static async Task ConfigureReadConnectionAsync(
+        FhmSaveSqliteContext context,
+        CancellationToken cancellationToken)
+    {
+        await context.Database.ExecuteSqlRawAsync("PRAGMA cache_size = -262144;", cancellationToken);
+        await context.Database.ExecuteSqlRawAsync("PRAGMA mmap_size = 536870912;", cancellationToken);
+    }
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

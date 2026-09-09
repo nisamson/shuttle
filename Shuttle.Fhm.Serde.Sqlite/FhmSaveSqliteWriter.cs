@@ -1,4 +1,5 @@
 using EFCore.BulkExtensions;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Shuttle.Fhm.Serde.Domain.Files;
@@ -10,8 +11,9 @@ namespace Shuttle.Fhm.Serde.Sqlite;
 /// <summary>Options governing creation of an FHM save SQLite database.</summary>
 public sealed class FhmSaveSqliteWriteOptions
 {
-    /// <summary>Gets or sets whether an existing database file may be replaced.</summary>
+    /// <summary>Gets or sets whether an existing database file may be replaced by a new import.</summary>
     public bool Overwrite { get; init; }
+
     /// <summary>Gets or sets an optional recipient of completed import-phase timings.</summary>
     public IProgress<FhmSaveSqliteWriteProgress>? Progress { get; init; }
     /// <summary>Gets or sets an optional recipient of source capture progress updates.</summary>
@@ -34,7 +36,7 @@ public sealed class FhmSaveSqliteWriter
     public Task WriteAsync(FhmSave save, string databasePath, CancellationToken cancellationToken = default) =>
         WriteAsync(save, databasePath, new FhmSaveSqliteWriteOptions(), cancellationToken);
 
-    /// <summary>Writes a new database using explicit replacement options.</summary>
+    /// <summary>Writes a new database using the supplied import options.</summary>
     public async Task WriteAsync(
         FhmSave save,
         string databasePath,
@@ -73,7 +75,7 @@ public sealed class FhmSaveSqliteWriter
             cancellationToken);
 
     /// <summary>
-    /// Streams one FHM save folder into a new database using explicit replacement options.
+    /// Streams one FHM save folder into a new database using the supplied import options.
     /// </summary>
     public async Task WriteFromDirectoryAsync(
         string sourceDirectory,
@@ -112,59 +114,79 @@ public sealed class FhmSaveSqliteWriter
     {
         var elapsed = System.Diagnostics.Stopwatch.StartNew();
         var fullPath = Path.GetFullPath(databasePath);
-        var databaseExists = File.Exists(fullPath);
-        if (databaseExists && !options.Overwrite)
+        if (File.Exists(fullPath))
         {
-            throw new IOException($"SQLite save database '{fullPath}' already exists. Set Overwrite to replace it explicitly.");
+            if (!options.Overwrite)
+            {
+                throw new IOException(
+                    $"SQLite save database '{fullPath}' already exists. Set Overwrite to replace it with a new import.");
+            }
+
+            File.Delete(fullPath);
+            File.Delete($"{fullPath}-shm");
+            File.Delete($"{fullPath}-wal");
         }
 
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
         await using var context = new FhmSaveSqliteContext(FhmSaveSqliteContext.CreateOptions(fullPath));
-        if (databaseExists)
-        {
-            await EnsureExistingDatabaseIsAdapterFormatAsync(context, fullPath, cancellationToken);
-        }
 
         await context.Database.MigrateAsync(cancellationToken);
         ReportElapsed(options, "Schema migration", elapsed);
-        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        await context.Database.OpenConnectionAsync(cancellationToken);
         try
         {
-            if (await context.Manifests.AnyAsync(cancellationToken))
+            await FhmSaveSqliteContext.ConfigureFreshImportConnectionAsync(context, cancellationToken);
+            await context.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys = OFF;", cancellationToken);
+            await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+            try
             {
-                if (!options.Overwrite)
+                if (await context.Manifests.AnyAsync(cancellationToken))
                 {
-                    throw new InvalidDataException("The SQLite save database is already populated.");
+                    throw new InvalidDataException("A new SQLite import database unexpectedly contains an adapter manifest.");
                 }
 
-                await ClearExistingSaveAsync(context, cancellationToken);
-                ReportElapsed(options, "Existing database cleanup", elapsed);
-            }
-            else if (databaseExists)
-            {
-                throw new InvalidDataException(
-                    $"SQLite save database '{fullPath}' does not contain an adapter manifest and cannot be replaced safely.");
-            }
+                ReportElapsed(options, "Source preparation", elapsed);
+                context.Manifests.Add(new SaveManifest
+                {
+                    SchemaVersion = SchemaVersion,
+                    SourceFormatVersion = "FHM 10 save folder",
+                    SourceFileCount = sourceFileCount,
+                });
 
-            ReportElapsed(options, "Source preparation", elapsed);
-            context.Manifests.Add(new SaveManifest
+                await addSourceFiles(context).ConfigureAwait(false);
+                ReportElapsed(options, "Source capture and entity projection", elapsed);
+                await BulkInsertAsync(context, cancellationToken);
+                ReportElapsed(options, "SQLite persistence", elapsed);
+                await EnsureForeignKeysValidAsync(context, transaction, cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                ReportElapsed(options, "Transaction commit", elapsed);
+            }
+            catch
             {
-                SchemaVersion = SchemaVersion,
-                SourceFormatVersion = "FHM 10 save folder",
-                SourceFileCount = sourceFileCount,
-            });
-
-            await addSourceFiles(context).ConfigureAwait(false);
-            ReportElapsed(options, "Source capture and entity projection", elapsed);
-            await BulkInsertAsync(context, cancellationToken);
-            ReportElapsed(options, "SQLite persistence", elapsed);
-            await transaction.CommitAsync(cancellationToken);
-            ReportElapsed(options, "Transaction commit", elapsed);
+                await transaction.RollbackAsync(CancellationToken.None);
+                throw;
+            }
         }
-        catch
+        finally
         {
-            await transaction.RollbackAsync(CancellationToken.None);
-            throw;
+            await context.Database.CloseConnectionAsync();
+        }
+    }
+
+    private static async Task EnsureForeignKeysValidAsync(
+        FhmSaveSqliteContext context,
+        IDbContextTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        await using var command = context.Database.GetDbConnection().CreateCommand();
+        command.Transaction = transaction.GetDbTransaction();
+        command.CommandText = "PRAGMA foreign_key_check;";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (await reader.ReadAsync(cancellationToken))
+        {
+            throw new InvalidDataException(
+                $"SQLite foreign-key validation failed for {reader.GetString(0)} row {reader.GetInt64(1)}, " +
+                $"parent table {reader.GetString(2)}, constraint {reader.GetInt32(3)}.");
         }
     }
 
@@ -192,7 +214,7 @@ public sealed class FhmSaveSqliteWriter
         await BulkInsertAsync<PlayerRoleWeight>(context, cancellationToken);
         await BulkInsertAsync<PlayerRoleIndexEntry>(context, cancellationToken);
 
-        await BulkInsertAsync<Team>(context, cancellationToken);
+        await BulkInsertTeamsAsync(context, cancellationToken);
         await BulkInsertAsync<TeamTactic>(context, cancellationToken);
         await BulkInsertAsync<Player>(context, cancellationToken);
         await BulkInsertAsync<PlayerAttributes>(context, cancellationToken);
@@ -224,19 +246,77 @@ public sealed class FhmSaveSqliteWriter
         context.ChangeTracker.Clear();
     }
 
-    private static Task BulkInsertAsync<TEntity>(FhmSaveSqliteContext context, CancellationToken cancellationToken)
+    private static async Task BulkInsertAsync<TEntity>(FhmSaveSqliteContext context, CancellationToken cancellationToken)
         where TEntity : class
     {
         var entities = context.ChangeTracker.Entries<TEntity>()
             .Where(entry => entry.State == EntityState.Added)
             .Select(entry => entry.Entity)
             .ToList();
-        return entities.Count == 0
-            ? Task.CompletedTask
-            : context.BulkInsertAsync(
+        if (entities.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await context.BulkInsertAsync(
                 entities,
                 new BulkConfig { BatchSize = SqliteBulkInsertBatchSize },
                 cancellationToken: cancellationToken);
+        }
+        catch (SqliteException exception) when (exception.SqliteErrorCode == 19)
+        {
+            throw new InvalidDataException(
+                $"SQLite foreign-key constraint failed while inserting {entities.Count} {typeof(TEntity).Name} entities.",
+                exception);
+        }
+    }
+
+    private static async Task BulkInsertTeamsAsync(FhmSaveSqliteContext context, CancellationToken cancellationToken)
+    {
+        var teams = context.ChangeTracker.Entries<Team>()
+            .Where(entry => entry.State == EntityState.Added)
+            .Select(entry => entry.Entity)
+            .ToList();
+        if (teams.Count == 0)
+        {
+            return;
+        }
+
+        var affiliateReferences = teams
+            .Select(team => new TeamAffiliateReferences(
+                team,
+                team.AffiliateParentRecordOrdinal,
+                team.SecondaryAffiliateParentRecordOrdinal))
+            .ToList();
+        foreach (var reference in affiliateReferences)
+        {
+            reference.Team.AffiliateParentRecordOrdinal = null;
+            reference.Team.SecondaryAffiliateParentRecordOrdinal = null;
+        }
+
+        await BulkInsertAsync<Team>(context, cancellationToken);
+
+        foreach (var reference in affiliateReferences)
+        {
+            reference.Team.AffiliateParentRecordOrdinal = reference.AffiliateParentRecordOrdinal;
+            reference.Team.SecondaryAffiliateParentRecordOrdinal = reference.SecondaryAffiliateParentRecordOrdinal;
+        }
+
+        try
+        {
+            await context.BulkUpdateAsync(
+                teams,
+                new BulkConfig { BatchSize = SqliteBulkInsertBatchSize },
+                cancellationToken: cancellationToken);
+        }
+        catch (SqliteException exception) when (exception.SqliteErrorCode == 19)
+        {
+            throw new InvalidDataException(
+                $"SQLite foreign-key constraint failed while restoring affiliate references for {teams.Count} Team entities.",
+                exception);
+        }
     }
 
     private static async Task EnsureExistingDatabaseIsAdapterFormatAsync(
@@ -383,6 +463,10 @@ public sealed class FhmSaveSqliteWriter
                 FileShare.Read,
                 bufferSize: 1024 * 1024,
                 FileOptions.SequentialScan);
+            var hasOpaqueMultiRecordLeagues = sourcePath.RelativePath.Equals(
+                "leagues.dat",
+                StringComparison.OrdinalIgnoreCase) &&
+                FhmLeaguesFile.HasMultipleRecords(source);
             using var capture = new CapturingReadStream(
                 source,
                 MaximumInlineFileContentLength,
@@ -408,12 +492,35 @@ public sealed class FhmSaveSqliteWriter
                 continue;
             }
 
-            var documented = kind == SaveFileKind.Documented
+            if (sourcePath.RelativePath.Equals("personal.dat", StringComparison.OrdinalIgnoreCase))
+            {
+                await BulkInsertAsync(context, cancellationToken).ConfigureAwait(false);
+                using (var reader = new FhmPersonnelFileReader(capture))
+                {
+                    await AddPersonnelInBatchesAsync(
+                        context,
+                        reader,
+                        teamRecordOrdinalsByRecordIndex,
+                        cancellationToken).ConfigureAwait(false);
+                }
+
+                capture.Drain();
+                var personnelContent = capture.Complete();
+                if (personnelContent.InlineContent is { } inlinePersonnelContent)
+                {
+                    UpdateBaselineFileContent(context, sourcePath.RelativePath, inlinePersonnelContent);
+                }
+
+                progress?.Report(new FhmSaveReadProgress("Decoded", sourcePath.RelativePath));
+                continue;
+            }
+
+            var documented = kind == SaveFileKind.Documented && !hasOpaqueMultiRecordLeagues
                 ? FhmSaveFileFactory.TryRead(sourcePath.RelativePath, capture)
                 : null;
             capture.Drain();
             var content = capture.Complete();
-            if (kind == SaveFileKind.Documented && documented is null)
+            if (kind == SaveFileKind.Documented && documented is null && !hasOpaqueMultiRecordLeagues)
             {
                 throw new InvalidDataException(
                     $"Documented save file '{sourcePath.RelativePath}' has no matching codec.");
@@ -463,7 +570,6 @@ public sealed class FhmSaveSqliteWriter
                     }
                 }
             }
-
             AddEntities(
                 context,
                 sourcePath.RelativePath,
@@ -660,7 +766,7 @@ public sealed class FhmSaveSqliteWriter
                 AddPlayerRoles(context, playerRoles);
                 break;
             case FhmPersonnelFile personnel:
-                AddPersonnel(context, personnel, teamRecordOrdinalsByRecordIndex);
+                context.Personnel.AddRange(CreatePersonnel(context, personnel, teamRecordOrdinalsByRecordIndex));
                 break;
             case FhmTeamsFile teams:
                 AddTeams(context, teams, teamRecordOrdinalsByRecordIndex);
@@ -1011,68 +1117,133 @@ public sealed class FhmSaveSqliteWriter
         }
     }
 
-    private static void AddPersonnel(
+    private static async Task AddPersonnelInBatchesAsync(
+        FhmSaveSqliteContext context,
+        IEnumerable<FhmPersonnelRecord> records,
+        IReadOnlyDictionary<int, int> teamRecordOrdinalsByRecordIndex,
+        CancellationToken cancellationToken)
+    {
+        var knownNameIds = GetKnownNameIds(context);
+        var batchCount = 0;
+        foreach (var record in records)
+        {
+            context.Personnel.Add(CreatePersonnel(record, knownNameIds, teamRecordOrdinalsByRecordIndex));
+            batchCount++;
+            if (batchCount < SqliteBulkInsertBatchSize)
+            {
+                continue;
+            }
+
+            await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            context.ChangeTracker.Clear();
+            batchCount = 0;
+        }
+
+        if (batchCount > 0)
+        {
+            await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            context.ChangeTracker.Clear();
+        }
+    }
+
+    private static IEnumerable<Personnel> CreatePersonnel(
         FhmSaveSqliteContext context,
         FhmPersonnelFile file,
         IReadOnlyDictionary<int, int> teamRecordOrdinalsByRecordIndex)
     {
+        var knownNameIds = GetKnownNameIds(context);
         foreach (var record in file.Records)
         {
-            int? teamRecordOrdinal = null;
-            if (record.TeamRecordIndex is int teamRecordIndex)
-            {
-                if (!teamRecordOrdinalsByRecordIndex.TryGetValue(teamRecordIndex, out var resolvedTeamRecordOrdinal))
-                {
-                    throw new InvalidDataException(
-                        $"Personnel {record.PersonnelId} references missing team record index {teamRecordIndex}.");
-                }
+            yield return CreatePersonnel(record, knownNameIds, teamRecordOrdinalsByRecordIndex);
+        }
+    }
 
+    private static HashSet<int> GetKnownNameIds(FhmSaveSqliteContext context)
+    {
+        var knownNameIds = context.Names
+            .AsNoTracking()
+            .Select(value => value.NameId)
+            .ToHashSet();
+        knownNameIds.UnionWith(context.ChangeTracker.Entries<Name>()
+            .Where(entry => entry.State == EntityState.Added)
+            .Select(entry => entry.Entity.NameId));
+        return knownNameIds;
+    }
+
+    private static Personnel CreatePersonnel(
+        FhmPersonnelRecord record,
+        IReadOnlySet<int> knownNameIds,
+        IReadOnlyDictionary<int, int> teamRecordOrdinalsByRecordIndex)
+    {
+        int? teamRecordOrdinal = null;
+        int? unresolvedTeamRecordIndex = null;
+        if (record.TeamRecordIndex is int teamRecordIndex)
+        {
+            if (!teamRecordOrdinalsByRecordIndex.TryGetValue(teamRecordIndex, out var resolvedTeamRecordOrdinal))
+            {
+                unresolvedTeamRecordIndex = teamRecordIndex;
+            }
+            else
+            {
                 teamRecordOrdinal = resolvedTeamRecordOrdinal;
             }
-
-            context.Personnel.Add(new Personnel
-            {
-                PersonnelId = record.PersonnelId,
-                FirstNameNameId = record.FirstNameNameId,
-                SurnameNameId = record.SurnameNameId,
-                NicknameNameId = record.NicknameNameId,
-                BirthDate = new DateOnly(record.BirthDate.Year, record.BirthDate.Month, record.BirthDate.Day),
-                NationalityId = record.NationalityId,
-                BirthCityId = record.BirthCityId,
-                TeamRecordOrdinal = teamRecordOrdinal,
-                Job = record.Job,
-                Negotiating = record.Negotiating,
-                OffensivePreference = record.OffensivePreference,
-                PlayerManagement = record.PlayerManagement,
-                PhysicalPreference = record.PhysicalPreference,
-                CoachingDefense = record.CoachingDefense,
-                CoachingForwards = record.CoachingForwards,
-                CoachingGoalies = record.CoachingGoalies,
-                CoachingProspects = record.CoachingProspects,
-                EvaluateAbilities = record.EvaluateAbilities,
-                EvaluatePotential = record.EvaluatePotential,
-                Reputation = record.Reputation,
-                LineMatchingTendency = record.LineMatchingTendency,
-                GoalieHandlingTendency = record.GoalieHandlingTendency,
-                VeteranPreference = record.VeteranPreference,
-                InnovationTendency = record.InnovationTendency,
-                LoyaltyTendency = record.LoyaltyTendency,
-                Salary = record.Salary,
-                ContractLength = record.ContractLength,
-                Retired = record.Retired,
-                DefensiveSkills = record.DefensiveSkills,
-                OffensiveSkills = record.OffensiveSkills,
-                BasedInLocationId = record.BasedInLocationId,
-                PhysicalTraining = record.PhysicalTraining,
-                Tactics = record.Tactics,
-                Discipline = record.Discipline,
-                SelfPreservation = record.SelfPreservation,
-                Motivation = record.Motivation,
-                IngameTactics = record.IngameTactics,
-                TrainerSkill = record.TrainerSkill,
-                SerializedRecord = record.GetSourceBytes(),
-            });
         }
+
+        return new()
+        {
+            PersonnelId = record.PersonnelId,
+            FirstNameNameId = record.FirstNameNameId,
+            FirstNameLookupNameId = knownNameIds.Contains(record.FirstNameNameId)
+                ? record.FirstNameNameId
+                : null,
+            SurnameNameId = record.SurnameNameId,
+            SurnameLookupNameId = knownNameIds.Contains(record.SurnameNameId)
+                ? record.SurnameNameId
+                : null,
+            NicknameNameId = record.NicknameNameId,
+            NicknameLookupNameId = record.NicknameNameId is int nicknameNameId &&
+                knownNameIds.Contains(nicknameNameId)
+                ? nicknameNameId
+                : null,
+            BirthYear = record.BirthDate.Year,
+            BirthMonth = record.BirthDate.Month,
+            BirthDay = record.BirthDate.Day,
+            NationalityId = record.NationalityId,
+            BirthCityId = record.BirthCityId,
+            TeamRecordOrdinal = teamRecordOrdinal,
+            UnresolvedTeamRecordIndex = unresolvedTeamRecordIndex,
+            Job = record.Job,
+            Negotiating = record.Negotiating,
+            OffensivePreference = record.OffensivePreference,
+            PlayerManagement = record.PlayerManagement,
+            PhysicalPreference = record.PhysicalPreference,
+            CoachingDefense = record.CoachingDefense,
+            CoachingForwards = record.CoachingForwards,
+            CoachingGoalies = record.CoachingGoalies,
+            CoachingProspects = record.CoachingProspects,
+            EvaluateAbilities = record.EvaluateAbilities,
+            EvaluatePotential = record.EvaluatePotential,
+            Reputation = record.Reputation,
+            LineMatchingTendency = record.LineMatchingTendency,
+            GoalieHandlingTendency = record.GoalieHandlingTendency,
+            VeteranPreference = record.VeteranPreference,
+            InnovationTendency = record.InnovationTendency,
+            LoyaltyTendency = record.LoyaltyTendency,
+            Salary = record.Salary,
+            ContractLength = record.ContractLength,
+            Retired = record.Retired,
+            DefensiveSkills = record.DefensiveSkills,
+            OffensiveSkills = record.OffensiveSkills,
+            BasedInLocationId = record.BasedInLocationId,
+            PhysicalTraining = record.PhysicalTraining,
+            Tactics = record.Tactics,
+            Discipline = record.Discipline,
+            SelfPreservation = record.SelfPreservation,
+            Motivation = record.Motivation,
+            IngameTactics = record.IngameTactics,
+            TrainerSkill = record.TrainerSkill,
+            SerializedRecord = record.GetSourceBytes(),
+        };
     }
 
     private static void AddTeams(
@@ -1299,6 +1470,10 @@ public sealed class FhmSaveSqliteWriter
 
     private sealed record SourcePath(string RelativePath, string FilePath);
 
+    private sealed record TeamAffiliateReferences(
+        Team Team,
+        int? AffiliateParentRecordOrdinal,
+        int? SecondaryAffiliateParentRecordOrdinal);
     private sealed record CapturedFileContent(byte[]? InlineContent);
 
     private sealed class CapturingReadStream : Stream

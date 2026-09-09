@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Shuttle.Fhm.Serde.Sqlite;
 
@@ -10,9 +11,11 @@ using Shuttle.Fhm.Serde.Sqlite;
 namespace Shuttle.Fhm.Serde.Sqlite.Migrations
 {
     [DbContext(typeof(FhmSaveSqliteContext))]
-    partial class FhmSaveSqliteContextModelSnapshot : ModelSnapshot
+    [Migration("20260901225229_PreserveUnresolvedPersonnelTeamReferences")]
+    partial class PreserveUnresolvedPersonnelTeamReferences
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
@@ -188,9 +191,6 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
                     b.Property<int?>("EvaluatePotential")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("FirstNameLookupNameId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int>("FirstNameNameId")
                         .HasColumnType("INTEGER");
 
@@ -219,9 +219,6 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int?>("Negotiating")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("NicknameLookupNameId")
                         .HasColumnType("INTEGER");
 
                     b.Property<int?>("NicknameNameId")
@@ -258,9 +255,6 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
                         .IsRequired()
                         .HasColumnType("BLOB");
 
-                    b.Property<int?>("SurnameLookupNameId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int>("SurnameNameId")
                         .HasColumnType("INTEGER");
 
@@ -281,11 +275,11 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
 
                     b.HasKey("PersonnelId");
 
-                    b.HasIndex("FirstNameLookupNameId");
+                    b.HasIndex("FirstNameNameId");
 
-                    b.HasIndex("NicknameLookupNameId");
+                    b.HasIndex("NicknameNameId");
 
-                    b.HasIndex("SurnameLookupNameId");
+                    b.HasIndex("SurnameNameId");
 
                     b.HasIndex("TeamRecordOrdinal");
 
@@ -325,7 +319,7 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
 
                             t.HasCheckConstraint("CK_Personnel_PlayerManagement", "PlayerManagement BETWEEN 0 AND 20");
 
-                            t.HasCheckConstraint("CK_Personnel_Reputation", "Reputation BETWEEN 0 AND 65535");
+                            t.HasCheckConstraint("CK_Personnel_Reputation", "Reputation BETWEEN 0 AND 100");
 
                             t.HasCheckConstraint("CK_Personnel_SelfPreservation", "SelfPreservation BETWEEN 0 AND 20");
 
@@ -1175,18 +1169,20 @@ namespace Shuttle.Fhm.Serde.Sqlite.Migrations
                 {
                     b.HasOne("Shuttle.Fhm.Serde.Sqlite.Entities.Name", "FirstName")
                         .WithMany()
-                        .HasForeignKey("FirstNameLookupNameId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .HasForeignKey("FirstNameNameId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("Shuttle.Fhm.Serde.Sqlite.Entities.Name", "Nickname")
                         .WithMany()
-                        .HasForeignKey("NicknameLookupNameId")
+                        .HasForeignKey("NicknameNameId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Shuttle.Fhm.Serde.Sqlite.Entities.Name", "Surname")
                         .WithMany()
-                        .HasForeignKey("SurnameLookupNameId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .HasForeignKey("SurnameNameId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("Shuttle.Fhm.Serde.Sqlite.Entities.Team", "Team")
                         .WithMany("Staff")
