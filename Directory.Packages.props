@@ -3,7 +3,7 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <EntityFrameworkVersion>10.0.9</EntityFrameworkVersion>
     <MicrosoftIdentityWebVersion>4.12.0</MicrosoftIdentityWebVersion>
-    <FluentUIVersion>5.0.0-rc.4-26180.1</FluentUIVersion>
+    <FluentUIVersion>5.0.0-rc.5-26219.1</FluentUIVersion>
     <OpenTelemetryVersion>1.15.3</OpenTelemetryVersion>
     <ScottPlotVersion>5.1.59</ScottPlotVersion>
   </PropertyGroup>

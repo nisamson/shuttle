@@ -183,6 +183,11 @@ public sealed class InMemoryShuttlePlayerClient : IShuttlePlayerClient {
                 || p.Username.Contains(text, StringComparison.OrdinalIgnoreCase));
         }
 
+        if (query.PlayerIds is { Count: > 0 }) {
+            var playerIds = query.PlayerIds.Distinct().ToList();
+            source = source.Where(p => playerIds.Contains(p.PlayerId));
+        }
+
         if (query.Positions is { Count: > 0 }) {
             var positions = query.Positions
                 .Select(code => PlayerPosition.TryFromString(code, out var pos) ? pos : (PlayerPosition?)null)

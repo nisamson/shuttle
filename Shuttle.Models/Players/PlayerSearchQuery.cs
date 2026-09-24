@@ -18,6 +18,12 @@ public record PlayerSearchQuery {
     public string? Text { get; init; }
 
     /// <summary>
+    /// Specific players to include, selected through the name/username autocomplete. This filter is
+    /// combined with the other active filters.
+    /// </summary>
+    public IReadOnlyList<int>? PlayerIds { get; init; }
+
+    /// <summary>
     /// Positions to include, expressed as short codes ("G", "C", "LW", "RW", "LD", "RD"). Short
     /// codes are used to avoid the ambiguity of the <see cref="PlayerPosition"/> <c>[Flags]</c> enum.
     /// </summary>

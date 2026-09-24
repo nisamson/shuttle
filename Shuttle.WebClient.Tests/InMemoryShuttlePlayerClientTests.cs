@@ -75,6 +75,16 @@ public class InMemoryShuttlePlayerClientTests {
     }
 
     [Fact]
+    public async Task SearchPlayers_filters_by_selected_player_ids() {
+        var result = await client.SearchPlayers(new PlayerSearchQuery {
+            PlayerIds = [1001, 1002],
+            PageSize = 100,
+        });
+
+        Assert.Equal([1001, 1002], result.Items.Select(player => player.PlayerId).Order());
+    }
+
+    [Fact]
     public async Task SearchPlayers_sorts_by_total_tpe_descending() {
         var result = await client.SearchPlayers(new PlayerSearchQuery {
             SortBy = PlayerSortField.TotalTpe,

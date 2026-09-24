@@ -133,6 +133,11 @@ public class PlayerController : ControllerBase {
             source = source.Where(p => p.Name.Contains(text) || p.Username.Contains(text));
         }
 
+        if (query.PlayerIds is { Count: > 0 }) {
+            var playerIds = query.PlayerIds.Distinct().ToList();
+            source = source.Where(p => playerIds.Contains(p.PlayerId));
+        }
+
         if (query.Positions is { Count: > 0 }) {
             var positions = query.Positions
                 .Select(code => PlayerPosition.TryFromString(code, out var pos) ? pos : (PlayerPosition?)null)

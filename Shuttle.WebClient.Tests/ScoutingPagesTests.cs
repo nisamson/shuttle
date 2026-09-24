@@ -157,7 +157,7 @@ public class ScoutingPagesTests : WebClientTestContext {
         cut.WaitForState(() => cut.Markup.Contains("Compare Board"));
 
         // Select every prospect via the grid's header "select all" control so the bulk toolbar shows.
-        cut.Find("th.select-all svg").Click();
+        cut.Find("th[col-select] svg").Click();
         cut.WaitForState(() => cut.Markup.Contains("Compare selected"));
 
         // The action must be a real navigating anchor (fluent-anchor-button), not a plain button that

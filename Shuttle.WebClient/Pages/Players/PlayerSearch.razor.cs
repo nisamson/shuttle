@@ -97,14 +97,17 @@ public partial class PlayerSearch : ComponentBase, IDisposable {
     }
 
     // User actions only update the URL; the LocationChanged handler re-runs the search.
-    private void OnSearch(PlayerSearchQuery filters) {
+    private async Task OnSearch(PlayerSearchQuery filters) {
         // A new filter set always starts from the first page but keeps the current sort.
-        Navigate(filters with {
+        query = filters with {
             Page = 1,
             PageSize = query.PageSize,
             SortBy = query.SortBy,
             SortDescending = query.SortDescending,
-        });
+        };
+
+        Navigation.NavigateTo(BuildUri(query));
+        await SearchAsync();
     }
 
     private void OnReset() {
@@ -195,6 +198,7 @@ public partial class PlayerSearch : ComponentBase, IDisposable {
         }
 
         Add("q", target.Text);
+        AddAll("PlayerIds", target.PlayerIds?.Select(playerId => playerId.ToString(CultureInfo.InvariantCulture)));
         AddAll("pos", target.Positions);
         AddStatus(target.Statuses);
         AddAll("league", target.Leagues?.Select(l => l.ToString()));
@@ -236,6 +240,7 @@ public partial class PlayerSearch : ComponentBase, IDisposable {
 
         return new PlayerSearchQuery {
             Text = First("q"),
+            PlayerIds = ParseInts(Many("PlayerIds")),
             Positions = Many("pos"),
             Statuses = ParseStatuses(Many("status")),
             Leagues = ParseEnums<KnownLeague>(Many("league")),
@@ -285,6 +290,19 @@ public partial class PlayerSearch : ComponentBase, IDisposable {
     private static int? ParseInt(string? value) =>
         int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? parsed : null;
 
+    private static IReadOnlyList<int>? ParseInts(IReadOnlyList<string>? values) {
+        if (values is null) {
+            return null;
+        }
+
+        var result = values
+            .Select(ParseInt)
+            .OfType<int>()
+            .Distinct()
+            .ToList();
+        return result.Count > 0 ? result : null;
+    }
+
     private static bool? ParseBool(string? value) =>
         bool.TryParse(value, out var parsed) ? parsed : null;
 
@@ -327,6 +345,7 @@ public partial class PlayerSearch : ComponentBase, IDisposable {
         && a.PageSize == b.PageSize
         && a.SortBy == b.SortBy
         && a.SortDescending == b.SortDescending
+        && SequenceEqual(a.PlayerIds, b.PlayerIds)
         && SequenceEqual(a.Positions, b.Positions)
         && SequenceEqual(a.Statuses, b.Statuses)
         && SequenceEqual(a.Leagues, b.Leagues)

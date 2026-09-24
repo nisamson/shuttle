@@ -8,13 +8,14 @@
             <label>Name or username</label>
             <FluentAutocomplete TOption="PlayerSuggestion"
                                 TValue="string"
+                                Multiple="true"
                                 Width="100%"
                                 Placeholder="Search by name or username"
                                 OnOptionsSearch="OnNameSearch"
                                 OptionText="@(p => $"{p.Name} ({p.Username})")"
                                 OptionValue="@(p => p.PlayerId.ToString())"
-                                SelectedItem="selectedNamePlayer"
-                                SelectedItemChanged="OnNameSelected"/>
+                                SelectedItems="selectedNamePlayers"
+                                SelectedItemsChanged="OnNameSelectionChanged"/>
         </div>
     </div>
 

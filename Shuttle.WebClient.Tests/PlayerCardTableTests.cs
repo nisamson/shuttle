@@ -129,8 +129,8 @@ public class PlayerCardTableTests : WebClientTestContext {
             .Add(c => c.Players, players)
             .Add(c => c.Selectable, true));
 
-        Assert.Single(cut.FindAll("th.select-all"));
-        Assert.Equal(players.Count, cut.FindAll("td.col-select").Count);
+        Assert.Single(cut.FindAll("th[col-select]"));
+        Assert.Equal(players.Count, cut.FindAll("td[col-select]").Count);
     }
 
     [Fact]
@@ -139,7 +139,7 @@ public class PlayerCardTableTests : WebClientTestContext {
 
         var cut = Render<PlayerCardTable>(p => p.Add(c => c.Players, players));
 
-        Assert.Empty(cut.FindAll(".col-select"));
+        Assert.Empty(cut.FindAll("[col-select]"));
     }
 
     [Fact]
@@ -152,7 +152,7 @@ public class PlayerCardTableTests : WebClientTestContext {
             .Add(c => c.Selectable, true)
             .Add(c => c.SelectedPlayersChanged, (IEnumerable<PlayerCard> s) => captured = s));
 
-        cut.FindAll("td.col-select")[0].Click();
+        cut.FindAll("td[col-select]")[0].Click();
 
         Assert.NotNull(captured);
         Assert.Equal(players[0].PlayerId, Assert.Single(captured!).PlayerId);

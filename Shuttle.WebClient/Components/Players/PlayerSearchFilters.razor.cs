@@ -43,7 +43,7 @@ public partial class PlayerSearchFilters : ComponentBase {
     private static readonly PlayerHandedness[] AllHandedness = Enum.GetValues<PlayerHandedness>();
 
     private string? text;
-    private PlayerSuggestion? selectedNamePlayer;
+    private IEnumerable<PlayerSuggestion> selectedNamePlayers = [];
     private IEnumerable<string> selectedPositions = [];
     private IEnumerable<PlayerStatus> selectedStatuses = [];
     private readonly HashSet<KnownLeague> leagues = [];
@@ -69,10 +69,11 @@ public partial class PlayerSearchFilters : ComponentBase {
         e.Items = await Directory.Search(e.Text);
     }
 
-    private void OnNameSelected(PlayerSuggestion? player) {
-        selectedNamePlayer = player;
-        if (player is not null) {
-            text = player.Name;
+    private void OnNameSelectionChanged(IEnumerable<PlayerSuggestion> players) {
+        selectedNamePlayers = players;
+        if (selectedNamePlayers.Any()) {
+            // Selected suggestions become exact player-id filters, not free-text filters.
+            text = null;
         }
     }
 
@@ -92,18 +93,23 @@ public partial class PlayerSearchFilters : ComponentBase {
         }
     }
 
-    protected override void OnParametersSet() {
+    protected override async Task OnParametersSetAsync() {
         if (ReferenceEquals(Initial, loadedInitial)) {
             return;
         }
 
         loadedInitial = Initial;
         LoadFrom(Initial);
+
+        if (Initial?.PlayerIds is { Count: > 0 } playerIds) {
+            var players = await Task.WhenAll(playerIds.Select(playerId => Directory.Find(playerId)));
+            selectedNamePlayers = players.OfType<PlayerSuggestion>().ToList();
+        }
     }
 
     private void LoadFrom(PlayerSearchQuery? source) {
         text = source?.Text;
-        selectedNamePlayer = null;
+        selectedNamePlayers = [];
         iihfNation = source?.IihfNation;
         draftSeasonText = source?.DraftSeason?.ToString(CultureInfo.InvariantCulture);
         minTotalTpeText = source?.MinTotalTpe?.ToString(CultureInfo.InvariantCulture);
@@ -157,6 +163,9 @@ public partial class PlayerSearchFilters : ComponentBase {
     private PlayerSearchQuery BuildQuery() =>
         new() {
             Text = Clean(text),
+            PlayerIds = selectedNamePlayers.Any()
+                ? selectedNamePlayers.Select(player => player.PlayerId).ToList()
+                : null,
             Positions = selectedPositions.Any() ? selectedPositions.ToList() : null,
             Statuses = selectedStatuses.Any() ? selectedStatuses.ToList() : null,
             Leagues = leagues.Count > 0 ? leagues.ToList() : null,
@@ -174,7 +183,7 @@ public partial class PlayerSearchFilters : ComponentBase {
 
     private async Task ResetAsync() {
         text = null;
-        selectedNamePlayer = null;
+        selectedNamePlayers = [];
         selectedPositions = [];
         selectedStatuses = [];
         leagues.Clear();
