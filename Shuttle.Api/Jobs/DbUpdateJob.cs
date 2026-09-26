@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using Microsoft.Extensions.Caching.Hybrid;
 using Quartz;
 using Shuttle.Api.Services;
@@ -46,10 +47,20 @@ public class DbUpdateJob : ISelfRegisteringJob {
         logger.LogInformation("Finished index update");
         await portalUpdater.UpdatePortal(token);
         logger.LogInformation("Finished portal update");
-        context.JobDetail.JobDataMap.Put(LastUpdatedKey, DateTimeOffset.UtcNow.ToString("o"));
+        var lastUpdated = DateTimeOffset.UtcNow;
+        context.JobDetail.JobDataMap.Put(
+            LastUpdatedKey,
+            lastUpdated.ToString("o", CultureInfo.InvariantCulture));
         // Purge every cache entry derived from the database now that it has changed, so consumers
         // (e.g. the recruitment analysis) recompute against the fresh data on their next request.
         await cache.RemoveByTagAsync(CacheTags.DatabaseData, token);
+        await context.Scheduler.TriggerJob(
+            DevelopmentProjectionJob.JobKey,
+            new JobDataMap {
+                [DevelopmentProjectionJob.DataAsOfKey] =
+                    lastUpdated.ToString("o", CultureInfo.InvariantCulture),
+            },
+            token);
         logger.LogInformation("Finished updating the database");
     }
     public static IServiceCollectionQuartzConfigurator RegisterJob(IServiceCollectionQuartzConfigurator qc) {

@@ -18,14 +18,15 @@
         <FluentAutocomplete TOption="PlayerSuggestion"
                             TValue="string"
                             Width="320px"
-                            Label="Add a player"
+                            Label="Players"
                             Placeholder="Search by name or username"
-                            Disabled="AddDisabled"
+                            Multiple="true"
+                            MaximumSelectedOptions="@HardCap"
                             OnOptionsSearch="OnPlayerSearch"
                             OptionText="@(p => $"{p.Name} ({p.Username})")"
                             OptionValue="@(p => p.PlayerId.ToString())"
-                            SelectedItem="selectedToAdd"
-                            SelectedItemChanged="OnPlayerSelected"/>
+                            SelectedItems="selectedPlayers"
+                            SelectedItemsChanged="OnPlayersSelected"/>
         @if (AddDisabled) {
             <FluentText Size="TextSize.Size200">A comparison holds up to @HardCap players.</FluentText>
         }
@@ -120,6 +121,9 @@
                         <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
                             <FluentText Size="TextSize.Size500" Weight="TextWeight.Bold">Total TPE</FluentText>
                             <FluentSpacer/>
+                            <FluentSwitch @bind-Value="limitToShortestTimeline" @bind-Value:after="OnTimelineRangeChanged">
+                                Limit to shortest timeline
+                            </FluentSwitch>
                             <FluentSwitch @bind-Value="alignTimelines" @bind-Value:after="OnAlignChanged">Align start dates</FluentSwitch>
                         </FluentStack>
                     }
@@ -137,6 +141,61 @@
                         <div style="width:100%;height:60vh;min-height:420px;">
                             <PlotlyChart Config="chartConfig" Layout="timelineChart.Layout" Data="timelineChart.Data" @ref="timelineChart.Chart"/>
                         </div>
+                    }
+                </FluentStack>
+            </FluentTab>
+            <FluentTab Header="Development projections" Id="@DevelopmentTabId">
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="16">
+                    @if (developmentChart is not null && HasDevelopmentProjection) {
+                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
+                            <FluentText Size="TextSize.Size500" Weight="TextWeight.Bold">Projected total TPE</FluentText>
+                            <FluentSpacer/>
+                            <FluentSwitch @bind-Value="limitToShortestTimeline" @bind-Value:after="OnTimelineRangeChanged">
+                                Limit to shortest timeline
+                            </FluentSwitch>
+                            <FluentSwitch @bind-Value="alignTimelines" @bind-Value:after="OnAlignChanged">Align start dates</FluentSwitch>
+                        </FluentStack>
+                    }
+
+                    @if (!developmentLoaded || developmentLoading) {
+                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" VerticalAlignment="VerticalAlignment.Center">
+                            <FluentSpinner/>
+                            <FluentText>Loading development projections…</FluentText>
+                        </FluentStack>
+                    } else if (developmentError is not null) {
+                        <FluentMessageBar Intent="MessageBarIntent.Error" Title="Failed to load development projections">
+                            @developmentError
+                        </FluentMessageBar>
+                    } else {
+                        @if (PlayersWithInsufficientHistory.Count > 0) {
+                            <FluentMessageBar Intent="MessageBarIntent.Info" Title="Not enough data for a projection">
+                                Not enough TPE history has been collected to provide a projection for
+                                @string.Join(", ", PlayersWithInsufficientHistory.Select(player => player.Name)).
+                                At least 10 earned-TPE data points and enough elapsed history are required.
+                            </FluentMessageBar>
+                        }
+                        @if (PlayersWithoutPublishedProjection.Count > 0) {
+                            <FluentMessageBar Intent="MessageBarIntent.Info" Title="Projection is being prepared">
+                                No development projection has been published yet for
+                                @string.Join(", ", PlayersWithoutPublishedProjection.Select(player => player.Name)).
+                            </FluentMessageBar>
+                        }
+                        @if (PlayersWithoutFuturePeerHistory.Count > 0) {
+                            <FluentMessageBar Intent="MessageBarIntent.Info" Title="Not enough future peer history">
+                                Similar curves were found for
+                                @string.Join(", ", PlayersWithoutFuturePeerHistory.Select(player => player.Name)),
+                                but fewer than five peers have enough later history to produce a reliable forecast.
+                            </FluentMessageBar>
+                        }
+
+                        @if (HasDevelopmentProjection && developmentChart is not null) {
+                            <FluentText Size="TextSize.Size200" Block="true">
+                                Solid lines are recorded TPE histories. Dashed lines are the published median projections.
+                            </FluentText>
+                            <div style="width:100%;height:60vh;min-height:420px;">
+                                <PlotlyChart Config="chartConfig" Layout="developmentChart.Layout" Data="developmentChart.Data" @ref="developmentChart.Chart"/>
+                            </div>
+                        }
                     }
                 </FluentStack>
             </FluentTab>

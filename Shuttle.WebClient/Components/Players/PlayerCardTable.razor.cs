@@ -48,11 +48,12 @@ public partial class PlayerCardTable : ComponentBase {
     // Per-column pixel minimums keep the table readable on mobile; fr shares expand it when there's room.
     private const string BaseColumns =
         "minmax(140px, 1.5fr) minmax(130px, 1.5fr) minmax(60px, 0.6fr) minmax(90px, 0.9fr) " +
-        "minmax(80px, 0.8fr) minmax(70px, 0.8fr) minmax(110px, 1fr) minmax(90px, 0.9fr) minmax(180px, 2fr)";
+        "minmax(80px, 0.8fr) minmax(70px, 0.8fr) minmax(110px, 1fr) minmax(90px, 0.9fr) " +
+        "minmax(100px, 0.9fr) minmax(180px, 2fr)";
 
     private string GridColumns => Selectable ? $"auto {BaseColumns}" : BaseColumns;
 
-    private string GridStyle => Selectable ? "min-width: 990px;" : "min-width: 950px;";
+    private string GridStyle => Selectable ? "min-width: 1090px;" : "min-width: 1050px;";
 
     /// <summary>The rows rendered by the grid, in the order supplied by the parent (no local sorting).</summary>
     private IQueryable<PlayerCard> Rows => (Players ?? []).AsQueryable();

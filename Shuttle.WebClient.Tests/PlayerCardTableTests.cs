@@ -2,6 +2,7 @@ using Bunit;
 using System.Linq;
 using Shuttle.Models.Players;
 using Shuttle.WebClient.Components.Players;
+using Shuttle.WebClient.Services;
 using Shuttle.WebClient.Testing;
 
 namespace Shuttle.WebClient.Tests;
@@ -47,6 +48,17 @@ public class PlayerCardTableTests : WebClientTestContext {
 
         var link = cut.Find(".emphasized-link");
         Assert.Equal($"/players/{player.PlayerId}", link.GetAttribute("href"));
+    }
+
+    [Fact]
+    public void Shows_the_short_current_tier_name() {
+        var player = SeedData.Players()[0];
+        var expected = PlayerTierClassifier.Current(player.TotalTpe, player.Position);
+
+        var cut = Render<PlayerCardTable>(p => p.Add(c => c.Players, new List<PlayerCard> { player }));
+
+        Assert.Contains(expected.ShortTierName, cut.Markup);
+        Assert.Contains($"Current tier: {expected.LongTierName}", cut.Markup);
     }
 
     [Fact]

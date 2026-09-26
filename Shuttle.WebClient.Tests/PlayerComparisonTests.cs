@@ -80,11 +80,17 @@ public class PlayerComparisonTests : WebClientTestContext {
 
     // A SupplyParameterFromQuery parameter must be supplied through the NavigationManager, not as a
     // component parameter, so navigate to the compare URL first and then render.
-    private IRenderedComponent<PlayerComparison> RenderCompare(params int[] ids) {
+    private IRenderedComponent<PlayerComparison> RenderCompare(int[] ids, string? tab = null) {
         var url = ids.Length == 0 ? Routes.Players.Compare : Routes.Players.CompareWith(ids);
+        if (tab is not null) {
+            url += $"{(url.Contains('?') ? '&' : '?')}tab={tab}";
+        }
         Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(url);
         return Render<PlayerComparison>();
     }
+
+    private IRenderedComponent<PlayerComparison> RenderCompare(params int[] ids) =>
+        RenderCompare(ids, tab: null);
 
     [Fact]
     public void Empty_selection_prompts_the_user_to_add_players() {
@@ -186,6 +192,40 @@ public class PlayerComparisonTests : WebClientTestContext {
         cut.WaitForState(() => cut.Markup.Contains("Skater attributes"));
 
         Assert.Contains("TPE timeline", cut.Markup);
+        Assert.Contains("Development projections", cut.Markup);
+    }
+
+    [Fact]
+    public void Tab_query_value_opens_and_loads_the_requested_comparison_tab() {
+        var cut = RenderCompare([1001, 1002], "development");
+
+        cut.WaitForState(() => GetDevelopmentChart(cut) is not null);
+
+        Assert.Equal("development", GetActiveTabId(cut));
+    }
+
+    [Fact]
+    public void Changing_comparison_tabs_updates_the_url() {
+        var cut = RenderCompare(1001, 1002);
+        cut.WaitForState(() => cut.Markup.Contains("Skater attributes"));
+
+        SetActiveDevelopmentTab(cut);
+
+        var navigation = Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        Assert.Contains("ids=1001,1002", navigation.Uri);
+        Assert.Contains("tab=development", navigation.Uri);
+    }
+
+    [Fact]
+    public void Player_multiselect_tracks_the_url_selection() {
+        var cut = RenderCompare(1001, 1002);
+        cut.WaitForState(() => cut.Markup.Contains("Skater attributes"));
+
+        var selected = (IEnumerable<PlayerSuggestion>)typeof(PlayerComparison)
+            .GetField("selectedPlayers", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(cut.Instance)!;
+
+        Assert.Equal([1001, 1002], selected.Select(player => player.PlayerId));
     }
 
     [Fact]
@@ -204,6 +244,27 @@ public class PlayerComparisonTests : WebClientTestContext {
         Assert.NotNull(timelineChart);
         // One overlaid timeline trace per player — nothing dropped by the concurrency gate.
         Assert.Equal(count, timelineChart!.Data.Count);
+        var starts = timelineChart.Data
+            .OfType<Plotly.Blazor.Traces.Scatter>()
+            .Select(trace => trace.X![0])
+            .Distinct()
+            .ToList();
+        Assert.Single(starts);
+    }
+
+    [Fact]
+    public void Opening_the_development_tab_overlays_actual_and_projected_curves() {
+        var cut = RenderCompare(1001, 1002);
+        cut.WaitForState(() => cut.Markup.Contains("Skater attributes"));
+
+        SetActiveDevelopmentTab(cut);
+
+        cut.WaitForState(() => GetDevelopmentChart(cut) is not null);
+        var chart = GetDevelopmentChart(cut);
+        Assert.NotNull(chart);
+        Assert.Contains(
+            chart!.Data.OfType<Plotly.Blazor.Traces.Scatter>(),
+            trace => trace.Name?.EndsWith(" projected", StringComparison.Ordinal) == true);
     }
 
     [Fact]
@@ -238,6 +299,16 @@ public class PlayerComparisonTests : WebClientTestContext {
             .GetField("timelineChart", BindingFlags.NonPublic | BindingFlags.Instance)!
             .GetValue(cut.Instance);
 
+    private static AttributeChart? GetDevelopmentChart(IRenderedComponent<PlayerComparison> cut) =>
+        (AttributeChart?)typeof(PlayerComparison)
+            .GetField("developmentChart", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(cut.Instance);
+
+    private static string GetActiveTabId(IRenderedComponent<PlayerComparison> cut) =>
+        (string)typeof(PlayerComparison)
+            .GetField("activeTabId", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(cut.Instance)!;
+
     // Mirrors what @bind-ActiveTabId + its :after hook do when the TPE-timeline tab is selected.
     private static void SetActiveTimelineTab(IRenderedComponent<PlayerComparison> cut) {
         var type = typeof(PlayerComparison);
@@ -246,6 +317,18 @@ public class PlayerComparisonTests : WebClientTestContext {
             .GetValue(null)!;
         type.GetField("activeTabId", BindingFlags.NonPublic | BindingFlags.Instance)!
             .SetValue(cut.Instance, timelineTabId);
+
+        var onTabChanged = type.GetMethod("OnTabChangedAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        cut.InvokeAsync(() => (Task)onTabChanged.Invoke(cut.Instance, null)!).GetAwaiter().GetResult();
+    }
+
+    private static void SetActiveDevelopmentTab(IRenderedComponent<PlayerComparison> cut) {
+        var type = typeof(PlayerComparison);
+        var developmentTabId = (string)type
+            .GetField("DevelopmentTabId", BindingFlags.NonPublic | BindingFlags.Static)!
+            .GetValue(null)!;
+        type.GetField("activeTabId", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(cut.Instance, developmentTabId);
 
         var onTabChanged = type.GetMethod("OnTabChangedAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         cut.InvokeAsync(() => (Task)onTabChanged.Invoke(cut.Instance, null)!).GetAwaiter().GetResult();

@@ -124,5 +124,6 @@
     <PackageVersion Include="xunit.v3" Version="3.0.1" />
     <PackageVersion Include="YoloDotNet" Version="4.2.0" />
     <PackageVersion Include="Facet" Version="6.3.4" />
+    <PackageVersion Include="FastDtw.CSharp" Version="2.3.0" />
   </ItemGroup>
 </Project>

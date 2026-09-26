@@ -8,9 +8,10 @@ namespace Shuttle.Models.Players;
 /// and sent by the Refit client as a flattened query string. Every property is optional; unset /
 /// empty properties are ignored by the server.
 /// <para>
-/// The enum-like filters (<see cref="Positions"/>, <see cref="Statuses"/>, <see cref="Leagues"/>,
-/// <see cref="Handedness"/>) are multiselect: a player matches when it equals any value in the
-/// collection (OR within a field), and all supplied filters must match (AND across fields).
+/// The enum-like filters (<see cref="Positions"/>, <see cref="Tiers"/>, <see cref="Statuses"/>,
+/// <see cref="Leagues"/>, <see cref="Handedness"/>) are multiselect: a player matches when it equals
+/// any value in the collection (OR within a field), and all supplied filters must match (AND across
+/// fields).
 /// </para>
 /// </summary>
 public record PlayerSearchQuery {
@@ -22,6 +23,15 @@ public record PlayerSearchQuery {
     /// codes are used to avoid the ambiguity of the <see cref="PlayerPosition"/> <c>[Flags]</c> enum.
     /// </summary>
     public IReadOnlyList<string>? Positions { get; init; }
+
+    /// <summary>Position-neutral TPE tiers to include.</summary>
+    public IReadOnlyList<PlayerTier>? Tiers { get; init; }
+
+    /// <summary>
+    /// Projected potential tiers to include, or realized peak tiers for players who have undergone a
+    /// major decline.
+    /// </summary>
+    public IReadOnlyList<PlayerTier>? DevelopmentTiers { get; init; }
 
     /// <summary>Lifecycle statuses to include.</summary>
     public IReadOnlyList<PlayerStatus>? Statuses { get; init; }

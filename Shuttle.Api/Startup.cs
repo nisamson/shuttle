@@ -13,6 +13,7 @@ using Quartz.AspNetCore;
 using Quartz.Impl;
 using Shuttle.Api.Jobs;
 using Shuttle.Api.Quartz;
+using Shuttle.Api.Services.DevelopmentProjections;
 using Shuttle.EFCore;
 using Shuttle.EFCore.Procedures;
 using Shuttle.ServiceDefaults;
@@ -45,6 +46,8 @@ public static class Startup {
         );
         builder.Services.AddScoped<IndexUpdater>();
         builder.Services.AddScoped<PortalUpdater>();
+        builder.Services.AddSingleton<DevelopmentProjectionCalculator>();
+        builder.Services.AddScoped<DevelopmentProjectionStore>();
         var connStr = ShuttleEfCoreExtensions.GetConnectionString();
         builder.Services.AddQuartz(q => {
             q.InterruptJobsOnShutdownWithWait = true;
@@ -60,6 +63,7 @@ public static class Startup {
             });
             HelloJob.RegisterJob(q);
             DbUpdateJob.RegisterJob(q);
+            DevelopmentProjectionJob.RegisterJob(q);
         });
         builder.Services.AddQuartzServer(o => {
                 o.AwaitApplicationStarted = true;

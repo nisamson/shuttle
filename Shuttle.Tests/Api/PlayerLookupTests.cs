@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shuttle.Api.Controllers;
+using Shuttle.Api.Services.DevelopmentProjections;
 using Shuttle.EFCore;
 using Shuttle.EFCore.Entities.Portal;
 using Shuttle.Models.Players;
@@ -47,7 +48,11 @@ public class PlayerLookupTests {
         var db = CreateContext();
         db.PlayerInformation.AddRange(players);
         await db.SaveChangesAsync(Ct);
-        return new PlayerController(db, new StubFreshnessProvider(), NullLogger<PlayerController>.Instance);
+        return new PlayerController(
+            db,
+            new StubFreshnessProvider(),
+            new DevelopmentProjectionStore(db, TimeProvider.System),
+            NullLogger<PlayerController>.Instance);
     }
 
     private sealed class StubFreshnessProvider : Shuttle.Api.Services.IDatabaseFreshnessProvider {

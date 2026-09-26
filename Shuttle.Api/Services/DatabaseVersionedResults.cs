@@ -31,11 +31,15 @@ public static class DatabaseVersionedResults {
     /// <param name="body">The response body to return on a <c>200</c>.</param>
     /// <param name="lastUpdated">The database freshness signal used as the ETag/Last-Modified version.</param>
     /// <param name="maxAge">How long clients/shared caches may reuse the response before revalidating.</param>
+    /// <param name="versionDiscriminator">
+    /// An optional additional cache identity, such as a persisted algorithm version.
+    /// </param>
     public static ActionResult DbVersionedOk<T>(
         this ControllerBase controller,
         T body,
         DateTimeOffset? lastUpdated,
-        TimeSpan maxAge) {
+        TimeSpan maxAge,
+        string? versionDiscriminator = null) {
         var headers = controller.Response.GetTypedHeaders();
         headers.CacheControl = new CacheControlHeaderValue {
             Public = true,
@@ -44,7 +48,7 @@ public static class DatabaseVersionedResults {
 
         if (lastUpdated is { } lu) {
             headers.LastModified = lu;
-            var etag = ComputeETag(controller.Request, lu);
+            var etag = ComputeETag(controller.Request, lu, versionDiscriminator);
             headers.ETag = etag;
 
             var ifNoneMatch = controller.Request.GetTypedHeaders().IfNoneMatch;
@@ -61,8 +65,11 @@ public static class DatabaseVersionedResults {
     /// Builds a strong ETag from the freshness signal and the exact resource (path + query), so
     /// distinct endpoints/queries never share a validator.
     /// </summary>
-    private static EntityTagHeaderValue ComputeETag(HttpRequest request, DateTimeOffset lastUpdated) {
-        var raw = $"{lastUpdated:o}|{request.Path}{request.QueryString}";
+    private static EntityTagHeaderValue ComputeETag(
+        HttpRequest request,
+        DateTimeOffset lastUpdated,
+        string? versionDiscriminator) {
+        var raw = $"{lastUpdated:o}|{versionDiscriminator}|{request.Path}{request.QueryString}";
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
         return new EntityTagHeaderValue($"\"{Convert.ToHexString(hash, 0, 8).ToLowerInvariant()}\"");
     }

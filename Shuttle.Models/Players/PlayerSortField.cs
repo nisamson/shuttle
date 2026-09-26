@@ -8,6 +8,7 @@ public enum PlayerSortField {
     Name,
     Username,
     TotalTpe,
+    Tier,
     DraftSeason,
     Position,
     Status,

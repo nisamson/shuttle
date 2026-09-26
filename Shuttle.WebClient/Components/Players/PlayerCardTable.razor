@@ -1,6 +1,7 @@
 @using Shuttle.Models.Players
 @using Shuttle.Shl.Api.Models.Common
 @using Shuttle.Shl.Api.Models.Portal.V1
+@using Shuttle.WebClient.Services
 
 @{
     // Fully controlled sort header: the indicator reflects the SortField/SortDescending parameters
@@ -58,6 +59,9 @@
     <TemplateColumn Title="Total TPE" Align="DataGridCellAlignment.End"
                     HeaderCellItemTemplate="@(_ => SortHeader(("Total TPE", PlayerSortField.TotalTpe)))">
         <span style="font-variant-numeric: tabular-nums;">@context.TotalTpe.ToString("N0")</span>
+    </TemplateColumn>
+    <TemplateColumn Title="Tier" HeaderCellItemTemplate="@(_ => SortHeader(("Tier", PlayerSortField.Tier)))">
+        <PlayerTierBadge Model="@PlayerTierClassifier.Current(context.TotalTpe, context.Position)" Compact="true"/>
     </TemplateColumn>
     <TemplateColumn Title="Flags">
         @if (context.Recreate) {

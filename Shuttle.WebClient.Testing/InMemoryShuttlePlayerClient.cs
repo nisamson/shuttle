@@ -62,6 +62,76 @@ public sealed class InMemoryShuttlePlayerClient : IShuttlePlayerClient {
         return Task.FromResult(player is null ? null : BuildTimeline(player));
     }
 
+    public Task<PlayerDevelopmentProjectionResult?> GetPlayerDevelopmentProjection(
+        int playerId,
+        CancellationToken token = default) {
+        var player = players.FirstOrDefault(p => p.PlayerId == playerId);
+        if (player is null) {
+            return Task.FromResult<PlayerDevelopmentProjectionResult?>(null);
+        }
+
+        if (player.TotalTpe <= 0) {
+            return Task.FromResult<PlayerDevelopmentProjectionResult?>(new PlayerDevelopmentProjectionResult {
+                PlayerId = playerId,
+                Status = DevelopmentProjectionStatus.InsufficientObservedData,
+                IsCurrent = true,
+            });
+        }
+
+        var timeline = BuildTimeline(player);
+        var observed = timeline
+            .Select(point => new DevelopmentCurvePoint {
+                Date = new DateTimeOffset(point.TaskDate),
+                TotalTpe = point.TotalTpe,
+            })
+            .ToList();
+        var last = observed[^1];
+        var weeklyGain = Math.Max(5, player.TotalTpe / 80d);
+        var projected = Enumerable.Range(1, 20)
+            .Select(week => new DevelopmentProjectionPoint {
+                Date = last.Date.AddDays(7 * week),
+                P10 = last.TotalTpe + (weeklyGain * 0.65 * week),
+                P50 = last.TotalTpe + (weeklyGain * week),
+                P90 = last.TotalTpe + (weeklyGain * 1.35 * week),
+                PeerCount = Math.Max(5, 15 - (week / 3)),
+            })
+            .ToList();
+        var similar = players
+            .Where(candidate => candidate.PlayerId != playerId && candidate.TotalTpe > 0)
+            .OrderBy(candidate => Math.Abs(candidate.TotalTpe - player.TotalTpe))
+            .ThenBy(candidate => candidate.PlayerId)
+            .Take(5)
+            .Select((candidate, index) => new DevelopmentSimilarity {
+                PlayerId = candidate.PlayerId,
+                Name = candidate.Name,
+                Username = candidate.Username,
+                Score = 0.95 - (index * 0.08),
+                Distance = 0.05 + (index * 0.08),
+            })
+            .ToList();
+
+        var generatedAt = last.Date.AddMinutes(5);
+        return Task.FromResult<PlayerDevelopmentProjectionResult?>(new PlayerDevelopmentProjectionResult {
+            PlayerId = playerId,
+            Status = DevelopmentProjectionStatus.Available,
+            DataAsOf = last.Date,
+            GeneratedAt = generatedAt,
+            IsCurrent = true,
+            Projection = new PlayerDevelopmentProjection {
+                PlayerId = playerId,
+                DataAsOf = last.Date,
+                GeneratedAt = generatedAt,
+                IsCurrent = true,
+                CadenceDays = 7,
+                BaselineTotalTpe = last.TotalTpe,
+                BaselineDate = last.Date,
+                ObservedPoints = observed,
+                ProjectedPoints = projected,
+                SimilarPlayers = similar,
+            },
+        });
+    }
+
     // Mirrors the server's QUERY /players/lookup semantics against the seed set: case-insensitive
     // name matching (ambiguous names rejected), unknown ids/names reported, resolved players
     // de-duplicated preserving order (requested ids first, then name-resolved).
@@ -201,6 +271,21 @@ public sealed class InMemoryShuttlePlayerClient : IShuttlePlayerClient {
             source = source.Where(p => statuses.Contains(p.Status));
         }
 
+        if (query.Tiers is { Count: > 0 }) {
+            var tiers = query.Tiers.Distinct().ToHashSet();
+            source = source.Where(p => tiers.Contains(PlayerTierExtensions.FromTotalTpe(p.TotalTpe)));
+        }
+
+        if (query.DevelopmentTiers is { Count: > 0 }) {
+            var tiers = query.DevelopmentTiers.Distinct().ToHashSet();
+            source = source.Where(player =>
+                PlayerTierExtensions.FromDevelopment(
+                    player.TotalTpe,
+                    player.TotalTpe,
+                    ProjectedPeakTpe(player)) is { } tier
+                && tiers.Contains(tier));
+        }
+
         if (query.Leagues is { Count: > 0 }) {
             var leagues = query.Leagues.Distinct().ToList();
             source = source.Where(p => p.CurrentLeague is not null && leagues.Contains(p.CurrentLeague.Value));
@@ -254,6 +339,7 @@ public sealed class InMemoryShuttlePlayerClient : IShuttlePlayerClient {
 
         return query.SortBy switch {
             PlayerSortField.TotalTpe => OrderBy(source, p => p.TotalTpe, desc),
+            PlayerSortField.Tier => OrderBy(source, p => PlayerTierExtensions.FromTotalTpe(p.TotalTpe), desc),
             PlayerSortField.DraftSeason => OrderBy(source, p => p.DraftSeason, desc),
             PlayerSortField.Position => OrderBy(source, p => p.Position, desc),
             PlayerSortField.Status => OrderBy(source, p => p.Status, desc),
@@ -272,4 +358,9 @@ public sealed class InMemoryShuttlePlayerClient : IShuttlePlayerClient {
             ? source.OrderByDescending(keySelector)
             : source.OrderBy(keySelector))
         .ThenBy(p => p.PlayerId);
+
+    private static double? ProjectedPeakTpe(PlayerCard player) =>
+        player.TotalTpe <= 0
+            ? null
+            : player.TotalTpe + (Math.Max(5, player.TotalTpe / 80d) * 20);
 }

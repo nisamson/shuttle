@@ -155,6 +155,161 @@ public class PlayerAttributeChartsTests {
         Assert.Equal(start.AddDays(30), (DateTime)bob.X![^1]);
     }
 
+    [Fact]
+    public void BuildTimelineOverlay_can_limit_every_series_to_the_shortest_observed_duration() {
+        var start = new DateTime(2021, 3, 1, 0, 0, 0, DateTimeKind.Utc);
+        var series = new List<(string, IReadOnlyList<TpeTimelinePoint>)> {
+            ("Short", Points(start, (0, 10), (20, 30))),
+            ("Long", Points(start.AddDays(5), (0, 5), (14, 20), (30, 40))),
+        };
+
+        var chart = PlayerAttributeCharts.BuildTimelineOverlay(
+            series,
+            align: true,
+            dark: false,
+            limitToShortest: true)!;
+
+        var traces = chart.Data.OfType<Scatter>().ToList();
+        Assert.All(traces, trace => Assert.Equal(start.AddDays(20), (DateTime)trace.X![^1]));
+        var longer = traces.Single(trace => trace.Name == "Long");
+        Assert.Equal(20, longer.Y![^1]);
+    }
+
+    [Fact]
+    public void BuildDevelopmentProjection_adds_actual_band_and_median_traces() {
+        var start = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var actual = Points(start.UtcDateTime, (0, 100), (7, 120));
+        var projection = new PlayerDevelopmentProjection {
+            PlayerId = 1,
+            DataAsOf = start.AddDays(90),
+            GeneratedAt = start.AddDays(90).AddMinutes(1),
+            IsCurrent = true,
+            CadenceDays = 7,
+            BaselineTotalTpe = 120,
+            BaselineDate = start.AddDays(7),
+            ObservedPoints = [
+                new DevelopmentCurvePoint { Date = start, TotalTpe = 100 },
+                new DevelopmentCurvePoint { Date = start.AddDays(7), TotalTpe = 120 },
+            ],
+            ProjectedPoints = [
+                new DevelopmentProjectionPoint {
+                    Date = start.AddDays(14),
+                    P10 = 125,
+                    P50 = 130,
+                    P90 = 140,
+                    PeerCount = 10,
+                },
+            ],
+            SimilarPlayers = [],
+        };
+
+        var chart = PlayerAttributeCharts.BuildDevelopmentProjection(actual, projection, dark: false);
+
+        Assert.NotNull(chart);
+        var traces = chart!.Data.OfType<Scatter>().ToList();
+        Assert.Equal(4, traces.Count);
+        Assert.Equal(["Actual TPE", "P10-P90 range", "P10-P90 range", "Projected median"],
+            traces.Select(trace => trace.Name));
+        Assert.Equal(Plotly.Blazor.Traces.ScatterLib.FillEnum.ToNextY, traces[2].Fill);
+        Assert.Equal("dash", traces[3].Line!.Dash);
+        Assert.Equal(start.AddDays(7).UtcDateTime, traces[3].X![0]);
+    }
+
+    [Fact]
+    public void BuildDevelopmentProjection_without_projection_keeps_actual_timeline() {
+        var start = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var chart = PlayerAttributeCharts.BuildDevelopmentProjection(
+            Points(start, (0, 100), (7, 120)),
+            projection: null,
+            dark: false);
+
+        Assert.NotNull(chart);
+        var trace = Assert.IsType<Scatter>(Assert.Single(chart!.Data));
+        Assert.Equal("Actual TPE", trace.Name);
+    }
+
+    [Fact]
+    public void BuildDevelopmentProjection_infers_baseline_date_for_older_payloads() {
+        var start = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var projection = new PlayerDevelopmentProjection {
+            PlayerId = 1,
+            DataAsOf = start.AddDays(90),
+            GeneratedAt = start.AddDays(90).AddMinutes(1),
+            IsCurrent = false,
+            CadenceDays = 7,
+            BaselineTotalTpe = 120,
+            ObservedPoints = [
+                new DevelopmentCurvePoint { Date = start, TotalTpe = 100 },
+                new DevelopmentCurvePoint { Date = start.AddDays(7), TotalTpe = 120 },
+            ],
+            ProjectedPoints = [
+                new DevelopmentProjectionPoint {
+                    Date = start.AddDays(14),
+                    P10 = 125,
+                    P50 = 130,
+                    P90 = 140,
+                    PeerCount = 10,
+                },
+            ],
+            SimilarPlayers = [],
+        };
+
+        var chart = PlayerAttributeCharts.BuildDevelopmentProjection(
+            actual: null,
+            projection,
+            dark: false)!;
+        var median = chart.Data
+            .OfType<Scatter>()
+            .Single(trace => trace.Name == "Projected median");
+
+        Assert.Equal(start.AddDays(7).UtcDateTime, median.X![0]);
+    }
+
+    [Fact]
+    public void BuildDevelopmentProjectionOverlay_pairs_actual_and_projected_traces_by_player() {
+        var start = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var projection = new PlayerDevelopmentProjection {
+            PlayerId = 1,
+            DataAsOf = start.AddDays(7),
+            GeneratedAt = start.AddDays(7).AddMinutes(1),
+            IsCurrent = true,
+            CadenceDays = 7,
+            BaselineTotalTpe = 120,
+            BaselineDate = start.AddDays(7),
+            ObservedPoints = [
+                new DevelopmentCurvePoint { Date = start, TotalTpe = 100 },
+                new DevelopmentCurvePoint { Date = start.AddDays(7), TotalTpe = 120 },
+            ],
+            ProjectedPoints = [
+                new DevelopmentProjectionPoint {
+                    Date = start.AddDays(14),
+                    P10 = 125,
+                    P50 = 130,
+                    P90 = 140,
+                    PeerCount = 10,
+                },
+            ],
+            SimilarPlayers = [],
+        };
+
+        var chart = PlayerAttributeCharts.BuildDevelopmentProjectionOverlay(
+            [
+                new PlayerDevelopmentSeries(
+                    "Alice",
+                    Points(start.UtcDateTime, (0, 100), (7, 120)),
+                    projection),
+            ],
+            align: true,
+            dark: false);
+
+        Assert.NotNull(chart);
+        var traces = chart!.Data.OfType<Scatter>().ToList();
+        Assert.Equal(["Alice actual", "Alice projected"], traces.Select(trace => trace.Name));
+        Assert.Equal(traces[0].Line!.Color, traces[1].Line!.Color);
+        Assert.Equal("dash", traces[1].Line.Dash);
+    }
+
     private static IReadOnlyList<TpeTimelinePoint> Points(
         DateTime start, params (int DayOffset, int TotalTpe)[] points) =>
         points.Select(p => new TpeTimelinePoint {

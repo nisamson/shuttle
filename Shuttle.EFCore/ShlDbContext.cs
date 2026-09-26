@@ -46,6 +46,10 @@ public class ShlDbContext : DbContext {
     public DbSet<PlayerEarnedTpe> PlayerEarnedTpe { get; set; }
     
     public DbSet<TpeTimelineBackfill> TpeTimelineBackfills { get; set; }
+
+    public DbSet<DevelopmentProjectionRun> DevelopmentProjectionRuns { get; set; }
+
+    public DbSet<PersistedDevelopmentProjection> DevelopmentProjections { get; set; }
     
     public DbSet<Team> Teams { get; set; }
 

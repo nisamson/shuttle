@@ -87,6 +87,55 @@ public class InMemoryShuttlePlayerClientTests {
     }
 
     [Fact]
+    public async Task SearchPlayers_filters_by_multiple_tiers_across_positions() {
+        var custom = new InMemoryShuttlePlayerClient([
+            Card(1, "Minor", 250, PlayerPosition.Center),
+            Card(2, "Core Defense", 1200, PlayerPosition.LeftDefense),
+            Card(3, "Core Goalie", 1499, PlayerPosition.Goalie),
+            Card(4, "Star", 1500, PlayerPosition.RightWing),
+        ]);
+
+        var result = await custom.SearchPlayers(new PlayerSearchQuery {
+            Tiers = [PlayerTier.MinorBottom, PlayerTier.Core],
+            PageSize = 100,
+        });
+
+        Assert.Equal([1, 2, 3], result.Items.Select(p => p.PlayerId).OrderBy(id => id));
+    }
+
+    [Fact]
+    public async Task SearchPlayers_filters_by_projected_tier() {
+        var custom = new InMemoryShuttlePlayerClient([
+            Card(1, "Future Star", 1200, PlayerPosition.Center),
+            Card(2, "Future Depth", 500, PlayerPosition.LeftDefense),
+            Card(3, "No Projection", 0, PlayerPosition.Goalie),
+        ]);
+
+        var result = await custom.SearchPlayers(new PlayerSearchQuery {
+            DevelopmentTiers = [PlayerTier.Star],
+            PageSize = 100,
+        });
+
+        Assert.Equal([1], result.Items.Select(p => p.PlayerId));
+    }
+
+    [Fact]
+    public async Task SearchPlayers_sorts_by_tier_with_players_in_the_same_band_equal() {
+        var custom = new InMemoryShuttlePlayerClient([
+            Card(3, "High Core Goalie", 1499, PlayerPosition.Goalie),
+            Card(1, "Low Core Forward", 1000, PlayerPosition.Center),
+            Card(2, "Depth Defense", 500, PlayerPosition.LeftDefense),
+        ]);
+
+        var result = await custom.SearchPlayers(new PlayerSearchQuery {
+            SortBy = PlayerSortField.Tier,
+            PageSize = 100,
+        });
+
+        Assert.Equal([2, 1, 3], result.Items.Select(p => p.PlayerId));
+    }
+
+    [Fact]
     public async Task SearchPlayers_paginates_and_reports_total() {
         var all = await client.SearchPlayers(new PlayerSearchQuery { PageSize = 100 });
 
@@ -200,15 +249,19 @@ public class InMemoryShuttlePlayerClientTests {
         Assert.Equal(ids.OrderBy(i => i), cards.Select(c => c.PlayerId).OrderBy(i => i));
     }
 
-    private static PlayerCard Card(int id, string name) => new() {
+    private static PlayerCard Card(
+        int id,
+        string name,
+        int totalTpe = 0,
+        PlayerPosition position = PlayerPosition.Center) => new() {
         PlayerId = id,
         UserId = id,
         Username = $"user{id}",
         Name = name,
         Status = PlayerStatus.Active,
-        Position = PlayerPosition.Center,
+        Position = position,
         Handedness = PlayerHandedness.Left,
-        TotalTpe = 0,
+        TotalTpe = totalTpe,
         AppliedTpe = 0,
         BankedTpe = 0,
         BankBalance = 0,

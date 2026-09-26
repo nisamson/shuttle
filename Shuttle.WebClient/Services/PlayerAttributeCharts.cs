@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Plotly.Blazor;
 using Plotly.Blazor.Traces;
 using Plotly.Blazor.Traces.ScatterPolarLib;
+using Shuttle.Models.Players;
 using Shuttle.Shl.Api.Models.Common;
 
 namespace Shuttle.WebClient.Services;
@@ -38,6 +39,12 @@ public sealed record AttributeChartSet(AttributeChart? Combined, IReadOnlyList<A
 
 /// <summary>A named series of attribute values contributed to an overlaid comparison chart.</summary>
 public sealed record PlayerAttributeSeries(string Name, PlayerAttributes Attributes);
+
+/// <summary>A player's actual TPE history and optional published development projection.</summary>
+public sealed record PlayerDevelopmentSeries(
+    string Name,
+    IReadOnlyList<TpeTimelinePoint> Actual,
+    PlayerDevelopmentProjection? Projection);
 
 /// <summary>
 /// Builds the radar/bar attribute charts shared by the player profile and comparison pages.
@@ -313,24 +320,58 @@ public static class PlayerAttributeCharts {
     /// Builds the "Total TPE" timeline chart, overlaying one step-line series per player. When
     /// <paramref name="align"/> is set, every series is shifted so its first point lands on the
     /// earliest player's start date, aligning origins while preserving each player's own pace.
+    /// When <paramref name="limitToShortest"/> is set, every series stops at the shortest selected
+    /// player's observed duration, with the cumulative value held through the common cutoff.
     /// Series with no points are dropped; returns <c>null</c> when nothing can be charted.
     /// </summary>
     public static AttributeChart? BuildTimelineOverlay(
-        IReadOnlyList<(string Name, IReadOnlyList<Shuttle.Models.Players.TpeTimelinePoint> Points)> series,
-        bool align, bool dark) {
-        var valid = series.Where(s => s.Points is { Count: > 0 }).ToList();
+        IReadOnlyList<(string Name, IReadOnlyList<TpeTimelinePoint> Points)> series,
+        bool align,
+        bool dark,
+        bool limitToShortest = false) {
+        var valid = series
+            .Where(s => s.Points is { Count: > 0 })
+            .Select(s => (
+                s.Name,
+                Points: (IReadOnlyList<TpeTimelinePoint>)s.Points
+                    .OrderBy(point => point.TaskDate)
+                    .ToList()))
+            .ToList();
         if (valid.Count == 0) {
             return null;
         }
 
         var earliestStart = valid.Min(s => s.Points[0].TaskDate);
+        var commonDuration = limitToShortest && valid.Count > 1
+            ? valid.Min(s => s.Points[^1].TaskDate - s.Points[0].TaskDate)
+            : (TimeSpan?)null;
 
         var data = new List<ITrace>();
         foreach (var (name, points) in valid) {
             var offset = align ? earliestStart - points[0].TaskDate : TimeSpan.Zero;
+            var cutoff = commonDuration is { } duration
+                ? points[0].TaskDate.Add(duration)
+                : (DateTime?)null;
+            var visiblePoints = cutoff is { } cutoffDate
+                ? points.Where(point => point.TaskDate <= cutoffDate).ToList()
+                : points.ToList();
+            var dates = visiblePoints
+                .Select(point => (object)point.TaskDate.Add(offset))
+                .ToList();
+            var values = visiblePoints
+                .Select(point => (object)point.TotalTpe)
+                .ToList();
+
+            if (cutoff is { } heldThrough
+                && visiblePoints.Count > 0
+                && visiblePoints[^1].TaskDate < heldThrough) {
+                dates.Add(heldThrough.Add(offset));
+                values.Add(visiblePoints[^1].TotalTpe);
+            }
+
             data.Add(new Plotly.Blazor.Traces.Scatter {
-                X = points.Select(p => (object)p.TaskDate.Add(offset)).ToList(),
-                Y = points.Select(p => (object)p.TotalTpe).ToList(),
+                X = dates,
+                Y = values,
                 Mode = Plotly.Blazor.Traces.ScatterLib.ModeFlag.Lines | Plotly.Blazor.Traces.ScatterLib.ModeFlag.Markers,
                 // A step ("hv") line reflects that the cumulative total holds until the next event.
                 Line = new Plotly.Blazor.Traces.ScatterLib.Line {
@@ -347,4 +388,214 @@ public static class PlayerAttributeCharts {
             Data = data,
         };
     }
+
+    /// <summary>
+    /// Builds a player-development chart with the actual event timeline, a dashed median forecast,
+    /// and a translucent P10-P90 uncertainty band. The projection begins at the final resampled
+    /// observed point so the forecast traces connect to a common baseline.
+    /// </summary>
+    public static AttributeChart? BuildDevelopmentProjection(
+        IReadOnlyList<TpeTimelinePoint>? actual,
+        PlayerDevelopmentProjection? projection,
+        bool dark) {
+        if (actual is not { Count: > 0 } && projection?.ObservedPoints is not { Count: > 0 }) {
+            return null;
+        }
+
+        var actualDates = actual is { Count: > 0 }
+            ? actual.Select(point => (object)AsUtc(point.TaskDate)).ToList()
+            : projection!.ObservedPoints.Select(point => (object)point.Date.UtcDateTime).ToList();
+        var actualValues = actual is { Count: > 0 }
+            ? actual.Select(point => (object)point.TotalTpe).ToList()
+            : projection!.ObservedPoints.Select(point => (object)point.TotalTpe).ToList();
+
+        var traces = new List<ITrace> {
+            new Scatter {
+                X = actualDates,
+                Y = actualValues,
+                Mode = Plotly.Blazor.Traces.ScatterLib.ModeFlag.Lines | Plotly.Blazor.Traces.ScatterLib.ModeFlag.Markers,
+                Line = new Plotly.Blazor.Traces.ScatterLib.Line {
+                    Shape = Plotly.Blazor.Traces.ScatterLib.LineLib.ShapeEnum.Hv,
+                },
+                Name = "Actual TPE",
+            },
+        };
+
+        if (projection is { ObservedPoints.Count: > 0, ProjectedPoints.Count: > 0 }) {
+            var baselineDate = GetProjectionBaselineDate(projection);
+            var dates = new List<object> { baselineDate.UtcDateTime };
+            dates.AddRange(projection.ProjectedPoints.Select(point => (object)point.Date.UtcDateTime));
+
+            var lower = new List<object> { (double)projection.BaselineTotalTpe };
+            lower.AddRange(projection.ProjectedPoints.Select(point => (object)point.P10));
+            var median = new List<object> { (double)projection.BaselineTotalTpe };
+            median.AddRange(projection.ProjectedPoints.Select(point => (object)point.P50));
+            var upper = new List<object> { (double)projection.BaselineTotalTpe };
+            upper.AddRange(projection.ProjectedPoints.Select(point => (object)point.P90));
+
+            var projectionColor = dark ? "#8ec5ff" : "#0067c0";
+            var bandColor = dark ? "rgba(142,197,255,0.22)" : "rgba(0,103,192,0.18)";
+
+            traces.Add(new Scatter {
+                X = dates,
+                Y = lower,
+                Mode = Plotly.Blazor.Traces.ScatterLib.ModeFlag.Lines,
+                Line = new Plotly.Blazor.Traces.ScatterLib.Line {
+                    Color = "rgba(0,0,0,0)",
+                },
+                Name = "P10-P90 range",
+            });
+            traces.Add(new Scatter {
+                X = dates,
+                Y = upper,
+                Mode = Plotly.Blazor.Traces.ScatterLib.ModeFlag.Lines,
+                Line = new Plotly.Blazor.Traces.ScatterLib.Line {
+                    Color = "rgba(0,0,0,0)",
+                },
+                Fill = Plotly.Blazor.Traces.ScatterLib.FillEnum.ToNextY,
+                FillColor = bandColor,
+                Name = "P10-P90 range",
+            });
+            traces.Add(new Scatter {
+                X = dates,
+                Y = median,
+                Mode = Plotly.Blazor.Traces.ScatterLib.ModeFlag.Lines,
+                Line = new Plotly.Blazor.Traces.ScatterLib.Line {
+                    Color = projectionColor,
+                    Dash = "dash",
+                },
+                Name = "Projected median",
+            });
+        }
+
+        return new AttributeChart {
+            Title = "Total TPE development",
+            Layout = BuildTimelineLayout(dark),
+            LayoutFactory = BuildTimelineLayout,
+            Data = traces,
+        };
+    }
+
+    /// <summary>
+    /// Overlays actual and median projected development curves for multiple players. Actual traces
+    /// are solid, projected traces are dashed, and each player's pair shares a color.
+    /// </summary>
+    public static AttributeChart? BuildDevelopmentProjectionOverlay(
+        IReadOnlyList<PlayerDevelopmentSeries> series,
+        bool align,
+        bool dark,
+        bool limitToShortest = false) {
+        var valid = series
+            .Select(item => {
+                var actual = item.Actual.OrderBy(point => point.TaskDate).ToList();
+                var observed = item.Projection?.ObservedPoints.OrderBy(point => point.Date).ToList() ?? [];
+                var start = actual.Count > 0
+                    ? AsUtc(actual[0].TaskDate)
+                    : observed.Count > 0
+                        ? observed[0].Date.UtcDateTime
+                        : (DateTime?)null;
+                var end = item.Projection?.ProjectedPoints.Count > 0
+                    ? item.Projection.ProjectedPoints.Max(point => point.Date).UtcDateTime
+                    : actual.Count > 0
+                        ? AsUtc(actual[^1].TaskDate)
+                        : observed.Count > 0
+                            ? observed[^1].Date.UtcDateTime
+                            : (DateTime?)null;
+                return new {
+                    item.Name,
+                    Actual = actual,
+                    item.Projection,
+                    Start = start,
+                    End = end,
+                };
+            })
+            .Where(item => item.Start is not null && item.End is not null)
+            .ToList();
+        if (valid.Count == 0) {
+            return null;
+        }
+
+        var earliestStart = valid.Min(item => item.Start!.Value);
+        var commonDuration = limitToShortest && valid.Count > 1
+            ? valid.Min(item => item.End!.Value - item.Start!.Value)
+            : (TimeSpan?)null;
+        var palette = dark
+            ? new[] { "#8ec5ff", "#ffb86c", "#7ee787", "#d2a8ff", "#ff7b72", "#79c0ff" }
+            : new[] { "#0067c0", "#ca5010", "#107c10", "#5c2d91", "#c50f1f", "#0078d4" };
+        var traces = new List<ITrace>();
+
+        for (var index = 0; index < valid.Count; index++) {
+            var item = valid[index];
+            var start = item.Start!.Value;
+            var offset = align ? earliestStart - start : TimeSpan.Zero;
+            var cutoff = commonDuration is { } duration ? start.Add(duration) : (DateTime?)null;
+            var color = palette[index % palette.Length];
+
+            var actualPoints = item.Actual
+                .Where(point => cutoff is null || AsUtc(point.TaskDate) <= cutoff)
+                .ToList();
+            if (actualPoints.Count > 0) {
+                traces.Add(new Scatter {
+                    X = actualPoints.Select(point => (object)AsUtc(point.TaskDate).Add(offset)).ToList(),
+                    Y = actualPoints.Select(point => (object)point.TotalTpe).ToList(),
+                    Mode = Plotly.Blazor.Traces.ScatterLib.ModeFlag.Lines
+                        | Plotly.Blazor.Traces.ScatterLib.ModeFlag.Markers,
+                    Line = new Plotly.Blazor.Traces.ScatterLib.Line {
+                        Color = color,
+                        Shape = Plotly.Blazor.Traces.ScatterLib.LineLib.ShapeEnum.Hv,
+                    },
+                    Name = $"{item.Name} actual",
+                });
+            }
+
+            if (item.Projection is not { ProjectedPoints.Count: > 0 } projection) {
+                continue;
+            }
+
+            var projectedPoints = projection.ProjectedPoints
+                .Where(point => cutoff is null || point.Date.UtcDateTime <= cutoff)
+                .ToList();
+            if (projectedPoints.Count == 0) {
+                continue;
+            }
+
+            var baselineDate = GetProjectionBaselineDate(projection);
+            var dates = new List<object> { baselineDate.UtcDateTime.Add(offset) };
+            dates.AddRange(projectedPoints.Select(point => (object)point.Date.UtcDateTime.Add(offset)));
+            var values = new List<object> { (double)projection.BaselineTotalTpe };
+            values.AddRange(projectedPoints.Select(point => (object)point.P50));
+            traces.Add(new Scatter {
+                X = dates,
+                Y = values,
+                Mode = Plotly.Blazor.Traces.ScatterLib.ModeFlag.Lines,
+                Line = new Plotly.Blazor.Traces.ScatterLib.Line {
+                    Color = color,
+                    Dash = "dash",
+                },
+                Name = $"{item.Name} projected",
+            });
+        }
+
+        return traces.Count == 0
+            ? null
+            : new AttributeChart {
+                Title = "Development projections",
+                Layout = BuildTimelineLayout(dark),
+                LayoutFactory = BuildTimelineLayout,
+                Data = traces,
+            };
+    }
+
+    private static DateTime AsUtc(DateTime value) =>
+        value.Kind == DateTimeKind.Utc
+            ? value
+            : value.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(value, DateTimeKind.Utc)
+                : value.ToUniversalTime();
+
+    private static DateTimeOffset GetProjectionBaselineDate(PlayerDevelopmentProjection projection) =>
+        projection.BaselineDate
+        ?? projection.ProjectedPoints.FirstOrDefault()?.Date.AddDays(-projection.CadenceDays)
+        ?? projection.ObservedPoints.LastOrDefault()?.Date
+        ?? projection.DataAsOf;
 }

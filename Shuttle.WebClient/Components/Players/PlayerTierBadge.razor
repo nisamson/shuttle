@@ -1,0 +1,42 @@
+@using Shuttle.WebClient.Services
+
+<FluentBadge Appearance="BadgeAppearance.Filled" Color="@Color" title="@Tooltip">
+    @if (Compact) {
+        @Model.ShortTierName
+    } else {
+        <span>@KindLabel: @Model.LongTierName</span>
+        @if (Model.Certainty is { } certainty) {
+            <span> · @CertaintyLabel(certainty) certainty</span>
+        }
+    }
+</FluentBadge>
+
+@code {
+    [Parameter, EditorRequired] public PlayerTierBadgeModel Model { get; set; } = null!;
+    [Parameter] public bool Compact { get; set; }
+
+    private string KindLabel => Model.Kind switch {
+        PlayerTierBadgeKind.Current => "Current tier",
+        PlayerTierBadgeKind.Potential => "Potential tier",
+        PlayerTierBadgeKind.Peak => "Peak tier",
+        _ => throw new ArgumentOutOfRangeException(),
+    };
+
+    private BadgeColor Color => Model.Kind switch {
+        PlayerTierBadgeKind.Current => BadgeColor.Important,
+        PlayerTierBadgeKind.Potential => BadgeColor.Warning,
+        PlayerTierBadgeKind.Peak => BadgeColor.Success,
+        _ => BadgeColor.Subtle,
+    };
+
+    private string Tooltip =>
+        $"{KindLabel}: {Model.LongTierName} at {Model.Tpe:N0} TPE"
+        + (Model.Certainty is { } certainty ? $" ({CertaintyLabel(certainty)} certainty)" : string.Empty);
+
+    private static string CertaintyLabel(PlayerTierCertainty certainty) => certainty switch {
+        PlayerTierCertainty.Low => "Low",
+        PlayerTierCertainty.Medium => "Med",
+        PlayerTierCertainty.High => "High",
+        _ => throw new ArgumentOutOfRangeException(nameof(certainty), certainty, null),
+    };
+}

@@ -196,6 +196,8 @@ public partial class PlayerSearch : ComponentBase, IDisposable {
 
         Add("q", target.Text);
         AddAll("pos", target.Positions);
+        AddAll("tier", target.Tiers?.Select(t => t.ToString()));
+        AddAll("devTier", target.DevelopmentTiers?.Select(t => t.ToString()));
         AddStatus(target.Statuses);
         AddAll("league", target.Leagues?.Select(l => l.ToString()));
         AddAll("hand", target.Handedness?.Select(h => h.ToString()));
@@ -237,6 +239,8 @@ public partial class PlayerSearch : ComponentBase, IDisposable {
         return new PlayerSearchQuery {
             Text = First("q"),
             Positions = Many("pos"),
+            Tiers = ParseEnums<PlayerTier>(Many("tier")),
+            DevelopmentTiers = ParseEnums<PlayerTier>(Many("devTier")),
             Statuses = ParseStatuses(Many("status")),
             Leagues = ParseEnums<KnownLeague>(Many("league")),
             Handedness = ParseEnums<PlayerHandedness>(Many("hand")),
@@ -328,6 +332,8 @@ public partial class PlayerSearch : ComponentBase, IDisposable {
         && a.SortBy == b.SortBy
         && a.SortDescending == b.SortDescending
         && SequenceEqual(a.Positions, b.Positions)
+        && SequenceEqual(a.Tiers, b.Tiers)
+        && SequenceEqual(a.DevelopmentTiers, b.DevelopmentTiers)
         && SequenceEqual(a.Statuses, b.Statuses)
         && SequenceEqual(a.Leagues, b.Leagues)
         && SequenceEqual(a.Handedness, b.Handedness);

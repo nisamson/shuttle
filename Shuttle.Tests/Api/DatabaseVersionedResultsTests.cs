@@ -108,4 +108,25 @@ public class DatabaseVersionedResultsTests {
             older.Response.Headers.ETag.ToString(),
             newer.Response.Headers.ETag.ToString());
     }
+
+    [Fact]
+    public void SameResourceAndFreshness_DifferentDiscriminatorProducesDifferentEtag() {
+        var versionOne = Controller(RequestFor("/players/42/development-projection"));
+        _ = versionOne.DbVersionedOk(
+            "body",
+            LastUpdated,
+            TimeSpan.FromMinutes(5),
+            "development-projection-v1");
+
+        var versionTwo = Controller(RequestFor("/players/42/development-projection"));
+        _ = versionTwo.DbVersionedOk(
+            "body",
+            LastUpdated,
+            TimeSpan.FromMinutes(5),
+            "development-projection-v2");
+
+        Assert.NotEqual(
+            versionOne.Response.Headers.ETag.ToString(),
+            versionTwo.Response.Headers.ETag.ToString());
+    }
 }

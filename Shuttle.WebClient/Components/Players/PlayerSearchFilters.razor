@@ -47,6 +47,34 @@
     </div>
 
     <div class="filter-field">
+        <label>Tier</label>
+        <FluentAutocomplete TOption="PlayerTier"
+                            TValue="string"
+                            Multiple="true"
+                            Width="100%"
+                            Placeholder="Any tier"
+                            OnOptionsSearch="OnTierSearch"
+                            OptionText="@(t => t.ToDisplayName())"
+                            OptionValue="@(t => t.ToString())"
+                            MaximumSelectedOptions="9"
+                            @bind-SelectedItems="selectedTiers"/>
+    </div>
+
+    <div class="filter-field">
+        <label>Projected / peak tier</label>
+        <FluentAutocomplete TOption="PlayerTier"
+                            TValue="string"
+                            Multiple="true"
+                            Width="100%"
+                            Placeholder="Any projected or peak tier"
+                            OnOptionsSearch="OnTierSearch"
+                            OptionText="@(t => t.ToDisplayName())"
+                            OptionValue="@(t => t.ToString())"
+                            MaximumSelectedOptions="9"
+                            @bind-SelectedItems="selectedDevelopmentTiers"/>
+    </div>
+
+    <div class="filter-field">
         <label>League</label>
         <div class="chip-group">
             @foreach (var league in LeagueOptions) {

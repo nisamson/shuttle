@@ -33,7 +33,7 @@ public sealed class DatabaseFreshnessProvider : IDatabaseFreshnessProvider {
     public async Task<DateTimeOffset?> GetLastUpdatedAsync(CancellationToken cancellationToken = default) {
         var scheduler = await schedulerFactory.GetScheduler(cancellationToken);
         var jobDetail = await scheduler.GetJobDetail(DbUpdateJob.JobKey, cancellationToken);
-        var raw = jobDetail?.JobDataMap.GetString(DbUpdateJob.LastUpdatedKey);
+        var raw = jobDetail?.JobDataMap.GetOptionalString(DbUpdateJob.LastUpdatedKey);
 
         return DateTimeOffset.TryParse(
             raw,

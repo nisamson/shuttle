@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Shuttle.Api.Contracts;
 using Shuttle.Api.Services;
+using Shuttle.Api.Services.DevelopmentProjections;
 using Shuttle.EFCore;
 using Shuttle.EFCore.Entities.Portal;
 using Shuttle.Models.Players;
@@ -26,14 +27,17 @@ public class PlayerController : ControllerBase {
 
     private readonly ShlDbContext db;
     private readonly IDatabaseFreshnessProvider freshness;
+    private readonly DevelopmentProjectionStore projectionStore;
     private readonly ILogger<PlayerController> logger;
 
     public PlayerController(
         ShlDbContext db,
         IDatabaseFreshnessProvider freshness,
+        DevelopmentProjectionStore projectionStore,
         ILogger<PlayerController> logger) {
         this.db = db;
         this.freshness = freshness;
+        this.projectionStore = projectionStore;
         this.logger = logger;
     }
 
@@ -98,6 +102,14 @@ public class PlayerController : ControllerBase {
             db.PlayerInformation,
             query);
 
+        if (query.DevelopmentTiers is { Count: > 0 }) {
+            var matchingIds = await GetDevelopmentTierPlayerIdsAsync(
+                filtered,
+                query.DevelopmentTiers,
+                cancellationToken);
+            filtered = filtered.Where(player => matchingIds.Contains(player.PlayerId));
+        }
+
         var totalCount = await filtered.CountAsync(cancellationToken);
 
         var page = Math.Max(1, query.Page);
@@ -124,6 +136,71 @@ public class PlayerController : ControllerBase {
 
     private const int MaxPageSize = 100;
 
+    private async Task<HashSet<int>> GetDevelopmentTierPlayerIdsAsync(
+        IQueryable<PlayerInformation> candidates,
+        IReadOnlyList<PlayerTier> requestedTiers,
+        CancellationToken cancellationToken) {
+        var requested = requestedTiers.Distinct().ToHashSet();
+        var players = await candidates
+            .Select(player => new {
+                player.PlayerId,
+                CurrentTpe = player.TotalTpe,
+            })
+            .ToListAsync(cancellationToken);
+        if (players.Count == 0) {
+            return [];
+        }
+
+        var playerIds = players.Select(player => player.PlayerId).ToList();
+        var peaks = await db.TpeEvents
+            .Where(tpeEvent => playerIds.Contains(tpeEvent.PlayerId))
+            .GroupBy(tpeEvent => tpeEvent.PlayerId)
+            .Select(group => new {
+                PlayerId = group.Key,
+                PeakTpe = group.Max(tpeEvent => tpeEvent.TotalTpe),
+            })
+            .ToDictionaryAsync(row => row.PlayerId, row => row.PeakTpe, cancellationToken);
+
+        var latestRunId = await db.DevelopmentProjectionRuns
+            .Where(run =>
+                run.AlgorithmVersion == DevelopmentProjectionAlgorithm.CurrentVersion
+                && run.PublishedAt != null)
+            .OrderByDescending(run => run.PublishedAt)
+            .ThenByDescending(run => run.Id)
+            .Select(run => (long?)run.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var projectedPeaks = latestRunId is null
+            ? new Dictionary<int, double>()
+            : await db.DevelopmentProjections
+                .Where(projection =>
+                    projection.RunId == latestRunId
+                    && playerIds.Contains(projection.PlayerId)
+                    && projection.ProjectedPeakTpe != null)
+                .ToDictionaryAsync(
+                    projection => projection.PlayerId,
+                    projection => projection.ProjectedPeakTpe!.Value,
+                    cancellationToken);
+
+        return players
+            .Where(player => {
+                if (!peaks.TryGetValue(player.PlayerId, out var peakTpe)) {
+                    return false;
+                }
+
+                var projectedPeakTpe = projectedPeaks.TryGetValue(player.PlayerId, out var projectedPeak)
+                    ? projectedPeak
+                    : (double?)null;
+                var tier = PlayerTierExtensions.FromDevelopment(
+                    player.CurrentTpe,
+                    peakTpe,
+                    projectedPeakTpe);
+                return tier is not null && requested.Contains(tier.Value);
+            })
+            .Select(player => player.PlayerId)
+            .ToHashSet();
+    }
+
     private static IQueryable<PlayerInformation> ApplyFilters(
         IQueryable<PlayerInformation> source,
         IQueryable<PlayerInformation> allPlayers,
@@ -149,6 +226,20 @@ public class PlayerController : ControllerBase {
         if (query.Statuses is { Count: > 0 }) {
             var statuses = query.Statuses.Distinct().ToList();
             source = source.Where(p => statuses.Contains(p.Status));
+        }
+
+        if (query.Tiers is { Count: > 0 }) {
+            var tiers = query.Tiers.Distinct().ToList();
+            source = source.Where(p => tiers.Contains(
+                p.TotalTpe < 200 ? PlayerTier.MinorDepth
+                : p.TotalTpe < 300 ? PlayerTier.MinorBottom
+                : p.TotalTpe < 450 ? PlayerTier.MinorTop
+                : p.TotalTpe < 650 ? PlayerTier.Depth
+                : p.TotalTpe < 1000 ? PlayerTier.Bottom
+                : p.TotalTpe < 1500 ? PlayerTier.Core
+                : p.TotalTpe < 1850 ? PlayerTier.Star
+                : p.TotalTpe < 2000 ? PlayerTier.Elite
+                : PlayerTier.Franchise));
         }
 
         if (query.Leagues is { Count: > 0 }) {
@@ -214,6 +305,17 @@ public class PlayerController : ControllerBase {
         // PlayerId is a stable tiebreaker so paging is deterministic.
         return query.SortBy switch {
             PlayerSortField.TotalTpe => source.OrderByField(p => p.TotalTpe, desc).ThenBy(p => p.PlayerId),
+            PlayerSortField.Tier => source.OrderByField(
+                p => p.TotalTpe < 200 ? PlayerTier.MinorDepth
+                    : p.TotalTpe < 300 ? PlayerTier.MinorBottom
+                    : p.TotalTpe < 450 ? PlayerTier.MinorTop
+                    : p.TotalTpe < 650 ? PlayerTier.Depth
+                    : p.TotalTpe < 1000 ? PlayerTier.Bottom
+                    : p.TotalTpe < 1500 ? PlayerTier.Core
+                    : p.TotalTpe < 1850 ? PlayerTier.Star
+                    : p.TotalTpe < 2000 ? PlayerTier.Elite
+                    : PlayerTier.Franchise,
+                desc).ThenBy(p => p.PlayerId),
             PlayerSortField.DraftSeason => source.OrderByField(p => p.DraftSeason, desc).ThenBy(p => p.PlayerId),
             PlayerSortField.Position => source.OrderByField(p => p.Position, desc).ThenBy(p => p.PlayerId),
             PlayerSortField.Status => source.OrderByField(p => p.Status, desc).ThenBy(p => p.PlayerId),
@@ -284,6 +386,60 @@ public class PlayerController : ControllerBase {
             .ToListAsync(cancellationToken);
 
         return this.DbVersionedOk(timeline, lastUpdated, CacheMaxAge);
+    }
+
+    /// <summary>
+    /// Returns the latest development-projection status for an existing player. The response
+    /// distinguishes an unpublished projection run from insufficient observed history; only a
+    /// nonexistent player returns 404.
+    /// </summary>
+    [HttpGet("{playerId:int}/development-projection")]
+    [ProducesResponseType<PlayerDevelopmentProjectionResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status304NotModified)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PlayerDevelopmentProjectionResult>> GetPlayerDevelopmentProjection(
+        int playerId,
+        CancellationToken cancellationToken) {
+        var playerExists = await db.PlayerInformation
+            .AsNoTracking()
+            .AnyAsync(player => player.PlayerId == playerId, cancellationToken);
+        if (!playerExists) {
+            logger.LogInformation("Player {PlayerId} not found", playerId);
+            return NotFound();
+        }
+
+        var lastUpdated = await freshness.GetLastUpdatedAsync(cancellationToken);
+        var stored = await projectionStore.GetLatestAsync(playerId, cancellationToken);
+        var isCurrent = stored?.DataAsOf is { } dataAsOf
+            && lastUpdated is { } databaseLastUpdated
+            && dataAsOf == databaseLastUpdated;
+        var body = stored is null
+            ? new PlayerDevelopmentProjectionResult {
+                PlayerId = playerId,
+                AlgorithmVersion = DevelopmentProjectionAlgorithm.CurrentVersion,
+                Status = DevelopmentProjectionStatus.NotGenerated,
+                IsCurrent = false,
+            }
+            : stored with {
+                IsCurrent = isCurrent,
+                Projection = stored.Projection is null
+                    ? null
+                    : stored.Projection with { IsCurrent = isCurrent },
+            };
+
+        // The body changes once when a DB refresh makes the prior projection stale and again whenever
+        // another projection run publishes. Use raw freshness for Last-Modified while including the
+        // selected run identity in the ETag discriminator, so even a newly published run that is
+        // already stale relative to a later refresh receives a distinct validator.
+        DateTimeOffset? responseVersion = isCurrent
+            ? body.GeneratedAt
+            : lastUpdated ?? body.GeneratedAt;
+        var runIdentity = $"{body.DataAsOf:o}|{body.GeneratedAt:o}";
+        return this.DbVersionedOk(
+            body,
+            responseVersion,
+            CacheMaxAge,
+            $"development-projection-v{body.AlgorithmVersion}|{runIdentity}");
     }
 
     private const int MaxResolveInputs = 200;

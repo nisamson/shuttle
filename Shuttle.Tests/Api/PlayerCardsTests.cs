@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shuttle.Api.Controllers;
 using Shuttle.Api.Services;
+using Shuttle.Api.Services.DevelopmentProjections;
 using Shuttle.EFCore;
 using Shuttle.EFCore.Entities.Portal;
 using Shuttle.Models.Players;
@@ -56,7 +57,11 @@ public class PlayerCardsTests {
         var db = CreateContext();
         db.PlayerInformation.AddRange(players);
         await db.SaveChangesAsync(Ct);
-        return new PlayerController(db, new StubFreshnessProvider(), NullLogger<PlayerController>.Instance);
+        return new PlayerController(
+            db,
+            new StubFreshnessProvider(),
+            new DevelopmentProjectionStore(db, TimeProvider.System),
+            NullLogger<PlayerController>.Instance);
     }
 
     private static IReadOnlyList<PlayerCard> OkCards(ActionResult<IReadOnlyList<PlayerCard>> action) {

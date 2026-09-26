@@ -36,6 +36,7 @@ public partial class PlayerSearchFilters : ComponentBase {
     private object? loadedInitial;
 
     private static readonly string[] PositionOptions = ["G", "C", "LW", "RW", "LD", "RD"];
+    private static readonly IReadOnlyList<PlayerTier> TierOptions = PlayerTierExtensions.All;
     private static readonly PlayerStatus[] StatusOptions = Enum.GetValues<PlayerStatus>();
 
     // IIHF and WJC are intentionally excluded from the league filter.
@@ -45,6 +46,8 @@ public partial class PlayerSearchFilters : ComponentBase {
     private string? text;
     private PlayerSuggestion? selectedNamePlayer;
     private IEnumerable<string> selectedPositions = [];
+    private IEnumerable<PlayerTier> selectedTiers = [];
+    private IEnumerable<PlayerTier> selectedDevelopmentTiers = [];
     private IEnumerable<PlayerStatus> selectedStatuses = [];
     private readonly HashSet<KnownLeague> leagues = [];
     private readonly HashSet<PlayerHandedness> handedness = [];
@@ -86,6 +89,11 @@ public partial class PlayerSearchFilters : ComponentBase {
             ? StatusOptions
             : StatusOptions.Where(s => StatusLabel(s).Contains(e.Text, StringComparison.OrdinalIgnoreCase));
 
+    private void OnTierSearch(OptionsSearchEventArgs<PlayerTier> e) =>
+        e.Items = string.IsNullOrWhiteSpace(e.Text)
+            ? TierOptions
+            : TierOptions.Where(t => t.ToDisplayName().Contains(e.Text, StringComparison.OrdinalIgnoreCase));
+
     private static void Toggle<T>(HashSet<T> set, T value) {
         if (!set.Add(value)) {
             set.Remove(value);
@@ -112,6 +120,8 @@ public partial class PlayerSearchFilters : ComponentBase {
         maxBankBalanceText = source?.MaxBankBalance?.ToString(CultureInfo.InvariantCulture);
 
         selectedPositions = source?.Positions?.ToList() ?? [];
+        selectedTiers = source?.Tiers?.ToList() ?? [];
+        selectedDevelopmentTiers = source?.DevelopmentTiers?.ToList() ?? [];
         selectedStatuses = source?.Statuses?.ToList() ?? [];
 
         leagues.Clear();
@@ -158,6 +168,8 @@ public partial class PlayerSearchFilters : ComponentBase {
         new() {
             Text = Clean(text),
             Positions = selectedPositions.Any() ? selectedPositions.ToList() : null,
+            Tiers = selectedTiers.Any() ? selectedTiers.ToList() : null,
+            DevelopmentTiers = selectedDevelopmentTiers.Any() ? selectedDevelopmentTiers.ToList() : null,
             Statuses = selectedStatuses.Any() ? selectedStatuses.ToList() : null,
             Leagues = leagues.Count > 0 ? leagues.ToList() : null,
             Handedness = handedness.Count > 0 ? handedness.ToList() : null,
@@ -176,6 +188,8 @@ public partial class PlayerSearchFilters : ComponentBase {
         text = null;
         selectedNamePlayer = null;
         selectedPositions = [];
+        selectedTiers = [];
+        selectedDevelopmentTiers = [];
         selectedStatuses = [];
         leagues.Clear();
         handedness.Clear();

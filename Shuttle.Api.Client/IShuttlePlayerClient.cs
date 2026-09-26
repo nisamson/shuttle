@@ -53,6 +53,19 @@ public interface IShuttlePlayerClient {
     Task<IReadOnlyList<TpeTimelinePoint>?> GetPlayerTpeTimeline(int playerId, CancellationToken token = default);
 
     /// <summary>
+    /// Fetches the latest development-projection status for the given player. Existing players
+    /// return a non-null result whose status distinguishes an unpublished run from insufficient
+    /// observed history. Returns <see langword="null"/> only when the player does not exist (HTTP
+    /// 404).
+    /// </summary>
+    /// <param name="playerId">The SHL player id.</param>
+    /// <param name="token">A cancellation token.</param>
+    [Get("/players/{playerId}/development-projection")]
+    Task<PlayerDevelopmentProjectionResult?> GetPlayerDevelopmentProjection(
+        int playerId,
+        CancellationToken token = default);
+
+    /// <summary>
     /// Fetches the "at a glance" <see cref="PlayerCard"/> for a batch of player ids in a single
     /// request, ordered by name. Unknown ids are omitted from the result. Uses the HTTP <c>QUERY</c>
     /// verb so large id sets aren't constrained by URL length. Prefer this over issuing one

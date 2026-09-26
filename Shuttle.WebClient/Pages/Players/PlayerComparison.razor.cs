@@ -29,6 +29,7 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
     private const int MaxTimelineConcurrency = 6;
 
     [Parameter, SupplyParameterFromQuery(Name = "ids")] public string? Ids { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "tab")] public string? Tab { get; set; }
 
     [Inject] private IShuttlePlayerClient PlayerClient { get; set; } = null!;
     [Inject] private IPlayerDirectoryService Directory { get; set; } = null!;
@@ -53,6 +54,7 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
 
     private const string AttributesTabId = "attributes";
     private const string TimelineTabId = "tpe-timeline";
+    private const string DevelopmentTabId = "development";
     private string activeTabId = AttributesTabId;
 
     // TPE timelines are fetched lazily the first time the timeline tab is opened, then cached per
@@ -62,9 +64,15 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
     private bool timelineLoading;
     private bool timelineLoaded;
     private string? timelineError;
-    private bool alignTimelines;
+    private bool alignTimelines = true;
+    private bool limitToShortestTimeline;
+    private readonly Dictionary<int, PlayerDevelopmentProjectionResult?> projections = new();
+    private AttributeChart? developmentChart;
+    private bool developmentLoading;
+    private bool developmentLoaded;
+    private string? developmentError;
 
-    private PlayerSuggestion? selectedToAdd;
+    private IEnumerable<PlayerSuggestion> selectedPlayers = [];
     private bool loading;
     private string? loadError;
     private bool darkMode;
@@ -80,6 +88,36 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
             ? "Goaltender attributes"
             : "Skater attributes";
 
+    private bool HasDevelopmentProjection =>
+        SelectedCards.Any(HasDevelopmentProjectionFor);
+
+    private IReadOnlyList<PlayerCard> PlayersWithInsufficientHistory =>
+        SelectedCards
+            .Where(card => projections.GetValueOrDefault(card.PlayerId)?.Status
+                == DevelopmentProjectionStatus.InsufficientObservedData)
+            .ToList();
+
+    private IReadOnlyList<PlayerCard> PlayersWithoutPublishedProjection =>
+        SelectedCards
+            .Where(card => projections.GetValueOrDefault(card.PlayerId) is null
+                or { Status: DevelopmentProjectionStatus.NotGenerated })
+            .ToList();
+
+    private IReadOnlyList<PlayerCard> PlayersWithoutFuturePeerHistory =>
+        SelectedCards
+            .Where(card => projections.GetValueOrDefault(card.PlayerId) is {
+                Status: DevelopmentProjectionStatus.Available,
+                Projection.ProjectedPoints.Count: 0,
+            })
+            .ToList();
+
+    private bool HasDevelopmentProjectionFor(PlayerCard card) =>
+        projections.TryGetValue(card.PlayerId, out var result)
+        && result is {
+            Status: DevelopmentProjectionStatus.Available,
+            Projection.ProjectedPoints.Count: > 0,
+        };
+
     protected override void OnInitialized() {
         darkMode = OptionsStorage.CurrentOptions.DarkMode;
         OptionsStorage.OptionsChanged += OnOptionsChanged;
@@ -90,7 +128,7 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
     private async Task LoadAsync() {
         loading = true;
         loadError = null;
-        selectedToAdd = null;
+        activeTabId = NormalizeTab(Tab);
         requestedIds = ParseIds(Ids);
 
         try {
@@ -112,12 +150,15 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
             }
 
             ComputeGroups();
+            selectedPlayers = SelectedCards.Select(ToSuggestion).ToList();
             RebuildCharts();
 
             // If the timeline tab has already been opened, keep it in sync with the current selection
             // (fetching any newly added players and rebuilding the overlay).
             if (activeTabId == TimelineTabId) {
                 await LoadTimelinesAsync();
+            } else if (activeTabId == DevelopmentTabId) {
+                await LoadDevelopmentProjectionsAsync();
             }
         } catch (Exception ex) {
             loadError = ex.Message;
@@ -219,10 +260,25 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
     private async Task OnTabChangedAsync() {
         if (activeTabId == TimelineTabId) {
             await LoadTimelinesAsync();
+        } else if (activeTabId == DevelopmentTabId) {
+            await LoadDevelopmentProjectionsAsync();
+        }
+
+        if (!string.Equals(Tab, activeTabId, StringComparison.Ordinal)) {
+            var uri = Navigation.GetUriWithQueryParameter(
+                "tab",
+                activeTabId == AttributesTabId ? null : activeTabId);
+            Navigation.NavigateTo(uri, replace: true);
         }
 
         needsRedraw = true;
     }
+
+    private static string NormalizeTab(string? tab) => tab switch {
+        TimelineTabId => TimelineTabId,
+        DevelopmentTabId => DevelopmentTabId,
+        _ => AttributesTabId,
+    };
 
     private async Task LoadTimelinesAsync() {
         var toFetch = SelectedCards
@@ -268,6 +324,49 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
         }
     }
 
+    private async Task LoadDevelopmentProjectionsAsync() {
+        await LoadTimelinesAsync();
+
+        var toFetch = SelectedCards
+            .Where(card => !projections.ContainsKey(card.PlayerId))
+            .Select(card => card.PlayerId)
+            .ToList();
+        if (toFetch.Count > 0) {
+            developmentLoading = true;
+            developmentError = null;
+            StateHasChanged();
+
+            try {
+                using var gate = new SemaphoreSlim(MaxTimelineConcurrency);
+                var results = await Task.WhenAll(toFetch.Select(id => FetchProjectionAsync(id, gate)));
+                foreach (var (id, projection) in results) {
+                    projections[id] = projection;
+                }
+            } catch (Exception ex) {
+                developmentError = ex.Message;
+            } finally {
+                developmentLoading = false;
+            }
+        }
+
+        developmentLoaded = true;
+        BuildDevelopmentChart();
+        needsRedraw = true;
+    }
+
+    private async Task<(int Id, PlayerDevelopmentProjectionResult? Projection)> FetchProjectionAsync(
+        int id,
+        SemaphoreSlim gate) {
+        await gate.WaitAsync();
+        try {
+            return (id, await PlayerClient.GetPlayerDevelopmentProjection(id));
+        } catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound) {
+            return (id, null);
+        } finally {
+            gate.Release();
+        }
+    }
+
     // Overlays one step-line TPE series per selected player. When alignment is on, each series is
     // shifted so every player's first recorded point lands on the earliest player's start, letting
     // you compare progression pace from a common origin rather than by absolute calendar date.
@@ -278,7 +377,11 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
             .Select(x => (x.Name, Points: x.Points!))
             .ToList();
 
-        var rebuilt = PlayerAttributeCharts.BuildTimelineOverlay(series, alignTimelines, darkMode);
+        var rebuilt = PlayerAttributeCharts.BuildTimelineOverlay(
+            series,
+            alignTimelines,
+            darkMode,
+            limitToShortestTimeline);
 
         if (rebuilt is null || timelineChart is null) {
             // First build (or nothing to chart): adopt the new object outright; its ref binds on render.
@@ -299,7 +402,29 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
 
     private void OnAlignChanged() {
         BuildTimelineChart();
+        BuildDevelopmentChart();
         needsRedraw = true;
+    }
+
+    private void OnTimelineRangeChanged() {
+        BuildTimelineChart();
+        BuildDevelopmentChart();
+        needsRedraw = true;
+    }
+
+    private void BuildDevelopmentChart() {
+        var series = SelectedCards
+            .Select(card => new PlayerDevelopmentSeries(
+                card.Name,
+                timelines.GetValueOrDefault(card.PlayerId) ?? [],
+                projections.GetValueOrDefault(card.PlayerId)?.Projection))
+            .ToList();
+        var rebuilt = PlayerAttributeCharts.BuildDevelopmentProjectionOverlay(
+            series,
+            alignTimelines,
+            darkMode,
+            limitToShortestTimeline);
+        developmentChart = MergeChart(developmentChart, rebuilt);
     }
 
     private static List<int> ParseIds(string? ids) {
@@ -322,19 +447,39 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
         e.Items = await Directory.Search(e.Text);
     }
 
-    private void OnPlayerSelected(PlayerSuggestion? player) {
-        selectedToAdd = null;
-        if (player is null || requestedIds.Contains(player.PlayerId)) {
-            return;
-        }
-
-        Navigation.NavigateTo(Routes.Players.CompareWith(requestedIds.Append(player.PlayerId)));
+    private void OnPlayersSelected(IEnumerable<PlayerSuggestion>? players) {
+        var selected = players?
+            .DistinctBy(player => player.PlayerId)
+            .Take(HardCap)
+            .ToList() ?? [];
+        selectedPlayers = selected;
+        NavigateToSelection(selected.Select(player => player.PlayerId));
     }
 
     private void Remove(int playerId) =>
-        Navigation.NavigateTo(Routes.Players.CompareWith(requestedIds.Where(id => id != playerId)));
+        NavigateToSelection(requestedIds.Where(id => id != playerId));
 
-    private void ClearAll() => Navigation.NavigateTo(Routes.Players.Compare);
+    private void ClearAll() => NavigateToSelection([]);
+
+    private void NavigateToSelection(IEnumerable<int> playerIds) {
+        var ids = playerIds.Distinct().ToList();
+        var uri = ids.Count == 0
+            ? Routes.Players.Compare
+            : Routes.Players.CompareWith(ids);
+        if (activeTabId != AttributesTabId) {
+            uri = $"{uri}{(uri.Contains('?') ? '&' : '?')}tab={Uri.EscapeDataString(activeTabId)}";
+        }
+
+        Navigation.NavigateTo(uri);
+    }
+
+    private static PlayerSuggestion ToSuggestion(PlayerCard card) => new() {
+        PlayerId = card.PlayerId,
+        Name = card.Name,
+        Username = card.Username,
+        Status = card.Status,
+        Position = card.Position,
+    };
 
     private void OnViewChanged() => needsRedraw = true;
 
@@ -350,6 +495,7 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
 
         ApplyTheme(combinedChart);
         ApplyTheme(timelineChart);
+        ApplyTheme(developmentChart);
         needsRedraw = true;
         InvokeAsync(StateHasChanged);
     }
@@ -369,11 +515,13 @@ public partial class PlayerComparison : ComponentBase, IDisposable {
 
         // Only redraw the charts for the currently visible tab/view; the hidden ones may have been
         // disposed, so their captured refs must not be touched.
-        var visible = activeTabId == TimelineTabId
-            ? timelineChart is null ? Array.Empty<AttributeChart>() : new[] { timelineChart }
-            : groupedView
+        var visible = activeTabId switch {
+            TimelineTabId => timelineChart is null ? [] : [timelineChart],
+            DevelopmentTabId => developmentChart is null ? [] : [developmentChart],
+            _ => groupedView
                 ? (IEnumerable<AttributeChart>)attributeCharts
-                : combinedChart is null ? Array.Empty<AttributeChart>() : new[] { combinedChart };
+                : combinedChart is null ? [] : [combinedChart],
+        };
 
         foreach (var group in visible) {
             if (group.Chart is null) {

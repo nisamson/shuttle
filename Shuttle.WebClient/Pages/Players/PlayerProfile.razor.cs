@@ -20,6 +20,7 @@ namespace Shuttle.WebClient.Pages.Players;
 
 public partial class PlayerProfile : ComponentBase, IDisposable {
     [Parameter] public int PlayerId { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "tab")] public string? Tab { get; set; }
 
     [Inject] private IShuttlePlayerClient PlayerClient { get; set; } = null!;
     [Inject] private IShuttleLeagueClient LeagueClient { get; set; } = null!;
@@ -29,6 +30,9 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
     private bool darkMode;
 
     private void GoToSearch() => Navigation.NavigateTo(Routes.Players.Root);
+
+    private void CompareWith(int similarPlayerId) =>
+        Navigation.NavigateTo(Routes.Players.CompareWith([PlayerId, similarPlayerId]));
 
     protected override void OnInitialized() {
         darkMode = OptionsStorage.CurrentOptions.DarkMode;
@@ -57,6 +61,7 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
 
         ApplyTheme(combinedChart);
         ApplyTheme(timelineChart);
+        ApplyTheme(developmentChart);
 
         needsRedraw = true;
     }
@@ -91,16 +96,35 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
 
     private const string AttributesTabId = "attributes";
     private const string TimelineTabId = "tpe-timeline";
+    private const string DevelopmentTabId = "development";
     private string activeTabId = AttributesTabId;
+    private int? loadedPlayerId;
 
     private AttributeChart? timelineChart;
+    private AttributeChart? developmentChart;
     private bool timelineLoading;
     private bool timelineLoaded;
     private string? timelineError;
+    private string? projectionError;
+    private PlayerDevelopmentProjectionResult? projectionResult;
+    private PlayerTierBadgeModel? developmentTierBadge;
 
-    protected override async Task OnParametersSetAsync() => await LoadAsync();
+    private PlayerTierBadgeModel? CurrentTierBadge =>
+        card is null ? null : PlayerTierClassifier.Current(card.TotalTpe, card.Position);
 
-    private async Task LoadAsync() {
+    protected override async Task OnParametersSetAsync() {
+        var requestedTab = NormalizeTab(Tab);
+        if (loadedPlayerId == PlayerId && card is not null) {
+            activeTabId = requestedTab;
+            await EnsureActiveTabLoadedAsync();
+            needsRedraw = true;
+            return;
+        }
+
+        await LoadAsync(requestedTab);
+    }
+
+    private async Task LoadAsync(string requestedTab) {
         loading = true;
         notFound = false;
         error = null;
@@ -112,23 +136,29 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
         combinedChart = null;
         jsonDataUrl = null;
         jsonFileName = null;
-        activeTabId = AttributesTabId;
+        activeTabId = requestedTab;
         timelineChart = null;
+        developmentChart = null;
         timelineLoading = false;
         timelineLoaded = false;
         timelineError = null;
+        projectionError = null;
+        projectionResult = null;
+        developmentTierBadge = null;
 
         try {
             card = await PlayerClient.GetPlayer(PlayerId);
             if (card is null) {
                 notFound = true;
             } else {
+                loadedPlayerId = PlayerId;
                 BuildDownload(card);
                 await LoadTeamsAsync(card);
                 if (card.Attributes is not null) {
                     BuildCharts(card);
                     needsRedraw = true;
                 }
+                await EnsureActiveTabLoadedAsync();
             }
         } catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound) {
             notFound = true;
@@ -141,16 +171,34 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
 
     private void OnViewChanged() => needsRedraw = true;
 
-    // The TPE timeline is loaded lazily the first time its tab is opened so profiles that are never
-    // inspected for progression don't incur the extra backend call. Every tab change also flags a
-    // redraw so the now-visible chart resizes to its container (hidden charts render at zero size).
+    // Progression data is loaded lazily the first time either progression tab is opened. Every tab
+    // change also flags a redraw so the now-visible chart resizes to its container.
     private async Task OnTabChangedAsync() {
-        if (activeTabId == TimelineTabId && !timelineLoaded && !timelineLoading) {
-            await LoadTimelineAsync();
+        await EnsureActiveTabLoadedAsync();
+
+        if (!string.Equals(Tab, activeTabId, StringComparison.Ordinal)) {
+            var uri = Navigation.GetUriWithQueryParameter(
+                "tab",
+                activeTabId == AttributesTabId ? null : activeTabId);
+            Navigation.NavigateTo(uri, replace: true);
         }
 
         needsRedraw = true;
     }
+
+    private async Task EnsureActiveTabLoadedAsync() {
+        if ((activeTabId == TimelineTabId || activeTabId == DevelopmentTabId)
+            && !timelineLoaded
+            && !timelineLoading) {
+            await LoadTimelineAsync();
+        }
+    }
+
+    private static string NormalizeTab(string? tab) => tab switch {
+        TimelineTabId => TimelineTabId,
+        DevelopmentTabId => DevelopmentTabId,
+        _ => AttributesTabId,
+    };
 
     private async Task LoadTimelineAsync() {
         timelineLoading = true;
@@ -159,7 +207,24 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
 
         try {
             var timeline = await PlayerClient.GetPlayerTpeTimeline(PlayerId);
-            BuildTimeline(timeline);
+            timelineChart = PlayerAttributeCharts.BuildDevelopmentProjection(
+                timeline,
+                projection: null,
+                darkMode);
+            developmentChart = timelineChart;
+
+            try {
+                projectionResult = await PlayerClient.GetPlayerDevelopmentProjection(PlayerId);
+                developmentChart = PlayerAttributeCharts.BuildDevelopmentProjection(
+                    timeline,
+                    projectionResult?.Projection,
+                    darkMode);
+            } catch (Exception ex) {
+                projectionError = ex.Message;
+            }
+            developmentTierBadge = card is null
+                ? null
+                : PlayerTierClassifier.Development(card.Position, timeline, projectionResult);
         } catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound) {
             timelineChart = null;
         } catch (Exception ex) {
@@ -186,11 +251,13 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
 
         // Only redraw the charts for the currently visible tab/view; the hidden ones may have been
         // disposed, so their captured refs must not be touched.
-        var visible = activeTabId == TimelineTabId
-            ? timelineChart is null ? Array.Empty<AttributeChart>() : new[] { timelineChart }
-            : groupedView
+        var visible = activeTabId switch {
+            TimelineTabId => timelineChart is null ? [] : [timelineChart],
+            DevelopmentTabId => developmentChart is null ? [] : [developmentChart],
+            _ => groupedView
                 ? (IEnumerable<AttributeChart>)attributeCharts
-                : combinedChart is null ? Array.Empty<AttributeChart>() : new[] { combinedChart };
+                : combinedChart is null ? [] : [combinedChart],
+        };
         foreach (var group in visible) {
             if (group.Chart is null) {
                 continue;
@@ -204,31 +271,9 @@ public partial class PlayerProfile : ComponentBase, IDisposable {
         }
     }
 
-    private void BuildTimeline(IReadOnlyList<TpeTimelinePoint>? timeline) {
-        timelineChart = null;
-
-        if (timeline is null || timeline.Count == 0) {
-            return;
-        }
-
-        timelineChart = new AttributeChart {
-            Title = "Total TPE",
-            Layout = BuildTimelineLayout(darkMode),
-            LayoutFactory = BuildTimelineLayout,
-            Data = new List<ITrace> {
-                new Plotly.Blazor.Traces.Scatter {
-                    X = timeline.Select(p => (object)p.TaskDate).ToList(),
-                    Y = timeline.Select(p => (object)p.TotalTpe).ToList(),
-                    Mode = Plotly.Blazor.Traces.ScatterLib.ModeFlag.Lines | Plotly.Blazor.Traces.ScatterLib.ModeFlag.Markers,
-                    // A step ("hv") line reflects that the cumulative total holds until the next event.
-                    Line = new Plotly.Blazor.Traces.ScatterLib.Line {
-                        Shape = Plotly.Blazor.Traces.ScatterLib.LineLib.ShapeEnum.Hv,
-                    },
-                    Name = "Total TPE",
-                },
-            },
-        };
-    }
+    private string ProjectionDataAsOf =>
+        projectionResult?.DataAsOf?.UtcDateTime.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture)
+        ?? "unknown";
 
     private void BuildCharts(PlayerCard c) {
         var set = PlayerAttributeCharts.Build(c.Attributes!, darkMode);

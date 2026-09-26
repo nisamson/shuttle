@@ -1,0 +1,10 @@
+Min TPE,Max TPE,Forward Label,Defense Label,Goalie Label,Forward Short Label,Defense Short Label,Goalie Short Label
+0,199,Minor Depth F,Minor Depth D,Minor Depth,Min Depth F,Min Depth D,Min Depth
+200,299,Minor Bottom 6,Minor Bottom 4,Minor Backup,Min Bot 6,Min Bot 4,Min Backup
+300,449,Minor Top 6,Minor Top 4,Minor Starter,Min Top 6,Min Top 4,Min Starter
+450,649,Depth Forward,Depth Defenseman,Depth,Depth F,Depth D,Depth
+650,999,Bottom 6,Bottom 4,Fringe Starter,Bot 6,Bot 4,Fringe
+1000,1499,Core Forward,Core Defenseman,Backup,Core F,Core D,Backup
+1500,1849,Star Forward,Star Defenseman,Starter,Star F,Star D,Starter
+1850,1999,Elite Forward,Elite Defenseman,Elite,Elite F,Elite D,Elite
+2000,,Franchise Forward,Franchise Defenseman,Franchise,Franchise F,Franchise D,Franchise
