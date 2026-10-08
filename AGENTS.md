@@ -279,6 +279,9 @@ SDK-style .NET 10 solution (`SHLAnalytics.sln`) using Central Package Management
 
 - `dotnet restore` — restore packages. NuGetAudit runs here and **fails the restore** on
   any known-vulnerable package (warnings are treated as errors).
+  The only temporary exceptions are five project-local ImageSharp advisory
+  suppressions in `Shuttle.Fhm.Vision` and its tests, which are not deployed;
+  see `Shuttle.Fhm.Vision/README.md`. Other advisories still fail restore.
 - `dotnet build` — build the whole solution.
 - `dotnet build --no-restore -c Debug` — build without re-restoring (after a restore).
 - `dotnet build <Project>/<Project>.csproj` — build a single project.

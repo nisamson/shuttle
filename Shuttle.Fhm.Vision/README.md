@@ -232,3 +232,23 @@ The tests cover the platform-agnostic logic (profile serialization, ratio↔pixe
 numeric parsing, content-hash dedup, and end-to-end region extraction with a deterministic fake OCR
 engine). Live capture, the Windows OCR engine, and the WinForms calibrator are thin Windows-specific
 shells around this tested core.
+
+## Temporary dependency advisory exceptions
+
+`Shuttle.Fhm.Vision` and `Shuttle.Fhm.Vision.Tests` temporarily suppress these
+ImageSharp advisories using project-local `NuGetAuditSuppress` entries:
+
+- [GHSA-gwg2-r3hj-4w44](https://github.com/advisories/GHSA-gwg2-r3hj-4w44)
+- [GHSA-j3p4-wp97-rph4](https://github.com/advisories/GHSA-j3p4-wp97-rph4)
+- [GHSA-j9gm-c75j-xc9q](https://github.com/advisories/GHSA-j9gm-c75j-xc9q)
+- [GHSA-jjfr-hcj7-qf5w](https://github.com/advisories/GHSA-jjfr-hcj7-qf5w)
+- [GHSA-wmxv-xphr-5c9g](https://github.com/advisories/GHSA-wmxv-xphr-5c9g)
+
+This is an explicit temporary risk acceptance for non-production Windows tooling,
+which is not part of the deployed API or WebClient. It does not fix ImageSharp's
+vulnerabilities or make untrusted image ingestion safe. Remove the suppressions
+when ImageSharp is upgraded to a patched version.
+
+NuGet Audit and warnings-as-errors remain enabled. The exceptions apply only to
+these advisory URLs in these two projects; other advisories, including new
+ImageSharp advisories, still fail restore.

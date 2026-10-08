@@ -15,6 +15,8 @@ consistent when you change one. `Shuttle.Analysis/README.md` documents the CLI t
 
 - `dotnet restore` — restore. NuGetAudit runs here and **fails restore** on any known
   vulnerable package (audit warnings are errors).
+  Five ImageSharp advisories are temporarily suppressed only in the non-production
+  `Shuttle.Fhm.Vision` and its tests (see its README); other advisories still fail restore.
 - `dotnet build` / `dotnet build --no-restore -c Debug` — build all / after a restore.
 - `dotnet build <Project>/<Project>.csproj` — build one project.
 - `dotnet test` — full suite (`Shuttle.Tests`, xunit.v3 via Microsoft Testing Platform).
