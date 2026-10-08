@@ -14,6 +14,7 @@ public sealed class GameArchiveGit(string username, string password) {
             Repository.Clone(remote, path, new CloneOptions {
                 RecurseSubmodules = false,
                 FetchOptions = {
+                    Depth = 2,
                     CredentialsProvider = (_, _, _) => credentials,
                     OnTransferProgress = _ => !cancellationToken.IsCancellationRequested,
                 },

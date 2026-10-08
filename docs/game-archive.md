@@ -18,6 +18,10 @@ files later removed upstream.
 The API job and local runner share the `Shuttle.GameArchive` library.
 Clone, commit and push use LibGit2Sharp in-process; the production API does
 not invoke an external Git executable or write credentials to a helper file.
+Temporary checkouts use a shallow clone at depth 2. Publishing adds a normal
+commit without truncating or rewriting the remote repository's history.
+Git remotes must use HTTP(S) for shallow cloning; LibGit2Sharp's local-file
+transport does not support shallow fetches.
 
 ## Archive repository structure
 
@@ -151,8 +155,10 @@ GitHub rejects normal Git files over 100 MiB. The job fails with the offending
 file's URL rather than silently omitting it; Git LFS is intentionally not used.
 For a large initial backfill, inspect available disk space and the projected
 repository size (GitHub recommends staying under 5 GiB) before activation.
-The first sync can require substantial disk space: it holds downloaded files
-and a Git checkout separately until the snapshot is pushed.
+Every sync holds downloaded files and the full current Git checkout separately
+until the snapshot is pushed. Budget for roughly two uncompressed snapshots,
+plus Git objects, packing overhead, and free-space headroom. Depth 2 limits
+temporary history, not the current checkout's file size.
 
 ## Development
 
@@ -171,7 +177,7 @@ The runner waits for both the vault and Gitea bootstrap, reads its credential
 through the emulator, and synchronizes **the real SHL source** once. Selecting
 this profile is the explicit request to sync; `Archive:Enabled` does not gate it.
 Check disk capacity before starting: every run downloads the entire eligible source
-and clones the archive, including its history. The 100 MiB file limit and
+and shallow-clones the archive at depth 2. The 100 MiB file limit and
 5 GiB repository-size warning also apply locally.
 
 The runner exits `0` on success or no change, `1` on failure, and `130` on

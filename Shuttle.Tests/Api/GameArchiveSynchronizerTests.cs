@@ -30,7 +30,7 @@ public sealed class GameArchiveSynchronizerTests {
 
     [Fact]
     public async Task PublishesSnapshotWithNestedFilesManifestAndExistingReadme() {
-        using var fixture = new ArchiveFixture();
+        await using var fixture = new ArchiveFixture();
         fixture.Seed(("README.md", "Archive introduction"), ("other/keep.txt", "unmanaged"));
         fixture.Source.SetFiles(("shl/S85/game.csv", "first"), ("smjhl/S85/game.csv", "second"));
 
@@ -51,7 +51,7 @@ public sealed class GameArchiveSynchronizerTests {
 
     [Fact]
     public async Task SkippedDirectoriesRemoveOnlyManagedFilesAndPublishReport() {
-        using var fixture = new ArchiveFixture();
+        await using var fixture = new ArchiveFixture();
         fixture.Seed(("README.md", "untouched"), ("skipped/notes.txt", "unmanaged"));
         fixture.Source.SetFiles(("skipped/old.csv", "old"), ("game.csv", "game"));
         await fixture.SynchronizeAsync();
@@ -78,7 +78,7 @@ public sealed class GameArchiveSynchronizerTests {
 
     [Fact]
     public async Task SkippedRootRemovesManagedFilesButPreservesUnmanagedFilesAndHistory() {
-        using var fixture = new ArchiveFixture();
+        await using var fixture = new ArchiveFixture();
         fixture.Seed(("README.md", "untouched"), ("notes.txt", "unmanaged"));
         fixture.Source.SetFiles(("game.csv", "game"));
         await fixture.SynchronizeAsync();
@@ -99,7 +99,7 @@ public sealed class GameArchiveSynchronizerTests {
 
     [Fact]
     public async Task IdenticalSkippedReportDoesNotCommitButReportChangesDo() {
-        using var fixture = new ArchiveFixture();
+        await using var fixture = new ArchiveFixture();
         fixture.Seed(("README.md", "untouched"));
         fixture.Source.SetFiles(("skipped/hidden.csv", "hidden"));
         fixture.Source.DirectoryPages["skipped/"] = "<html><head><title>Custom index</title></head></html>";
@@ -122,7 +122,7 @@ public sealed class GameArchiveSynchronizerTests {
 
     [Fact]
     public async Task ResumingApacheListingClearsReportAndArchivesFiles() {
-        using var fixture = new ArchiveFixture();
+        await using var fixture = new ArchiveFixture();
         fixture.Seed(("README.md", "untouched"));
         fixture.Source.SetFiles(("skipped/game.csv", "game"));
         fixture.Source.DirectoryPages["skipped/"] = "<html><head><title>Custom index</title></head></html>";
@@ -138,7 +138,7 @@ public sealed class GameArchiveSynchronizerTests {
 
     [Fact]
     public async Task FailedDownloadDoesNotPublishChangedSkippedReportOrRemoveFiles() {
-        using var fixture = new ArchiveFixture();
+        await using var fixture = new ArchiveFixture();
         fixture.Seed(("README.md", "untouched"));
         fixture.Source.SetFiles(("skipped/old.csv", "old"), ("game.csv", "game"));
         await fixture.SynchronizeAsync();
@@ -156,7 +156,7 @@ public sealed class GameArchiveSynchronizerTests {
 
     [Fact]
     public async Task UpdatesAddsAndRemovesOnlyManifestOwnedFiles() {
-        using var fixture = new ArchiveFixture();
+        await using var fixture = new ArchiveFixture();
         fixture.Seed(
             ("README.md", "Keep this README"),
             ("outside.txt", "Keep this file"),
@@ -180,7 +180,7 @@ public sealed class GameArchiveSynchronizerTests {
 
     [Fact]
     public async Task IdenticalSecondRunDoesNotCommitOrPush() {
-        using var fixture = new ArchiveFixture();
+        await using var fixture = new ArchiveFixture();
         fixture.Seed(("README.md", "untouched"));
         fixture.Source.SetFiles(("game.csv", "same"));
         await fixture.SynchronizeAsync();
@@ -195,7 +195,7 @@ public sealed class GameArchiveSynchronizerTests {
 
     [Fact]
     public async Task ArchiveStagesFilesEvenWhenRemoteGitignoreMatchesThem() {
-        using var fixture = new ArchiveFixture();
+        await using var fixture = new ArchiveFixture();
         fixture.Seed(("README.md", "untouched"), (".gitignore", "*.csv\n"));
         fixture.Source.SetFiles(("shl/game.csv", "archived"));
 
@@ -207,7 +207,7 @@ public sealed class GameArchiveSynchronizerTests {
 
     [Fact]
     public async Task EmptyInventoryRemovesOnlyPreviouslyManagedFiles() {
-        using var fixture = new ArchiveFixture();
+        await using var fixture = new ArchiveFixture();
         fixture.Seed(("README.md", "untouched"), ("notes.txt", "unmanaged"),
             ("old.csv", "old"), (GameArchiveManifest.FileName, ManifestJson("old.csv")));
         fixture.Source.SetFiles();
@@ -222,7 +222,7 @@ public sealed class GameArchiveSynchronizerTests {
 
     [Fact]
     public async Task FailedDownloadLeavesRemoteAtPreviousSnapshot() {
-        using var fixture = new ArchiveFixture();
+        await using var fixture = new ArchiveFixture();
         fixture.Seed(("README.md", "untouched"));
         fixture.Source.SetFiles(("old.csv", "old"));
         await fixture.SynchronizeAsync();
@@ -240,7 +240,7 @@ public sealed class GameArchiveSynchronizerTests {
 
     [Fact]
     public async Task CancelledDownloadLeavesRemoteAtPreviousSnapshot() {
-        using var fixture = new ArchiveFixture();
+        await using var fixture = new ArchiveFixture();
         fixture.Seed(("README.md", "untouched"));
         fixture.Source.SetFiles(("old.csv", "old"));
         await fixture.SynchronizeAsync();
@@ -257,7 +257,7 @@ public sealed class GameArchiveSynchronizerTests {
 
     [Fact]
     public async Task TruncatedDownloadLeavesRemoteAtPreviousSnapshot() {
-        using var fixture = new ArchiveFixture();
+        await using var fixture = new ArchiveFixture();
         fixture.Seed(("README.md", "untouched"));
         fixture.Source.SetFiles(("old.csv", "old"));
         await fixture.SynchronizeAsync();
@@ -275,7 +275,7 @@ public sealed class GameArchiveSynchronizerTests {
 
     [Fact]
     public async Task UnmanagedFileAtIncomingPathAbortsWithoutOverwritingOrPushing() {
-        using var fixture = new ArchiveFixture();
+        await using var fixture = new ArchiveFixture();
         fixture.Seed(("README.md", "untouched"), ("shl/foreign.csv", "unmanaged"));
         var head = fixture.Head;
         fixture.Source.SetFiles(("shl/foreign.csv", "incoming"));
@@ -289,7 +289,7 @@ public sealed class GameArchiveSynchronizerTests {
 
     [Fact]
     public async Task InvalidManifestAbortsBeforeMutatingRemote() {
-        using var fixture = new ArchiveFixture();
+        await using var fixture = new ArchiveFixture();
         fixture.Seed(("README.md", "untouched"), (GameArchiveManifest.FileName, ManifestJson("../README.md")));
         var head = fixture.Head;
         fixture.Source.SetFiles(("game.csv", "incoming"));
@@ -302,7 +302,7 @@ public sealed class GameArchiveSynchronizerTests {
 
     [Fact]
     public async Task CaseCollidingManifestAbortsBeforeMutatingRemote() {
-        using var fixture = new ArchiveFixture();
+        await using var fixture = new ArchiveFixture();
         fixture.Seed(("README.md", "untouched"), (GameArchiveManifest.FileName, ManifestJson("shl/game.csv", "shl/GAME.csv")));
         var head = fixture.Head;
         fixture.Source.SetFiles(("game.csv", "incoming"));
@@ -315,7 +315,7 @@ public sealed class GameArchiveSynchronizerTests {
 
     [Fact]
     public async Task UnsupportedManifestVersionAbortsWithoutPublishing() {
-        using var fixture = new ArchiveFixture();
+        await using var fixture = new ArchiveFixture();
         var manifest = new GameArchiveManifest(GameArchiveManifest.SchemaUri, 2, [], []);
         fixture.Seed(("README.md", "untouched"),
             (GameArchiveManifest.FileName, JsonSerializer.Serialize(manifest, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
@@ -329,24 +329,58 @@ public sealed class GameArchiveSynchronizerTests {
     }
 
     [Fact]
-    public void ManagedGitCloneFailureDoesNotExposeCredential() {
-        using var fixture = new ArchiveFixture();
+    public async Task ManagedGitCloneFailureDoesNotExposeCredential() {
+        await using var fixture = new ArchiveFixture();
         const string password = "archive-secret-9387";
         var git = new GameArchiveGit("bot", password);
+        var remote = await fixture.GetGitRemoteAsync();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            git.Clone(new Uri(Path.Combine(fixture.DirectoryPath, "missing.git")).AbsoluteUri,
+            git.Clone(remote.Replace("/remote.git", "/missing.git", StringComparison.Ordinal),
                 Path.Combine(fixture.DirectoryPath, "missing-clone"), TestContext.Current.CancellationToken));
 
         Assert.DoesNotContain(password, exception.ToString(), StringComparison.Ordinal);
         Assert.False(File.Exists(Path.Combine(fixture.DirectoryPath, "archive-askpass.cmd")));
     }
 
-    private sealed class ArchiveFixture : IDisposable {
+    [Fact]
+    public async Task TemporaryCloneUsesDepthTwoAndPushPreservesFullRemoteHistory() {
+        await using var fixture = new ArchiveFixture();
+        fixture.Seed(("README.md", "original"));
+        var originalHead = fixture.Head;
+        fixture.Seed(("history.txt", "second"));
+        fixture.Seed(("history.txt", "third"));
+        fixture.Seed(("history.txt", "fourth"));
+        var remote = await fixture.GetGitRemoteAsync();
+        var checkout = Path.Combine(fixture.DirectoryPath, "shallow-checkout");
+        var git = new GameArchiveGit("bot", "test-password");
+        using (var repository = git.Clone(remote, checkout, TestContext.Current.CancellationToken)) {
+            Assert.True(repository.Info.IsShallow);
+            Assert.Equal(2, repository.Commits.Count());
+            Assert.Equal(fixture.Head, repository.Head.Tip.Sha);
+            Assert.Equal("fourth", File.ReadAllText(Path.Combine(checkout, "history.txt")));
+        }
+
+        fixture.Source.SetFiles(("game.csv", "new snapshot"));
+        await fixture.SynchronizeAsync();
+
+        Assert.Equal(5, fixture.CommitCount);
+        Assert.Equal("original", fixture.HistoricalFile(originalHead, "README.md"));
+        Assert.Equal("new snapshot", fixture.RemoteFile("game.csv"));
+        using var nextClone = git.Clone(remote, Path.Combine(fixture.DirectoryPath, "next-checkout"),
+            TestContext.Current.CancellationToken);
+        Assert.True(nextClone.Info.IsShallow);
+        Assert.Equal(2, nextClone.Commits.Count());
+        Assert.Equal(fixture.Head, nextClone.Head.Tip.Sha);
+    }
+
+    private sealed class ArchiveFixture : IAsyncDisposable {
         private readonly string bare;
         private readonly string seed;
         private readonly HttpClient client;
         private readonly GameArchiveSynchronizer synchronizer;
+        private readonly GameArchiveOptions options;
+        private GameArchiveGitHttpServer? gitServer;
 
         public ArchiveFixture() {
             DirectoryPath = Path.Combine(Path.GetTempPath(), $"shuttle-archive-test-{Guid.NewGuid():N}");
@@ -354,17 +388,19 @@ public sealed class GameArchiveSynchronizerTests {
             bare = Path.Combine(DirectoryPath, "remote.git");
             seed = Path.Combine(DirectoryPath, "seed");
             Git(DirectoryPath, "init", "--bare", bare);
+            Git(DirectoryPath, $"--git-dir={bare}", "config", "http.receivepack", "true");
             Git(DirectoryPath, "init", "-b", "main", seed);
             Git(seed, "remote", "add", "origin", new Uri(bare).AbsoluteUri);
             Source = new ArchiveSource();
             client = new HttpClient(Source);
+            options = new GameArchiveOptions {
+                SourceUrl = "http://localhost/games/",
+                RemoteUrl = new Uri(bare).AbsoluteUri,
+            };
             synchronizer = new GameArchiveSynchronizer(
                 new GameArchiveCrawler(client),
                 new FakeCredentialProvider(),
-                Options.Create(new GameArchiveOptions {
-                    SourceUrl = "http://localhost/games/",
-                    RemoteUrl = new Uri(bare).AbsoluteUri,
-                }),
+                Options.Create(options),
                 new DevelopmentEnvironment(),
                 NullLogger<GameArchiveSynchronizer>.Instance);
         }
@@ -400,10 +436,25 @@ public sealed class GameArchiveSynchronizerTests {
             return output;
         }
 
-        public Task SynchronizeAsync() => synchronizer.SynchronizeAsync(TestContext.Current.CancellationToken);
-        public Task SynchronizeWithCancellationAsync(CancellationToken cancellationToken) => synchronizer.SynchronizeAsync(cancellationToken);
+        public async Task<string> GetGitRemoteAsync() {
+            gitServer ??= await GameArchiveGitHttpServer.StartAsync(DirectoryPath, TestContext.Current.CancellationToken);
+            options.RemoteUrl = gitServer.RemoteUrl;
+            return options.RemoteUrl;
+        }
 
-        public void Dispose() {
+        public async Task SynchronizeAsync() {
+            await GetGitRemoteAsync();
+            await synchronizer.SynchronizeAsync(TestContext.Current.CancellationToken);
+        }
+
+        public async Task SynchronizeWithCancellationAsync(CancellationToken cancellationToken) {
+            await GetGitRemoteAsync();
+            await synchronizer.SynchronizeAsync(cancellationToken);
+        }
+
+        public async ValueTask DisposeAsync() {
+            if (gitServer is not null)
+                await gitServer.DisposeAsync();
             client.Dispose();
             foreach (var path in Directory.EnumerateFiles(DirectoryPath, "*", SearchOption.AllDirectories))
                 File.SetAttributes(path, FileAttributes.Normal);
