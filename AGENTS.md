@@ -34,6 +34,8 @@ file paths and skipped-directory metadata; its JSON Schema is in
 `docs/game-archive-manifest.schema.json`. Their managed
 files are removed from the current snapshot, but retained in Git history;
 HTTP/download failures still abort without publishing.
+Source files ending in `.html`, `.xml`, or `.txt` are excluded case-insensitively;
+previously managed excluded files are removed only after a successful sync.
 See `docs/game-archive.md`.
 `Shuttle.GameArchive` owns the shared archive services; the API owns only the
 Quartz job. `Shuttle.GameArchive.Runner` performs a local one-shot sync through

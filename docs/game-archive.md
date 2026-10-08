@@ -7,7 +7,7 @@ It preserves source-relative paths (e.g. `shl/S85/csv/...`). It is not an
 archive stored in the SHLAnalytics repository.
 
 The `GameArchiveJob` runs every six hours in production via the persistent Quartz
-store. It inventories the eligible directory tree and downloads all discovered
+store. It inventories the eligible directory tree and downloads all eligible
 files before modifying a temporary clone. `manifest.json` identifies paths it
 owns and skipped directories; on a
 successful scan the job removes only managed paths absent from the new inventory,
@@ -62,6 +62,76 @@ Directories appear only when they contain archived files; Git does not track
 empty directories. Skipped subtrees such as `iihf/S37/` are documented in the
 manifest, not represented by placeholder folders. Previously managed files
 removed from the current tree remain accessible through earlier Git commits.
+
+## File-type coverage
+
+Source files ending in **`.html`, `.xml`, or `.txt` are intentionally not
+archived**, using case-insensitive extension matching. Their existence is
+documented here rather than represented by per-file manifest entries.
+Apache HTML directory listings are still fetched to discover eligible files;
+directories with names ending in those extensions are still traversed.
+Other extensions remain eligible, including unknown extensions. Files inside
+ZIPs or other binary containers are not inspected, filtered, or rewritten.
+
+These exclusions acknowledge useful historical data without attempting to
+preserve it in the current snapshot:
+
+| Excluded type | Observed contents | Files observed on 2026-10-08 |
+|---|---|---:|
+| `.html` | Older STHS game reports, detailed play-by-play, line usage, rosters/ratings, and season statistics | 33,498 |
+| `.xml` | Structured STHS player/goalie ratings, contracts, statistics, schedules, league configuration, and transaction/event exports | 1,790 |
+| `.txt` | Later-season narrated, timestamped play-by-play logs | 20,231 |
+
+Their coverage is not uniform. SHL HTML was observed in S3-S52 except S36;
+SHL XML in S28, S29, S32, and S34; SHL text logs in S53-S68. SMJHL HTML was
+observed in S15-S52, XML in S31-S45, and text logs in S53-S65. Older IIHF
+and WJC custom-index exclusions limit what this inventory can establish.
+Special tournaments and prospects have additional, irregular coverage.
+
+Previously managed excluded files are removed from the current snapshot
+only after all eligible downloads succeed; earlier commits retain their
+contents. Unmanaged files remain untouched, even if their extensions are
+excluded. Ignored file-content changes do not trigger commits. Unsafe and
+case-colliding listing entries remain fatal, including excluded entries.
+
+### Remaining formats and observed season coverage
+
+The 2026-10-08 Apache-listing inventory contains **7,808 remaining files**,
+approximately **1.390 GiB** uncompressed. Sizes are rounded listing estimates,
+not measured Git storage. The 40 skipped custom-index subtrees are outside
+these counts. A season listed below has at least one file of that type;
+this is not proof of a complete season or a complete save.
+
+| Type | Files | Contents | Observed distribution |
+|---|---:|---|---|
+| `.csv` | 5,649 | Structured simulator exports, including players/ratings, teams, schedules, statistics, and modern box-score summaries | SHL/SMJHL S53-S90; IIHF/WJC S53-S89; sporadic older exports and prospects S45-S49; 41 additional files under `team-files/83/` |
+| `.sth` | 387 | STHS native league saves, including timestamped backup copies | IIHF S47-S52; SMJHL S30-S36 and S47-S52; prospects S45-S49; WJC S44-S46, S48, S51-S52 and special tournaments; none inventoried under SHL |
+| `.stc` | 233 | STHS client league files | SHL S28-S35 and S37-S52; SMJHL S30-S52; IIHF S43-S52; WJC S44-S52 and special tournaments; prospects S45-S49 |
+| `.js` | 237 | Legacy HTML-page interaction helpers and bundled libraries such as jQuery | SHL S28-S35 and S37-S52; SMJHL S30-S52; IIHF S43-S52; WJC S44-S52 and special tournaments; prospects S45-S49 and S53 |
+| `.css` | 437 | Legacy HTML-page and table styles | Same broad season distribution as `.js` |
+| `.png` | 289 | Mostly navigation/toggle icons; also two `test1.png` files | Patchy legacy coverage: SHL S28-S52; SMJHL S30-S52; IIHF S43-S52; WJC S44-S52 and special tournaments; prospects S45-S49 and S53 |
+| `.gif` | 188 | Footer-background images | Patchy legacy coverage over the same broad ranges as `.png` |
+| `.jpg` | 188 | Page-background images | Same broad distribution as `.gif` |
+| `.dat` | 154 | `STHSLegacy.dat` text navigation maps listing HTML filenames and labels, not FHM save records | SHL S40-S52; SMJHL S32-S52; IIHF S43-S52; WJC S44-S52 and special tournaments; prospects S53 |
+| `.ini` | 37 | Windows `desktop.ini` folder/icon metadata | SHL S28-S35, S37-S38, and S43 |
+| `.str` | 3 | STHS rating packs | SMJHL S50-S51 |
+| `.log` | 3 | Chromium-style crash/debug messages, not hockey play-by-play | WJC S48 |
+| `.stcareer` | 1 | STHS cumulative career-statistics file | IIHF S46 round robin |
+| `.fhm` | 1 | Binary `team_0.fhm` file; its detailed contents have not been decoded | WJC S61 |
+| `.zip` | 1 | FHM save-data bundle: 28 `.dat` entries, including `players.dat`, `teams.dat`, `leagues.dat`, `names.dat`, and `personal.dat`, plus one other entry | SHL S88 |
+
+The roles of STHS native extensions are described in the
+[official STHS manual](https://sths.simont.info/ManualV3_En.php); their sampled
+binary contents were not decoded. CSV exports dominate newer-season coverage.
+JS, CSS, images, and navigation maps primarily support the HTML files now
+excluded, but remain eligible under the current policy.
+
+Older CSV coverage is sporadic: SHL S28, S29, S32, and S34; SMJHL S32, S35,
+S37, S38, and S40; WJC S45 and S51. The `team-files/83/` path is reported
+literally, without assuming that its numeric folder is a season identifier.
+Sampled newer CSVs are semicolon-delimited and contain named FHM attributes,
+ability/potential, line assignments, and box-score fields. Sampled older
+STHS CSVs are comma-delimited and include ratings, contracts, and statistics.
 
 ## Manifest schema and stable ordering
 
@@ -138,13 +208,13 @@ policy enables archiving the remaining Apache-listed source now.
 ### HTTP 404 and upstream removals
 
 HTTP 404 responses are not retried. A 404 while fetching a directory listing
-or downloading a file advertised by a listing aborts the sync, leaving the
+or downloading an eligible file advertised by a listing aborts the sync, leaving the
 remote archive and manifest unchanged. A 404 is not a skipped-directory
 entry; that requires a successful HTML response.
 
 A previously managed file absent from a successfully fetched listing is
 treated as removed upstream and deleted from the current snapshot, with its
-content retained in Git history. In contrast, a listed file returning 404
+content retained in Git history. In contrast, an eligible listed file returning 404
 makes the inventory inconsistent, so no snapshot is published.
 
 If upstream updates are shown to cause transient listed-file 404s, a small,

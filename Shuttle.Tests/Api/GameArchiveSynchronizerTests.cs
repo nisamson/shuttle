@@ -179,6 +179,52 @@ public sealed class GameArchiveSynchronizerTests {
     }
 
     [Fact]
+    public async Task ExcludedReportsAreNotDownloadedAndRemoveOnlyManagedFilesAfterSuccessfulSync() {
+        await using var fixture = new ArchiveFixture();
+        fixture.Seed(
+            ("README.md", "untouched"), ("notes.txt", "unmanaged"),
+            ("game.HTML", "old report"), ("players.xml", "old players"), ("playbyplay.TxT", "old log"),
+            ("game.csv", "old game"),
+            (GameArchiveManifest.FileName, ManifestJson("game.HTML", "players.xml", "playbyplay.TxT", "game.csv")));
+        var previousHead = fixture.Head;
+        fixture.Source.SetFiles(
+            ("game.HTML", "ignored report"), ("players.xml", "ignored players"), ("playbyplay.TxT", "ignored log"),
+            ("game.csv", "updated game"));
+        fixture.Source.FailDownload = "game.csv";
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => fixture.SynchronizeAsync());
+
+        Assert.Equal(previousHead, fixture.Head);
+        Assert.Equal("old report", fixture.RemoteFile("game.HTML"));
+        Assert.Equal("old players", fixture.RemoteFile("players.xml"));
+        Assert.Equal("old log", fixture.RemoteFile("playbyplay.TxT"));
+        fixture.Source.FailDownload = "game.HTML";
+        fixture.Source.RequestedPaths.Clear();
+
+        await fixture.SynchronizeAsync();
+
+        Assert.Null(fixture.RemoteFile("game.HTML"));
+        Assert.Null(fixture.RemoteFile("players.xml"));
+        Assert.Null(fixture.RemoteFile("playbyplay.TxT"));
+        Assert.Equal("old report", fixture.HistoricalFile(previousHead, "game.HTML"));
+        Assert.Equal("old players", fixture.HistoricalFile(previousHead, "players.xml"));
+        Assert.Equal("old log", fixture.HistoricalFile(previousHead, "playbyplay.TxT"));
+        Assert.Equal("updated game", fixture.RemoteFile("game.csv"));
+        Assert.Equal("untouched", fixture.RemoteFile("README.md"));
+        Assert.Equal("unmanaged", fixture.RemoteFile("notes.txt"));
+        Assert.Equal("game.csv", Assert.Single(ReadManifest(fixture).Files));
+        Assert.DoesNotContain("game.HTML", fixture.Source.RequestedPaths);
+        Assert.DoesNotContain("players.xml", fixture.Source.RequestedPaths);
+        Assert.DoesNotContain("playbyplay.TxT", fixture.Source.RequestedPaths);
+        var head = fixture.Head;
+        fixture.Source.SetFiles(("game.csv", "updated game"), ("game.HTML", "changed ignored report"));
+
+        await fixture.SynchronizeAsync();
+
+        Assert.Equal(head, fixture.Head);
+    }
+
+    [Fact]
     public async Task IdenticalSecondRunDoesNotCommitOrPush() {
         await using var fixture = new ArchiveFixture();
         fixture.Seed(("README.md", "untouched"));

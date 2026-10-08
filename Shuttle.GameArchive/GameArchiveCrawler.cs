@@ -58,6 +58,10 @@ public sealed class GameArchiveCrawler(HttpClient client) {
                 } else {
                     if (!localNames.Add(relative))
                         throw new InvalidDataException($"Duplicate or case-colliding archive entry {relative}.");
+                    if (relative.EndsWith(".html", StringComparison.OrdinalIgnoreCase)
+                        || relative.EndsWith(".xml", StringComparison.OrdinalIgnoreCase)
+                        || relative.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
+                        continue;
                     files.Add(relative, target);
                 }
             }

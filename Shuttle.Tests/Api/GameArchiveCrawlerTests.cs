@@ -30,6 +30,8 @@ public sealed class GameArchiveCrawlerTests {
     [InlineData("<a href=\"MANIFEST.JSON\">manifest case collision</a>")]
     [InlineData("<a href=\"CON.csv\">device</a>")]
     [InlineData("<a href=\"A.csv\">A</a><a href=\"a.csv\">a</a>")]
+    [InlineData("<a href=\"CON.txt\">excluded device</a>")]
+    [InlineData("<a href=\"A.html\">A</a><a href=\"a.HTML\">a</a>")]
     public async Task Inventory_rejects_unsafe_or_colliding_entries(string links) {
         using var http = Client(new Dictionary<string, string> {
             ["/games/"] = Listing("games", links),
@@ -41,6 +43,50 @@ public sealed class GameArchiveCrawlerTests {
             await Assert.ThrowsAsync<InvalidDataException>(
                 () => crawler.InventoryAsync(Root, TestContext.Current.CancellationToken));
         }
+    }
+
+    [Fact]
+    public async Task Inventory_excludes_report_extensions_but_traverses_matching_directory_names() {
+        var handler = new FixtureHandler(new Dictionary<string, string> {
+            ["/games/"] = Listing("games",
+                "<a href=\"game.html\">Game</a><a href=\"players.XML\">Players</a><a href=\"log.TxT\">Log</a>"
+                + "<a href=\"data.html.csv\">Data</a><a href=\"reports.html/\">Directory</a>"),
+            ["/games/reports.html/"] = Listing("games/reports.html", "<a href=\"stats.csv\">Stats</a>"),
+        });
+        using var http = new HttpClient(handler);
+
+        var inventory = await new GameArchiveCrawler(http).InventoryAsync(Root, TestContext.Current.CancellationToken);
+
+        Assert.Equal(["data.html.csv", "reports.html/stats.csv"], inventory.Files.Keys.Order(StringComparer.Ordinal));
+        Assert.Empty(inventory.SkippedDirectories);
+        Assert.Equal(2, handler.RequestCount);
+    }
+
+    [Theory]
+    [InlineData(".csv")]
+    [InlineData(".css")]
+    [InlineData(".sth")]
+    [InlineData(".png")]
+    [InlineData(".js")]
+    [InlineData(".stc")]
+    [InlineData(".gif")]
+    [InlineData(".jpg")]
+    [InlineData(".dat")]
+    [InlineData(".ini")]
+    [InlineData(".log")]
+    [InlineData(".str")]
+    [InlineData(".fhm")]
+    [InlineData(".STCareer")]
+    [InlineData(".zip")]
+    public async Task Inventory_keeps_other_file_types(string extension) {
+        var path = $"file{extension}";
+        using var http = Client(new Dictionary<string, string> {
+            ["/games/"] = Listing("games", $"<a href=\"{path}\">File</a>"),
+        });
+
+        var inventory = await new GameArchiveCrawler(http).InventoryAsync(Root, TestContext.Current.CancellationToken);
+
+        Assert.Equal(path, Assert.Single(inventory.Files).Key);
     }
 
     [Fact]
