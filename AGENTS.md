@@ -21,6 +21,28 @@ websites, stores it in Azure SQL, and serves it to the front end.
 `Shuttle.Api` periodically pulls from them (via its background Quartz jobs) to keep the
 database current.
 
+`GameArchiveJob` is a separate six-hour Quartz job, enabled by default in the
+production AppHost (but not local development). When enabled it mirrors the public Apache directory
+`https://simulationhockey.com/games/` into the separate
+`shuttle-shl/shl-games-archive` Git repository. It uses an Azure Key Vault
+secret for the `shuttle-bot` Git credential; local development uses an
+emulated vault and persistent Gitea. The job must complete all downloads
+before changing the checkout and must not delete files after failed scans.
+Successful non-Apache HTML directories are intentionally skipped and documented
+in the versioned `manifest.json` with warning logs. It combines sorted owned
+file paths and skipped-directory metadata; its JSON Schema is in
+`docs/game-archive-manifest.schema.json`. Their managed
+files are removed from the current snapshot, but retained in Git history;
+HTTP/download failures still abort without publishing.
+Only source files ending in `.csv` are archived (case-insensitive matching);
+previously managed non-CSV files are removed only after a successful sync.
+See `docs/game-archive.md`.
+`Shuttle.GameArchive` owns the shared archive services; the API owns only the
+Quartz job. `Shuttle.GameArchive.Runner` performs a local one-shot sync through
+the AppHost's `ArchiveOnly` launch profile (real SHL source by default, loopback
+Git/vault destinations only), without API, SQL, Azure login, or Quartz. Gitea
+persists and remains running after the runner exits; restart the runner manually.
+
 ### Competitions
 
 The broader game includes several competitions that this solution reports on:
@@ -259,6 +281,9 @@ SDK-style .NET 10 solution (`SHLAnalytics.sln`) using Central Package Management
 
 - `dotnet restore` — restore packages. NuGetAudit runs here and **fails the restore** on
   any known-vulnerable package (warnings are treated as errors).
+  The only temporary exceptions are five project-local ImageSharp advisory
+  suppressions in `Shuttle.Fhm.Vision` and its tests, which are not deployed;
+  see `Shuttle.Fhm.Vision/README.md`. Other advisories still fail restore.
 - `dotnet build` — build the whole solution.
 - `dotnet build --no-restore -c Debug` — build without re-restoring (after a restore).
 - `dotnet build <Project>/<Project>.csproj` — build a single project.

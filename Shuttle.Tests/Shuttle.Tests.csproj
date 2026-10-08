@@ -26,6 +26,8 @@
     <ProjectReference Include="..\Shuttle.Core\Shuttle.Core.csproj" />
     <ProjectReference Include="..\Shuttle.Math\Shuttle.Math.csproj" />
     <ProjectReference Include="..\Shuttle.Api\Shuttle.Api.csproj" />
+    <ProjectReference Include="..\Shuttle.GameArchive\Shuttle.GameArchive.csproj" />
+    <ProjectReference Include="..\Shuttle.GameArchive.Runner\Shuttle.GameArchive.Runner.csproj" />
     <ProjectReference Include="..\Shuttle.Api.Client\Shuttle.Api.Client.csproj" />
     <ProjectReference Include="..\Shuttle.Analysis\Shuttle.Analysis.csproj" />
     <ProjectReference Include="..\Shuttle.BinarySerde.Common\Shuttle.BinarySerde.Common.csproj" />
@@ -45,6 +47,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Serialization\Portal\portalPlayers.json" />
+    <EmbeddedResource Include="..\docs\game-archive-manifest.schema.json" LogicalName="GameArchiveManifestSchema.json" />
   </ItemGroup>
 
 </Project>

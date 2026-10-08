@@ -27,7 +27,6 @@
         <PackageReference Include="OpenTelemetry.Instrumentation.Quartz" />
         <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
 
-        <PackageReference Include="Azure.Identity" />
         <PackageReference Include="Microsoft.EntityFrameworkCore" />
         <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
@@ -46,6 +45,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Shuttle.EFCore\Shuttle.EFCore.csproj" />
+        <ProjectReference Include="..\Shuttle.GameArchive\Shuttle.GameArchive.csproj" />
         <ProjectReference Include="..\Shuttle.Models\Shuttle.Models.csproj" />
         <ProjectReference Include="..\Shuttle.Shl.Api.Client\Shuttle.Shl.Api.Client.csproj" />
         <ProjectReference Include="..\Shuttle.ServiceDefaults\Shuttle.ServiceDefaults.csproj" />
