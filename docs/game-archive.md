@@ -1,6 +1,6 @@
 # SHL game-file archive
 
-`Shuttle.Api` mirrors files discoverable through Apache directory listings under
+`Shuttle.Api` mirrors CSV files discoverable through Apache directory listings under
 `https://simulationhockey.com/games/` into the **separate**
 `shuttle-shl/shl-games-archive` Git repository, retaining its root `README.md`.
 It preserves source-relative paths (e.g. `shl/S85/csv/...`). It is not an
@@ -55,8 +55,8 @@ The source's `/games/` directory maps directly to the repository root; there
 is no extra `games/` wrapper. File paths, names, and season numbering are
 preserved rather than normalized. The manifest's `files` array covers source
 files only, not the README or `manifest.json` itself. Root `manifest.json` is
-reserved for archive metadata; a nested source file such as `shl/manifest.json`
-is permitted.
+reserved for archive metadata. Other source JSON files, including a nested
+`shl/manifest.json`, are excluded by the CSV-only policy.
 
 Directories appear only when they contain archived files; Git does not track
 empty directories. Skipped subtrees such as `iihf/S37/` are documented in the
@@ -65,13 +65,15 @@ removed from the current tree remain accessible through earlier Git commits.
 
 ## File-type coverage
 
-Source files ending in **`.html`, `.xml`, or `.txt` are intentionally not
-archived**, using case-insensitive extension matching. Their existence is
-documented here rather than represented by per-file manifest entries.
+**Only source files ending in `.csv` are archived**, using case-insensitive
+extension matching (`.CSV` and mixed-case variants are included).
+All other extensions, unknown extensions, and extensionless files are
+intentionally excluded. Their existence is documented here rather than
+represented by per-file manifest entries. The repository's root README and
+generated manifest are preserved separately from this source-file policy.
 Apache HTML directory listings are still fetched to discover eligible files;
-directories with names ending in those extensions are still traversed.
-Other extensions remain eligible, including unknown extensions. Files inside
-ZIPs or other binary containers are not inspected, filtered, or rewritten.
+all discovered safe directories are still traversed, regardless of their names.
+ZIPs and other binary containers are excluded, not opened to recover CSVs.
 
 These exclusions acknowledge useful historical data without attempting to
 preserve it in the current snapshot:
@@ -94,13 +96,15 @@ contents. Unmanaged files remain untouched, even if their extensions are
 excluded. Ignored file-content changes do not trigger commits. Unsafe and
 case-colliding listing entries remain fatal, including excluded entries.
 
-### Remaining formats and observed season coverage
+### Observed source formats and season coverage
 
-The 2026-10-08 Apache-listing inventory contains **7,808 remaining files**,
-approximately **1.390 GiB** uncompressed. Sizes are rounded listing estimates,
+The 2026-10-08 Apache-listing inventory contains **5,649 eligible CSV files**,
+approximately **0.481 GiB (493 MiB)** uncompressed. Sizes are rounded listing estimates,
 not measured Git storage. The 40 skipped custom-index subtrees are outside
 these counts. A season listed below has at least one file of that type;
-this is not proof of a complete season or a complete save.
+this is not proof of a complete season or a complete save. The following
+catalog records observed formats for documentation; **only its CSV row is
+archived**. The non-CSV formats below are intentionally excluded.
 
 | Type | Files | Contents | Observed distribution |
 |---|---:|---|---|
@@ -124,7 +128,7 @@ The roles of STHS native extensions are described in the
 [official STHS manual](https://sths.simont.info/ManualV3_En.php); their sampled
 binary contents were not decoded. CSV exports dominate newer-season coverage.
 JS, CSS, images, and navigation maps primarily support the HTML files now
-excluded, but remain eligible under the current policy.
+excluded; they too are excluded under the CSV-only policy.
 
 Older CSV coverage is sporadic: SHL S28, S29, S32, and S34; SMJHL S32, S35,
 S37, S38, and S40; WJC S45 and S51. The `team-files/83/` path is reported

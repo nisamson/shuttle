@@ -38,7 +38,7 @@ public sealed class GameArchiveSynchronizer(
         if (scan.SkippedDirectories.Count > 0)
             logger.LogWarning("Archive snapshot excludes {SkippedDirectoryCount} non-Apache directories; see {ReportFile}",
                 scan.SkippedDirectories.Count, GameArchiveManifest.FileName);
-        logger.LogInformation("Archive coverage excludes .html, .xml, and .txt source files");
+        logger.LogInformation("Archive coverage includes only .csv source files (case-insensitive extension matching)");
         logger.LogInformation("Found {FileCount} eligible game files in the source tree", inventory.Count);
         var workspace = Path.Combine(Path.GetTempPath(), "shuttle-game-archive", Guid.NewGuid().ToString("N"));
         var staging = Path.Combine(workspace, "downloads");

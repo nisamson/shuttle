@@ -46,39 +46,50 @@ public sealed class GameArchiveCrawlerTests {
     }
 
     [Fact]
-    public async Task Inventory_excludes_report_extensions_but_traverses_matching_directory_names() {
+    public async Task Inventory_keeps_csv_but_traverses_non_csv_directory_names() {
         var handler = new FixtureHandler(new Dictionary<string, string> {
             ["/games/"] = Listing("games",
                 "<a href=\"game.html\">Game</a><a href=\"players.XML\">Players</a><a href=\"log.TxT\">Log</a>"
-                + "<a href=\"data.html.csv\">Data</a><a href=\"reports.html/\">Directory</a>"),
+                + "<a href=\"data.html.csv\">Data</a><a href=\"reports.html/\">Directory</a>"
+                + "<a href=\"reports.csv/\">CSV-named directory</a>"),
             ["/games/reports.html/"] = Listing("games/reports.html", "<a href=\"stats.csv\">Stats</a>"),
+            ["/games/reports.csv/"] = Listing("games/reports.csv", "<a href=\"nested.csv\">Stats</a>"),
         });
         using var http = new HttpClient(handler);
 
         var inventory = await new GameArchiveCrawler(http).InventoryAsync(Root, TestContext.Current.CancellationToken);
 
-        Assert.Equal(["data.html.csv", "reports.html/stats.csv"], inventory.Files.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(["data.html.csv", "reports.csv/nested.csv", "reports.html/stats.csv"],
+            inventory.Files.Keys.Order(StringComparer.Ordinal));
         Assert.Empty(inventory.SkippedDirectories);
-        Assert.Equal(2, handler.RequestCount);
+        Assert.Equal(3, handler.RequestCount);
     }
 
     [Theory]
-    [InlineData(".csv")]
-    [InlineData(".css")]
-    [InlineData(".sth")]
-    [InlineData(".png")]
-    [InlineData(".js")]
-    [InlineData(".stc")]
-    [InlineData(".gif")]
-    [InlineData(".jpg")]
-    [InlineData(".dat")]
-    [InlineData(".ini")]
-    [InlineData(".log")]
-    [InlineData(".str")]
-    [InlineData(".fhm")]
-    [InlineData(".STCareer")]
-    [InlineData(".zip")]
-    public async Task Inventory_keeps_other_file_types(string extension) {
+    [InlineData(".csv", true)]
+    [InlineData(".CSV", true)]
+    [InlineData(".CsV", true)]
+    [InlineData(".html", false)]
+    [InlineData(".xml", false)]
+    [InlineData(".txt", false)]
+    [InlineData(".css", false)]
+    [InlineData(".sth", false)]
+    [InlineData(".png", false)]
+    [InlineData(".js", false)]
+    [InlineData(".stc", false)]
+    [InlineData(".gif", false)]
+    [InlineData(".jpg", false)]
+    [InlineData(".dat", false)]
+    [InlineData(".ini", false)]
+    [InlineData(".log", false)]
+    [InlineData(".str", false)]
+    [InlineData(".fhm", false)]
+    [InlineData(".STCareer", false)]
+    [InlineData(".zip", false)]
+    [InlineData(".bin", false)]
+    [InlineData("", false)]
+    [InlineData(".csv.zip", false)]
+    public async Task Inventory_keeps_only_csv_files(string extension, bool included) {
         var path = $"file{extension}";
         using var http = Client(new Dictionary<string, string> {
             ["/games/"] = Listing("games", $"<a href=\"{path}\">File</a>"),
@@ -86,7 +97,10 @@ public sealed class GameArchiveCrawlerTests {
 
         var inventory = await new GameArchiveCrawler(http).InventoryAsync(Root, TestContext.Current.CancellationToken);
 
-        Assert.Equal(path, Assert.Single(inventory.Files).Key);
+        if (included)
+            Assert.Equal(path, Assert.Single(inventory.Files).Key);
+        else
+            Assert.Empty(inventory.Files);
     }
 
     [Fact]

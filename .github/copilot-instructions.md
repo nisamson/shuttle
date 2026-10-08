@@ -53,8 +53,8 @@ Two shipped apps over shared libraries, orchestrated by an Aspire AppHost.
   (schema: `docs/game-archive-manifest.schema.json`); their managed files are
   removed from the current snapshot but remain in history. HTTP/download
   failures still abort publishing.
-  Source files ending in `.html`, `.xml`, or `.txt` are excluded case-insensitively;
-  previously managed excluded files are removed only after a successful sync.
+  Only source files ending in `.csv` are archived (case-insensitive matching);
+  previously managed non-CSV files are removed only after a successful sync.
 - **`Shuttle.WebClient`** — standalone Blazor WebAssembly front end using **Fluent UI Blazor**
   and MSAL. No server host; it calls `Shuttle.Api` over HTTP.
 - **`Shuttle.EFCore`** — data layer: `ShlDbContext`, entities, migrations. **Azure SQL** with
