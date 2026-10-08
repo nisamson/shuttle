@@ -10,6 +10,7 @@ using Shuttle.Api.Services.Recruitment;
 using Shuttle.Api.Services.Scouting;
 using Shuttle.Api.Services.Users;
 using Shuttle.EFCore;
+using Shuttle.GameArchive;
 using Shuttle.ServiceDefaults;
 using Shuttle.Shl.Api.Client;
 
@@ -60,6 +61,7 @@ builder.Services.AddCors(options => {
 builder.Services.AddShlApiClients();
 
 builder.AddShuttleDatabase();
+builder.Services.AddGameArchive(builder.Configuration, builder.Environment);
 builder.AddQuartz();
 
 builder.Services.AddUserService();

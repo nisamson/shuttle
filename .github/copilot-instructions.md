@@ -38,6 +38,19 @@ Two shipped apps over shared libraries, orchestrated by an Aspire AppHost.
   through `ISelfRegisteringJob`, and pull from the upstream SHL Index/Portal APIs
   (`Shuttle.Shl.Api.Client`) to keep the DB current. Ships the CrystalQuartz dashboard at
   `/quartz`. Authenticates API requests with JWT bearer (Entra ID, default scheme).
+  A six-hour `GameArchiveJob` (enabled in production, opt-in locally) mirrors public `/games/` files into the
+  separate `shuttle-shl/shl-games-archive` repository using a Key Vault secret;
+  local development uses an emulated vault and persistent Gitea
+  (see `docs/game-archive.md`).
+  Shared archive services live in `Shuttle.GameArchive`. The local
+  `Shuttle.GameArchive.Runner` uses the AppHost's `ArchiveOnly` profile for one
+  real-source sync to persistent Gitea via the vault emulator, without API,
+  SQL, Azure login, or Quartz; Git/vault destinations must be loopback.
+  Non-Apache HTML directories are skipped with warning logs and a committed
+  versioned `manifest.json` combining owned file paths and skipped directories
+  (schema: `docs/game-archive-manifest.schema.json`); their managed files are
+  removed from the current snapshot but remain in history. HTTP/download
+  failures still abort publishing.
 - **`Shuttle.WebClient`** — standalone Blazor WebAssembly front end using **Fluent UI Blazor**
   and MSAL. No server host; it calls `Shuttle.Api` over HTTP.
 - **`Shuttle.EFCore`** — data layer: `ShlDbContext`, entities, migrations. **Azure SQL** with

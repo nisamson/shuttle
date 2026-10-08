@@ -1,4 +1,5 @@
 using Aspire.Hosting.Azure;
+using Azure.Provisioning.KeyVault;
 using Azure.Provisioning.AppService;
 using Azure.Provisioning.Authorization;
 using Azure.Provisioning.Resources;
@@ -7,8 +8,35 @@ using Azure.ResourceManager.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Projects;
+using AzureKeyVaultEmulator.Aspire.Hosting;
+
+if (args.Length == 1 && args[0] == "--bootstrap-gitea") {
+    await GiteaBootstrap.RunAsync();
+    return;
+}
 
 var builder = DistributedApplication.CreateBuilder(args);
+
+if (builder.Configuration.GetValue("ArchiveOnly", false)) {
+    if (!builder.ExecutionContext.IsRunMode)
+        throw new InvalidOperationException("ArchiveOnly is a local run mode and cannot be published or deployed.");
+
+    var localVault = builder.AddAzureKeyVault("archive-vault").ClearDefaultRoleAssignments();
+    var bootstrap = LocalGameArchiveHosting.Add(builder, localVault);
+    builder.AddProject<Shuttle_GameArchive_Runner>("archive-runner")
+        .WithEnvironment("DOTNET_ENVIRONMENT", "Development")
+        .WithEnvironment("Archive__SourceUrl", builder.Configuration["Archive:SourceUrl"] ?? "https://simulationhockey.com/games/")
+        .WithEnvironment("Archive__RemoteUrl", LocalGameArchiveHosting.GitRemote)
+        .WithEnvironment("Archive__GitUsername", "shuttle-bot")
+        .WithEnvironment("Archive__SecretName", LocalGameArchiveHosting.SecretName)
+        .WithEnvironment("Archive__VaultUri", localVault)
+        .WithReference(localVault, connectionName: "archivevault")
+        .WithAzureKeyVaultEmulatorCredentials(localVault)
+        .WaitFor(localVault)
+        .WaitForCompletion(bootstrap);
+    builder.Build().Run();
+    return;
+}
 
 // The generated Azure infrastructure includes RBAC role assignments (ACR AcrPull, the Aspire
 // dashboard identity's Contributor, the web app's Website Contributor). Creating those needs
@@ -42,6 +70,9 @@ var insights = builder.AddAzureApplicationInsights("shuttle-app-insights")
     .PublishAsExisting(appInsightsName, shuttleRg)
     .RunAsExisting(devAppInsightsName, shuttleRg);
 
+var archiveVault = builder.AddAzureKeyVault("archive-vault")
+    .ClearDefaultRoleAssignments();
+
 var appServicePlan = builder.AddAzureAppServiceEnvironment("shuttle-app-service-plan")
     .WithAzureApplicationInsights(insights)
     .ConfigureInfrastructure(infra => {
@@ -65,6 +96,20 @@ var api = builder.AddProject<Shuttle_Api>("shuttle-api")
     .WithReference(sqlServer)
     .WaitFor(sqlServer)
     .WithAzureUserAssignedIdentity(umi)
+    .WithReference(archiveVault, connectionName: "archivevault")
+    .WithEnvironment("Archive__VaultUri", archiveVault)
+    .WithEnvironment("Archive__SourceUrl", builder.Configuration["Archive:SourceUrl"] ?? "https://simulationhockey.com/games/")
+    .WithEnvironment("Archive__RemoteUrl", builder.ExecutionContext.IsRunMode
+        ? LocalGameArchiveHosting.GitRemote
+        : "https://github.com/shuttle-shl/shl-games-archive.git")
+    .WithEnvironment("Archive__GitUsername", builder.ExecutionContext.IsRunMode
+        ? "shuttle-bot"
+        : builder.Configuration["Archive:GitUsername"] ?? "shuttle-bot")
+    .WithEnvironment("Archive__SecretName", builder.ExecutionContext.IsRunMode
+        ? LocalGameArchiveHosting.SecretName
+        : builder.Configuration["Archive:SecretName"] ?? "shl-games-archive-git-password")
+    .WithEnvironment("Archive__Enabled",
+        builder.Configuration.GetValue("Archive:Enabled", !builder.ExecutionContext.IsRunMode) ? "true" : "false")
     .WithEnvironment("SHUTTLESQLSERVER_DATABASE", databaseName)
     .WithUrl("/quartz", "Job Dashboard")
     .WithExternalHttpEndpoints()
@@ -80,6 +125,17 @@ var api = builder.AddProject<Shuttle_Api>("shuttle-api")
         }
     });
 #pragma warning restore ASPIREPROBES001
+
+// Explicit vault roles are emitted in a separate resource, not the vault's infrastructure.
+if (isFirstRun)
+    api.WithRoleAssignments(archiveVault, KeyVaultBuiltInRole.KeyVaultSecretsUser);
+
+if (builder.ExecutionContext.IsRunMode) {
+    var bootstrap = LocalGameArchiveHosting.Add(builder, archiveVault);
+
+    api.WithAzureKeyVaultEmulatorCredentials(archiveVault)
+        .WaitForCompletion(bootstrap);
+}
 
 // The Blazor WebAssembly front end is only orchestrated for local development. It runs via
 // the Blazor dev server and is excluded from publish so it does not affect the Azure App
