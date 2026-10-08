@@ -349,8 +349,7 @@ public sealed class GameArchiveSynchronizerTests {
         private readonly GameArchiveSynchronizer synchronizer;
 
         public ArchiveFixture() {
-            DirectoryPath = Path.Combine(Environment.CurrentDirectory, "Shuttle.Tests", "Api",
-                $".archive-test-work-{Guid.NewGuid():N}");
+            DirectoryPath = Path.Combine(Path.GetTempPath(), $"shuttle-archive-test-{Guid.NewGuid():N}");
             Directory.CreateDirectory(DirectoryPath);
             bare = Path.Combine(DirectoryPath, "remote.git");
             seed = Path.Combine(DirectoryPath, "seed");
