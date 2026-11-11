@@ -252,3 +252,8 @@ when ImageSharp is upgraded to a patched version.
 NuGet Audit and warnings-as-errors remain enabled. The exceptions apply only to
 these advisory URLs in these two projects; other advisories, including new
 ImageSharp advisories, still fail restore.
+
+The unsuppressed [GHSA-v76p-62qx-wwq2](https://github.com/advisories/GHSA-v76p-62qx-wwq2)
+currently blocks full-solution restore and tests. ImageSharp 3.2.0 patches it,
+but requires a Six Labors license for Release builds. Resolve licensing before
+upgrading; the archive credential checkpoint leaves Vision and its exceptions unchanged.

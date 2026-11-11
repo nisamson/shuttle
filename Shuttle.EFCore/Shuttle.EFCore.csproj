@@ -18,6 +18,8 @@
         <!-- Pulled in transitively by the Azure extension; alias it out of the global namespace so its
              Microsoft.Data.SqlClient.SqlAuthenticationMethod shim doesn't collide with the SqlClient type (CS0433). -->
         <PackageReference Include="Microsoft.Data.SqlClient.Extensions.Abstractions" Aliases="SqlClientExtAbstractions" />
+        <!-- SqlClient still pulls vulnerable Pkcs; remove when its dependency is patched. -->
+        <PackageReference Include="System.Security.Cryptography.Pkcs" />
         <PackageReference Include="linq2db.EntityFrameworkCore" />
         <PackageReference Include="OpenTelemetry" />
         <PackageReference Include="OpenTelemetry.Api" />
