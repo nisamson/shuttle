@@ -313,6 +313,19 @@ credential secret containing `testtest`. It may prompt to trust a local
 certificate on first use; trust only the generated development certificate.
 Neither local Git credentials nor the emulator are used in production.
 
+Emulator authentication is scoped to the archive's `SecretClient` through
+`Archive:Emulator:AZURE_*` settings. The AppHost must not inject the emulator's
+credentials or authority as process-wide `AZURE_*` variables into the API:
+Azure SQL's `ActiveDirectoryDefault` would also select those credentials.
+The full-stack API still requires valid developer Azure SQL access; the
+archive-only profile does not. Production continues to use `DefaultAzureCredential`.
+
+If Quartz reports "Database schema validation failed" with an inner
+`ClientSecretCredential` or SQL token-acquisition error, fix authentication
+first. Disabling `quartz.jobStore.performSchemaValidation` only postpones
+the same connection failure; it does not repair authentication or establish
+that the Quartz tables are missing.
+
 The API's archive sync remains disabled by default in local development to avoid an
 unintended full crawl. For a small smoke test, start the
 committed Apache-style fixture with:

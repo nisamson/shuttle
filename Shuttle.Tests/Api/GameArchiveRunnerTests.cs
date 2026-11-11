@@ -171,6 +171,101 @@ public sealed class GameArchiveRunnerTests {
             new ServiceCollection().AddGameArchive(configuration, new TestEnvironment(), runOnce));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ScopedEmulatorRegistrationLeavesProcessAzureCredentialsUnchanged(bool runOnce) {
+        var configuration = EmulatorConfiguration();
+        configuration["Archive:Enabled"] = runOnce ? "false" : "true";
+        var names = new[] { "AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET", "AZURE_AUTHORITY_HOST" };
+        var original = names.Select(Environment.GetEnvironmentVariable).ToArray();
+
+        var services = new ServiceCollection().AddGameArchive(configuration, new TestEnvironment(), runOnce);
+        using var provider = services.BuildServiceProvider();
+        Assert.Equal(new Uri("https://localhost:7443/"), provider.GetRequiredService<SecretClient>().VaultUri);
+        Assert.True(original.SequenceEqual(names.Select(Environment.GetEnvironmentVariable)));
+    }
+
+    [Fact]
+    public void DisabledApiDoesNotActivateEmulatorCredentials() {
+        var services = new ServiceCollection().AddGameArchive(
+            EmulatorConfiguration(), new TestEnvironment { EnvironmentName = Environments.Production });
+        using var provider = services.BuildServiceProvider();
+        Assert.Null(provider.GetService<SecretClient>());
+    }
+
+    [Theory]
+    [InlineData("Production")]
+    [InlineData("Staging")]
+    public void ScopedEmulatorCredentialsAreRejectedOutsideDevelopment(string environment) {
+        Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddGameArchive(
+            EmulatorConfiguration(), new TestEnvironment { EnvironmentName = environment }, runOnce: true));
+    }
+
+    [Theory]
+    [InlineData("http://localhost:7443/")]
+    [InlineData("https://production.vault.azure.net/")]
+    [InlineData("https://user:password@localhost:7443/")]
+    [InlineData("https://localhost:7443/?token=not-a-real-secret")]
+    [InlineData("https://localhost:7443/#fragment")]
+    public void ScopedEmulatorCredentialsRequireLocalHttpsVault(string vault) {
+        var configuration = EmulatorConfiguration();
+        configuration["Archive:VaultUri"] = vault;
+        Assert.Throws<InvalidOperationException>(() =>
+            new ServiceCollection().AddGameArchive(configuration, new TestEnvironment(), runOnce: true));
+    }
+
+    [Theory]
+    [InlineData("http://localhost:7443/")]
+    [InlineData("https://login.microsoftonline.com/")]
+    [InlineData("https://user:password@localhost:7443/")]
+    [InlineData("https://localhost:7443/?token=not-a-real-secret")]
+    [InlineData("https://localhost:7443/#fragment")]
+    [InlineData("not-a-url")]
+    public void ScopedEmulatorCredentialsRejectUnsafeAuthority(string authority) {
+        var configuration = EmulatorConfiguration();
+        configuration["Archive:Emulator:AZURE_AUTHORITY_HOST"] = authority;
+        Assert.Throws<InvalidOperationException>(() =>
+            new ServiceCollection().AddGameArchive(configuration, new TestEnvironment(), runOnce: true));
+    }
+
+    [Theory]
+    [InlineData("AZURE_TENANT_ID", null)]
+    [InlineData("AZURE_CLIENT_ID", null)]
+    [InlineData("AZURE_CLIENT_SECRET", null)]
+    [InlineData("AZURE_AUTHORITY_HOST", null)]
+    [InlineData("AZURE_CLIENT_SECRET", " ")]
+    public void PartialEmulatorCredentialsFailBeforeClientRegistration(string name, string? value) {
+        var configuration = EmulatorConfiguration();
+        configuration[$"Archive:Emulator:{name}"] = value;
+        var services = new ServiceCollection();
+        Assert.Throws<InvalidOperationException>(() =>
+            services.AddGameArchive(configuration, new TestEnvironment(), runOnce: true));
+        Assert.DoesNotContain(services, service => service.ServiceType == typeof(SecretClient));
+    }
+
+    [Theory]
+    [InlineData("Development")]
+    [InlineData("Production")]
+    [InlineData("Staging")]
+    public void RealVaultDoesNotRequireEmulatorCredentials(string environment) {
+        var configuration = Configuration(vault: "https://shuttle-test.vault.azure.net/");
+        var services = new ServiceCollection().AddGameArchive(
+            configuration, new TestEnvironment { EnvironmentName = environment }, runOnce: true);
+        using var provider = services.BuildServiceProvider();
+        Assert.Equal(new Uri("https://shuttle-test.vault.azure.net/"),
+            provider.GetRequiredService<SecretClient>().VaultUri);
+    }
+
+    private static IConfigurationRoot EmulatorConfiguration() {
+        var configuration = Configuration();
+        configuration["Archive:Emulator:AZURE_TENANT_ID"] = "00000000-0000-0000-0000-000000000001";
+        configuration["Archive:Emulator:AZURE_CLIENT_ID"] = "00000000-0000-0000-0000-000000000002";
+        configuration["Archive:Emulator:AZURE_CLIENT_SECRET"] = "test-only-emulator-secret";
+        configuration["Archive:Emulator:AZURE_AUTHORITY_HOST"] = "https://localhost:7443/";
+        return configuration;
+    }
+
     private static IConfigurationRoot Configuration(
         string? remote = "http://localhost:3000/shuttle-bot/shl-games-archive.git",
         string? vault = "https://localhost:7443/",

@@ -8,7 +8,6 @@ using Azure.ResourceManager.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Projects;
-using AzureKeyVaultEmulator.Aspire.Hosting;
 
 if (args.Length == 1 && args[0] == "--bootstrap-gitea") {
     await GiteaBootstrap.RunAsync();
@@ -31,7 +30,7 @@ if (builder.Configuration.GetValue("ArchiveOnly", false)) {
         .WithEnvironment("Archive__SecretName", LocalGameArchiveHosting.SecretName)
         .WithEnvironment("Archive__VaultUri", localVault)
         .WithReference(localVault, connectionName: "archivevault")
-        .WithAzureKeyVaultEmulatorCredentials(localVault)
+        .WithArchiveVaultEmulatorCredentials(localVault)
         .WaitFor(localVault)
         .WaitForCompletion(bootstrap);
     builder.Build().Run();
@@ -133,7 +132,7 @@ if (isFirstRun)
 if (builder.ExecutionContext.IsRunMode) {
     var bootstrap = LocalGameArchiveHosting.Add(builder, archiveVault);
 
-    api.WithAzureKeyVaultEmulatorCredentials(archiveVault)
+    api.WithArchiveVaultEmulatorCredentials(archiveVault)
         .WaitForCompletion(bootstrap);
 }
 
