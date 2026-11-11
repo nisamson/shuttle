@@ -15,6 +15,8 @@ consistent when you change one. `Shuttle.Analysis/README.md` documents the CLI t
 
 - `dotnet restore` — restore. NuGetAudit runs here and **fails restore** on any known
   vulnerable package (audit warnings are errors).
+  Five ImageSharp advisories are temporarily suppressed only in the non-production
+  `Shuttle.Fhm.Vision` and its tests (see its README); other advisories still fail restore.
 - `dotnet build` / `dotnet build --no-restore -c Debug` — build all / after a restore.
 - `dotnet build <Project>/<Project>.csproj` — build one project.
 - `dotnet test` — full suite (`Shuttle.Tests`, xunit.v3 via Microsoft Testing Platform).
@@ -38,6 +40,21 @@ Two shipped apps over shared libraries, orchestrated by an Aspire AppHost.
   through `ISelfRegisteringJob`, and pull from the upstream SHL Index/Portal APIs
   (`Shuttle.Shl.Api.Client`) to keep the DB current. Ships the CrystalQuartz dashboard at
   `/quartz`. Authenticates API requests with JWT bearer (Entra ID, default scheme).
+  A six-hour `GameArchiveJob` (enabled in production, opt-in locally) mirrors public `/games/` files into the
+  separate `shuttle-shl/shl-games-archive` repository using a Key Vault secret;
+  local development uses an emulated vault and persistent Gitea
+  (see `docs/game-archive.md`).
+  Shared archive services live in `Shuttle.GameArchive`. The local
+  `Shuttle.GameArchive.Runner` uses the AppHost's `ArchiveOnly` profile for one
+  real-source sync to persistent Gitea via the vault emulator, without API,
+  SQL, Azure login, or Quartz; Git/vault destinations must be loopback.
+  Non-Apache HTML directories are skipped with warning logs and a committed
+  versioned `manifest.json` combining owned file paths and skipped directories
+  (schema: `docs/game-archive-manifest.schema.json`); their managed files are
+  removed from the current snapshot but remain in history. HTTP/download
+  failures still abort publishing.
+  Only source files ending in `.csv` are archived (case-insensitive matching);
+  previously managed non-CSV files are removed only after a successful sync.
 - **`Shuttle.WebClient`** — standalone Blazor WebAssembly front end using **Fluent UI Blazor**
   and MSAL. No server host; it calls `Shuttle.Api` over HTTP.
 - **`Shuttle.EFCore`** — data layer: `ShlDbContext`, entities, migrations. **Azure SQL** with

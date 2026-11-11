@@ -102,6 +102,18 @@ stripped and the deploy needs no `roleAssignments/write`. Azure incremental depl
 delete resources absent from the template, so the bootstrapped assignments persist. See
 [Known caveats](#known-caveats) for the rationale.
 
+### Archive Key Vault bootstrap
+
+The game-file archiver is enabled by default in the production AppHost. It introduces
+an Aspire-provisioned Azure Key Vault and a Secrets User assignment for the API identity.
+Run the `FIRST_RUN=true` bootstrap again from an identity with role-assignment privileges
+to create that assignment, then insert `shl-games-archive-git-password` with a
+repository-scoped `shuttle-bot` PAT directly into the vault. The regular CI identity
+cannot create this role assignment or populate the secret. Until then, the Quartz job
+fails on credential lookup without crawling or pushing. Set `Archive:Enabled=false`
+explicitly to pause it. See [game archive](game-archive.md) for local development
+and rollout details.
+
 ## GitHub configuration
 
 ### Secrets (repo-level)

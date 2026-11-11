@@ -32,7 +32,9 @@ or a recreate — so scouts can evaluate draftees at a glance.
 **Shipped apps**
 
 - **`Shuttle.Api`** — ASP.NET Core Web API that serves the backend and hosts scheduled
-  background ingestion jobs (Quartz.NET, persistent SQL job store).
+  background ingestion jobs (Quartz.NET, persistent SQL job store). A scheduled job
+  mirrors public game files from `https://simulationhockey.com/games/` into
+  [`shuttle-shl/shl-games-archive`](https://github.com/shuttle-shl/shl-games-archive).
 - **`Shuttle.WebClient`** — Blazor WebAssembly (standalone) front end built with Fluent UI Blazor.
 
 **Shared libraries**
@@ -46,15 +48,36 @@ or a recreate — so scouts can evaluate draftees at a glance.
   domain models and shared calculation utilities.
 - **`Shuttle.ServiceDefaults`** — shared Aspire service defaults (OpenTelemetry, health
   endpoints).
+- **`Shuttle.GameArchive`** — shared crawling, Key Vault credentials, and Git snapshot
+  synchronization for the production job and local runner.
 
 **Orchestration & tests**
 
 - **`Shuttle.Backend.Aspire`** — .NET Aspire AppHost that orchestrates the backend and
   wires it to Azure SQL and Application Insights.
 - **`Shuttle.Tests`** — the test suite (xUnit).
+- **`Shuttle.GameArchive.Runner`** — one-shot local archive executable, launched by the
+  AppHost's `ArchiveOnly` profile without the API or SQL stack.
 
 Authentication throughout uses Entra ID via `Microsoft.Identity.Web`, and observability is
 provided by OpenTelemetry.
+
+### Game-file archive
+
+The game-file archive runs by default in the production AppHost; the ordinary local
+API requires explicit enablement. For an isolated, one-shot sync of the real SHL
+source to local Gitea, with Docker running:
+
+```powershell
+dotnet run --project Shuttle.Backend.Aspire\Shuttle.Backend.Aspire.csproj --launch-profile ArchiveOnly
+```
+
+This profile needs no Azure login or SQL. See
+[`docs/game-archive.md`](docs/game-archive.md) for local Gitea + Key Vault Emulator
+development, production Key Vault setup, and safe activation.
+Non-Apache HTML directories are documented in the archive's
+`manifest.json`'s `skippedDirectories` and excluded from the current snapshot;
+previously archived content remains in Git history.
 
 ## But for where?
 

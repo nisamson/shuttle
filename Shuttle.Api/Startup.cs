@@ -60,6 +60,7 @@ public static class Startup {
             });
             HelloJob.RegisterJob(q);
             DbUpdateJob.RegisterJob(q);
+            GameArchiveJob.RegisterJob(q);
         });
         builder.Services.AddQuartzServer(o => {
                 o.AwaitApplicationStarted = true;

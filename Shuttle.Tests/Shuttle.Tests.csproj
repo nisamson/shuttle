@@ -12,6 +12,10 @@
 
 
   <ItemGroup>
+    <!-- The emulator's current release still references a vulnerable AppHost. -->
+    <PackageReference Include="Aspire.Hosting.AppHost" ExcludeAssets="build;buildTransitive" />
+    <PackageReference Include="Aspire.Hosting.Azure.KeyVault" />
+    <PackageReference Include="AzureKeyVaultEmulator.Aspire.Hosting" />
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="JetBrains.Annotations" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
@@ -26,6 +30,8 @@
     <ProjectReference Include="..\Shuttle.Core\Shuttle.Core.csproj" />
     <ProjectReference Include="..\Shuttle.Math\Shuttle.Math.csproj" />
     <ProjectReference Include="..\Shuttle.Api\Shuttle.Api.csproj" />
+    <ProjectReference Include="..\Shuttle.GameArchive\Shuttle.GameArchive.csproj" />
+    <ProjectReference Include="..\Shuttle.GameArchive.Runner\Shuttle.GameArchive.Runner.csproj" />
     <ProjectReference Include="..\Shuttle.Api.Client\Shuttle.Api.Client.csproj" />
     <ProjectReference Include="..\Shuttle.Analysis\Shuttle.Analysis.csproj" />
     <ProjectReference Include="..\Shuttle.BinarySerde.Common\Shuttle.BinarySerde.Common.csproj" />
@@ -44,7 +50,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Shuttle.Backend.Aspire\LocalGameArchiveHosting.cs" Link="Api\LocalGameArchiveHosting.cs" />
     <EmbeddedResource Include="Serialization\Portal\portalPlayers.json" />
+    <EmbeddedResource Include="..\docs\game-archive-manifest.schema.json" LogicalName="GameArchiveManifestSchema.json" />
   </ItemGroup>
 
 </Project>

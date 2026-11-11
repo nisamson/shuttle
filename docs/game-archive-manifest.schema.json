@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/nisamson/shuttle/main/docs/game-archive-manifest.schema.json",
+  "title": "SHL game archive manifest",
+  "description": "Archive-owned manifest.json. File and skipped-directory arrays are written in ordinal path order. Runtime validation additionally enforces portable path safety, case-insensitive uniqueness, and that no files lie beneath a skipped directory.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "files", "skippedDirectories"],
+  "properties": {
+    "$schema": {
+      "const": "https://raw.githubusercontent.com/nisamson/shuttle/main/docs/game-archive-manifest.schema.json"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "files": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/filePath"
+      },
+      "description": "Managed source-relative file paths only; excludes README.md and manifest.json."
+    },
+    "skippedDirectories": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/skippedDirectory"
+      }
+    }
+  },
+  "$defs": {
+    "filePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*$",
+      "description": "Slash-separated relative file path. Runtime validation rejects reserved names, invalid platform characters, and case collisions."
+    },
+    "directoryPath": {
+      "type": "string",
+      "anyOf": [
+        { "const": "." },
+        {
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*/$"
+        }
+      ],
+      "description": "Source-relative directory path ending in /, or . for the source root."
+    },
+    "skippedDirectory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "url", "title", "reason"],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/directoryPath"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https?://[^/?#@]+/(?:[^?#]*/)?$",
+          "description": "Absolute HTTP(S) source-directory URL without credentials, query, or fragment. Runtime validation requires a trailing slash."
+        },
+        "title": {
+          "type": ["string", "null"]
+        },
+        "reason": {
+          "const": "non-apache-directory-listing"
+        }
+      }
+    }
+  }
+}
