@@ -1,10 +1,13 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-    <EntityFrameworkVersion>10.0.9</EntityFrameworkVersion>
-    <MicrosoftIdentityWebVersion>4.12.0</MicrosoftIdentityWebVersion>
+    <EntityFrameworkVersion>10.0.15</EntityFrameworkVersion>
+    <MicrosoftIdentityWebVersion>4.18.0</MicrosoftIdentityWebVersion>
+    <AspNetCoreAuthenticationVersion>10.0.15</AspNetCoreAuthenticationVersion>
+    <AspireVersion>13.6.5</AspireVersion>
+    <SqlClientExtensionsVersion>7.0.2</SqlClientExtensionsVersion>
     <FluentUIVersion>5.0.0-rc.4-26180.1</FluentUIVersion>
-    <OpenTelemetryVersion>1.15.3</OpenTelemetryVersion>
+    <OpenTelemetryVersion>1.17.0</OpenTelemetryVersion>
     <ScottPlotVersion>5.1.59</ScottPlotVersion>
   </PropertyGroup>
   <ItemGroup>
@@ -12,13 +15,13 @@
     <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.1.0" />
     <PackageVersion Include="Aspire.Hosting.Azure.AppConfiguration" Version="13.1.0" />
     <PackageVersion Include="Aspire.Hosting.Azure.AppContainers" Version="13.1.0" />
-    <PackageVersion Include="Aspire.Hosting.Azure.AppService" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.Azure.Functions" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.Azure.Sql" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Hosting.Azure.AppService" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Hosting.Azure.Functions" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Hosting.Azure.Sql" Version="$(AspireVersion)" />
     <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.1.0" />
-    <PackageVersion Include="Aspire.Microsoft.Data.SqlClient" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Microsoft.Data.SqlClient" Version="$(AspireVersion)" />
     <PackageVersion Include="AngleSharp" Version="1.5.0" />
-    <PackageVersion Include="Azure.Identity" Version="1.18.0" />
+    <PackageVersion Include="Azure.Identity" Version="1.21.0" />
     <PackageVersion Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.4.0" />
     <PackageVersion Include="BinarySerializer" Version="10.1.0" />
     <PackageVersion Include="Blazor.LocalStorage.WebAssembly" Version="9.0.1" />
@@ -28,15 +31,15 @@
     <PackageVersion Include="CrystalQuartz.AspNetCore" Version="7.3.0" />
     <PackageVersion Include="CsvHelper" Version="33.1.0" />
     <PackageVersion Include="dotenv.net" Version="4.0.0" />
-    <PackageVersion Include="EFCore.BulkExtensions" Version="10.0.1" />
+    <PackageVersion Include="EFCore.BulkExtensions.Sqlite" Version="10.0.1" />
     <PackageVersion Include="FlexLabs.EntityFrameworkCore.Upsert" Version="10.0.0-rc1" />
     <PackageVersion Include="JetBrains.Annotations" Version="2025.2.4" />
     <PackageVersion Include="linq2db.EntityFrameworkCore" Version="10.1.0" />
     <PackageVersion Include="Markdig" Version="0.42.0" />
     <PackageVersion Include="Mapster" Version="10.0.12" />
     <PackageVersion Include="Microsoft.ApplicationInsights.WorkerService" Version="2.23.0" />
-    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3" />
-    <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="$(AspNetCoreAuthenticationVersion)" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="$(AspNetCoreAuthenticationVersion)" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.3" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="10.0.3" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.3" />
@@ -51,8 +54,8 @@
     <PackageVersion Include="Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore" Version="2.1.0" />
     <PackageVersion Include="Microsoft.Azure.Functions.Worker.Sdk" Version="2.0.7" />
     <PackageVersion Include="Microsoft.Azure.WebJobs.Extensions" Version="5.2.1" />
-    <PackageVersion Include="Microsoft.Data.SqlClient.Extensions.Azure" Version="1.0.0" />
-    <PackageVersion Include="Microsoft.Data.SqlClient.Extensions.Abstractions" Version="1.0.0" />
+    <PackageVersion Include="Microsoft.Data.SqlClient.Extensions.Azure" Version="$(SqlClientExtensionsVersion)" />
+    <PackageVersion Include="Microsoft.Data.SqlClient.Extensions.Abstractions" Version="$(SqlClientExtensionsVersion)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="$(EntityFrameworkVersion)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Abstractions" Version="$(EntityFrameworkVersion)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="$(EntityFrameworkVersion)" />
@@ -71,7 +74,7 @@
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.3" />
     <PackageVersion Include="Microsoft.Extensions.Http.Polly" Version="10.0.3" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.1.0" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.15" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.1.0" />
     <PackageVersion Include="Microsoft.Identity.Web" Version="$(MicrosoftIdentityWebVersion)" />
     <PackageVersion Include="Microsoft.Identity.Web.UI" Version="$(MicrosoftIdentityWebVersion)" />
@@ -113,13 +116,11 @@
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageVersion Include="Serilog.Sinks.OpenTelemetry" Version="4.2.0" />
     <PackageVersion Include="SixLabors.ImageSharp" Version="3.1.12" />
-    <PackageVersion Include="StreamJsonRpc" Version="2.25.29" />
+    <PackageVersion Include="StreamJsonRpc" Version="2.26.150" />
     <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
-    <!-- EF Core SQLite 10.0.9 resolves vulnerable SQLitePCLRaw.lib.e_sqlite3 2.1.11. -->
-    <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.12-pre20260709125052" />
     <PackageVersion Include="System.Commandline" Version="2.0.2" />
     <PackageVersion Include="System.Linq.Async" Version="7.0.0" />
-    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.10" />
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.15" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
     <PackageVersion Include="xunit.v3" Version="3.0.1" />
     <PackageVersion Include="YoloDotNet" Version="4.2.0" />
