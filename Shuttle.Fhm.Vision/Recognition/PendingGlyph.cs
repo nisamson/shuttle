@@ -1,5 +1,6 @@
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using Shuttle.Fhm.Vision.Capture;
 using Shuttle.Fhm.Vision.Extraction;
 using Shuttle.Fhm.Vision.Layout;
 
@@ -77,7 +78,7 @@ public static class PendingGlyphBuilder {
         }
 
         var result = new List<PendingGlyph>();
-        using var loaded = await SixLabors.ImageSharp.Image.LoadAsync<Rgba32>(image.FullName, cancellationToken);
+        using var loaded = await ImageFileLoader.LoadAsync(image, cancellationToken);
         foreach (var profile in profiles) {
             if (!await extractor.IsPlayerScreenAsync(loaded, profile, cancellationToken)) {
                 continue;

@@ -348,8 +348,8 @@ Example:
 
 ```xml
 <PropertyGroup>
-  <EntityFrameworkVersion>10.0.9</EntityFrameworkVersion>
-  <MicrosoftIdentityWebVersion>4.12.0</MicrosoftIdentityWebVersion>
+  <EntityFrameworkVersion>10.0.15</EntityFrameworkVersion>
+  <MicrosoftIdentityWebVersion>4.18.0</MicrosoftIdentityWebVersion>
   <FluentUIVersion>5.0.0-rc.4-26180.1</FluentUIVersion>
 </PropertyGroup>
 <ItemGroup>

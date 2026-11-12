@@ -500,6 +500,8 @@ $RECYCLE.BIN/
 /Shuttle.Fhm.Vision/inspect/
 
 docs/nocommit
+# Local NuGet configuration
+/NuGet.Config
 # Aspire deploy/publish manifest output
 Shuttle.Backend.Aspire/aspire-output/
 ### Python template
