@@ -242,7 +242,7 @@ public static class VisionCommands {
                 profiles.Add(await LayoutProfileStore.LoadAsync(file, cancellationToken));
             }
 
-            using var image = await SixLabors.ImageSharp.Image.LoadAsync<Rgba32>(imageFile.FullName, cancellationToken);
+            using var image = await ImageFileLoader.LoadAsync(imageFile, cancellationToken);
             var recognizer = await TryLoadRecognizerAsync(parseResult.GetValue(templatesOption), cancellationToken);
             var level = parseResult.GetValue(verboseOption) ? LogLevel.Debug : LogLevel.Information;
             var extractor = new RegionExtractor(
@@ -320,7 +320,7 @@ public static class VisionCommands {
                 return 1;
             }
 
-            using var image = await SixLabors.ImageSharp.Image.LoadAsync<Rgba32>(imageFile.FullName, cancellationToken);
+            using var image = await ImageFileLoader.LoadAsync(imageFile, cancellationToken);
             Console.WriteLine($"Image: {imageFile.FullName} ({image.Width}x{image.Height})");
 
             var outDir = parseResult.GetValue(outOption)
@@ -445,7 +445,7 @@ public static class VisionCommands {
             // guesses reflect everything labelled so far (the dataset is small, so this is cheap).
             var guesser = set.Templates.Count > 0 ? new TemplateDigitRecognizer(set) : null;
 
-            using var image = await SixLabors.ImageSharp.Image.LoadAsync<Rgba32>(imageFile.FullName, cancellationToken);
+            using var image = await ImageFileLoader.LoadAsync(imageFile, cancellationToken);
             Console.WriteLine($"Image: {imageFile.FullName} ({image.Width}x{image.Height})");
             Console.WriteLine(
                 "For each glyph: press Enter to accept the guess (when shown), type a character to label it, "

@@ -232,3 +232,35 @@ The tests cover the platform-agnostic logic (profile serialization, ratio↔pixe
 numeric parsing, content-hash dedup, and end-to-end region extraction with a deterministic fake OCR
 engine). Live capture, the Windows OCR engine, and the WinForms calibrator are thin Windows-specific
 shells around this tested core.
+
+## Accepted ImageSharp security risk
+
+`Shuttle.Fhm.Vision` and `Shuttle.Fhm.Vision.Tests` suppress these
+ImageSharp advisories using project-local `NuGetAuditSuppress` entries:
+
+- [GHSA-gwg2-r3hj-4w44](https://github.com/advisories/GHSA-gwg2-r3hj-4w44)
+- [GHSA-j3p4-wp97-rph4](https://github.com/advisories/GHSA-j3p4-wp97-rph4)
+- [GHSA-j9gm-c75j-xc9q](https://github.com/advisories/GHSA-j9gm-c75j-xc9q)
+- [GHSA-jjfr-hcj7-qf5w](https://github.com/advisories/GHSA-jjfr-hcj7-qf5w)
+- [GHSA-v76p-62qx-wwq2](https://github.com/advisories/GHSA-v76p-62qx-wwq2)
+- [GHSA-wmxv-xphr-5c9g](https://github.com/advisories/GHSA-wmxv-xphr-5c9g)
+
+In particular, [GHSA-v76p-62qx-wwq2](https://github.com/advisories/GHSA-v76p-62qx-wwq2)
+describes an out-of-bounds write in ImageSharp's TIFF decoder when reading a
+crafted tiled, fax-compressed TIFF. It can crash the process and cause memory
+corruption, with potential code-execution impact.
+
+**We are not going to fix these vulnerabilities under the current usage model.**
+This Windows-only tool is used to capture and analyze FHM player screens and
+screenshots from trusted sources only. That is an operational assumption, not a
+general guarantee that every vulnerability is harmless.
+
+The CLI and digit-training image loaders reject classic TIFF and BigTIFF
+signatures before ImageSharp decoding, regardless of filename extension. The
+tool does not encode TIFF; its screenshots and crops are saved as PNG. The
+external-image loader skips encoded metadata and explicitly discards any ICC
+profile retained by the decoder, preventing downstream ICC profile parsing in
+this workflow. These mitigations are not a replacement for upgrading
+ImageSharp: the suppressions do not patch version 3.1.12. Do not process
+untrusted images. NuGet Audit and warnings-as-errors remain enabled, and
+advisories outside this explicit list still fail restore.
